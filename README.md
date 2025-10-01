@@ -33,26 +33,26 @@ A modern, secure book borrowing and lending platform designed specifically for P
 
 ### Installation
 
-1. **Clone the repository**
+1. **Clone and setup**
    ```bash
-   git clone <repository-url>
-   cd "Book exchange"
+   git clone https://github.com/Sedictt/LiBrowse.git
+   cd LiBrowse
+   npm run init
    ```
 
-2. **Install dependencies**
+2. **Configure environment**
    ```bash
-   npm install
+   # Edit .env file with your database credentials
+   nano .env  # or use any text editor
    ```
 
-3. **Set up the database**
-   - Start XAMPP/WAMP and ensure MySQL is running
-   - Import the database schema:
-     ```bash
-     mysql -u root -p < database/schema.sql
-     ```
+3. **Setup database**
+   ```bash
+   npm run db:setup
+   ```
 
-4. **Configure environment variables**
-   - Copy `.env.example` to `.env` (if exists) or update the existing `.env` file
+4. **Environment variables**
+   - The `.env` file will be created from `.env.example` during init
    - Update the following variables:
      ```env
      # Database Configuration
@@ -80,7 +80,7 @@ A modern, secure book borrowing and lending platform designed specifically for P
    - Generate an App Password for the application
    - Use the App Password in the `EMAIL_PASSWORD` field
 
-6. **Run the application**
+5. **Start the server**
    ```bash
    # Development mode with auto-restart
    npm run dev
@@ -89,6 +89,14 @@ A modern, secure book borrowing and lending platform designed specifically for P
    npm start
    ```
 
+## 📋 Available Scripts
+
+- `npm run init` - Initial setup (creates .env, installs dependencies)
+- `npm start` - Start the production server
+- `npm run dev` - Start development server with auto-reload
+- `npm run db:setup` - Initialize database schema
+- `npm run setup` - Database setup script
+
 7. **Access the application**
    - Open your browser and go to `http://localhost:3000`
    - The application will be ready to use!
@@ -96,35 +104,32 @@ A modern, secure book borrowing and lending platform designed specifically for P
 ## 📁 Project Structure
 
 ```
-Book exchange/
+LiBrowse/
 ├── config/
-│   └── database.js          # Database configuration
+│   └── database.js          # Database connection configuration
 ├── database/
-│   └── schema.sql           # Database schema and sample data
+│   └── schema.sql           # Database schema and tables
 ├── middleware/
-│   └── auth.js              # Authentication middleware
+│   ├── auth.js              # Authentication middleware
+│   └── captcha.js           # Security middleware
 ├── public/
-│   ├── css/
-│   │   └── style.css        # Modern dark theme styles
-│   ├── js/
-│   │   ├── main.js          # Main application logic
-│   │   ├── api.js           # API client utilities
-│   │   ├── auth.js          # Authentication handling
-│   │   └── books.js         # Book management
-│   └── index.html           # Main application page
+│   ├── css/style.css        # Frontend styling
+│   ├── js/main.js           # Frontend JavaScript
+│   └── index.html           # Main HTML page
 ├── routes/
-│   ├── auth.js              # Authentication routes
-│   ├── books.js             # Book management routes
-│   ├── users.js             # User profile routes
-│   ├── transactions.js      # Transaction management
-│   ├── feedback.js          # Feedback system
-│   ├── notifications.js     # Notification system
-│   └── stats.js             # Platform statistics
-├── uploads/                 # File uploads (books, profiles)
-├── .env                     # Environment variables
+│   ├── auth.js              # Authentication endpoints
+│   ├── users.js             # User management
+│   ├── books.js             # Book catalog management
+│   ├── transactions.js      # Borrowing/lending logic
+│   └── feedback.js          # User feedback system
+├── scripts/
+│   ├── setup.js             # Database initialization
+│   └── start.js             # Guided setup script
+├── uploads/                 # File upload directory
+├── server.js                # Main Express server
 ├── package.json             # Dependencies and scripts
-├── server.js                # Main server file
-└── README.md                # This file
+├── .env.example             # Environment variables template
+└── .gitignore              # Git ignore rules
 ```
 
 ## 🎨 Design System
