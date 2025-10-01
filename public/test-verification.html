@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Document Verification Test - Booqy</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/verification.css">
+    <!-- Use local Font Awesome or remove if not needed -->
+    <style>
+        /* Fallback icons without Font Awesome */
+        .fa-upload:before { content: "📤"; }
+        .fa-check-circle:before { content: "✅"; }
+        .fa-exclamation-circle:before { content: "❌"; }
+        .fa-info-circle:before { content: "ℹ️"; }
+        .fa-spinner:before { content: "⏳"; }
+        .fa-book:before { content: "📚"; }
+        .fa-user:before { content: "👤"; }
+        .fa-times:before { content: "✖️"; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <a href="dashboard.html" class="brand-link">
+                    <div class="logo">
+                        <i class="fas fa-book"></i>
+                        <span>Booqy</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="verification-container">
+                <div class="verification-header">
+                    <h1>Document Verification</h1>
+                    <p>Upload your student ID for account verification using OCR technology</p>
+                </div>
+
+                <!-- Verification Status -->
+                <div class="verification-status">
+                    <div class="status-card warning">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span>Verification Required</span>
+                    </div>
+                </div>
+
+                <!-- Instructions -->
+                <div class="instructions-section">
+                    <h2>Before You Start</h2>
+                    <div class="instructions-grid">
+                        <div class="instruction-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Ensure your student ID is clearly visible and well-lit</span>
+                        </div>
+                        <div class="instruction-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Upload high-quality images (JPG, PNG) or PDF documents</span>
+                        </div>
+                        <div class="instruction-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Maximum file size: 5MB per image</span>
+                        </div>
+                        <div class="instruction-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Front side of ID is required, back side is optional</span>
+                        </div>
+                        <div class="instruction-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Our OCR system will automatically extract and verify your information</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upload Section -->
+                <div class="upload-section">
+                    <h2>Upload Documents</h2>
+                    
+                    <!-- Front ID Upload -->
+                    <div class="upload-group">
+                        <label class="upload-label">
+                            <span class="required">Front Side of Student ID *</span>
+                        </label>
+                        <div class="upload-area" id="frontUploadArea">
+                            <div class="upload-content">
+                                <i class="fas fa-upload"></i>
+                                <h3>Drop your front ID here</h3>
+                                <p>or <span class="upload-link">browse files</span></p>
+                                <small>JPG, PNG, PDF up to 5MB</small>
+                            </div>
+                            <input type="file" id="frontIdInput" accept=".jpg,.jpeg,.png,.pdf" hidden>
+                        </div>
+                        <div class="file-preview" id="frontPreview"></div>
+                    </div>
+
+                    <!-- Back ID Upload -->
+                    <div class="upload-group">
+                        <label class="upload-label">
+                            <span>Back Side of Student ID (Optional)</span>
+                        </label>
+                        <div class="upload-area" id="backUploadArea">
+                            <div class="upload-content">
+                                <i class="fas fa-upload"></i>
+                                <h3>Drop your back ID here</h3>
+                                <p>or <span class="upload-link">browse files</span></p>
+                                <small>JPG, PNG, PDF up to 5MB</small>
+                            </div>
+                            <input type="file" id="backIdInput" accept=".jpg,.jpeg,.png,.pdf" hidden>
+                        </div>
+                        <div class="file-preview" id="backPreview"></div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="submit-section">
+                        <button type="button" class="btn btn-primary btn-large" id="submitVerification" disabled>
+                            <i class="fas fa-check-circle"></i>
+                            Submit for Verification
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Progress Section -->
+                <div class="progress-section" id="progressSection" style="display: none;">
+                    <h3>Processing Your Documents</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">Initializing...</div>
+                </div>
+
+                <!-- Results Section -->
+                <div class="results-section" id="resultsSection" style="display: none;">
+                    <h3>Verification Results</h3>
+                    <div class="results-content" id="resultsContent">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    
+    <script>
+        // Simple verification manager without authentication dependencies
+        class SimpleVerificationManager {
+            constructor() {
+                this.frontFile = null;
+                this.backFile = null;
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                // Front ID upload
+                const frontArea = document.getElementById('frontUploadArea');
+                const frontInput = document.getElementById('frontIdInput');
+                
+                frontArea.addEventListener('click', () => frontInput.click());
+                frontArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    frontArea.classList.add('drag-over');
+                });
+                frontArea.addEventListener('dragleave', () => {
+                    frontArea.classList.remove('drag-over');
+                });
+                frontArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    frontArea.classList.remove('drag-over');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        this.handleFrontFile(files[0]);
+                    }
+                });
+                frontInput.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        this.handleFrontFile(e.target.files[0]);
+                    }
+                });
+
+                // Back ID upload
+                const backArea = document.getElementById('backUploadArea');
+                const backInput = document.getElementById('backIdInput');
+                
+                backArea.addEventListener('click', () => backInput.click());
+                backArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    backArea.classList.add('drag-over');
+                });
+                backArea.addEventListener('dragleave', () => {
+                    backArea.classList.remove('drag-over');
+                });
+                backArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    backArea.classList.remove('drag-over');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        this.handleBackFile(files[0]);
+                    }
+                });
+                backInput.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        this.handleBackFile(e.target.files[0]);
+                    }
+                });
+
+                // Submit button
+                document.getElementById('submitVerification').addEventListener('click', () => {
+                    this.submitVerification();
+                });
+            }
+
+            handleFrontFile(file) {
+                if (this.validateFile(file)) {
+                    this.frontFile = file;
+                    this.showFilePreview('frontPreview', file);
+                    this.updateSubmitButton();
+                }
+            }
+
+            handleBackFile(file) {
+                if (this.validateFile(file)) {
+                    this.backFile = file;
+                    this.showFilePreview('backPreview', file);
+                }
+            }
+
+            validateFile(file) {
+                const maxSize = 5 * 1024 * 1024; // 5MB
+                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+
+                if (file.size > maxSize) {
+                    showToast('File size must be less than 5MB', 'error');
+                    return false;
+                }
+
+                if (!allowedTypes.includes(file.type)) {
+                    showToast('Only JPG, PNG, and PDF files are allowed', 'error');
+                    return false;
+                }
+
+                return true;
+            }
+
+            showFilePreview(previewId, file) {
+                const preview = document.getElementById(previewId);
+                preview.innerHTML = `
+                    <div class="file-info">
+                        <i class="fas fa-check-circle"></i>
+                        <span>${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                    </div>
+                `;
+                preview.style.display = 'block';
+            }
+
+            updateSubmitButton() {
+                const submitBtn = document.getElementById('submitVerification');
+                submitBtn.disabled = !this.frontFile;
+            }
+
+            async submitVerification() {
+                if (!this.frontFile) {
+                    showToast('Please upload the front side of your student ID', 'error');
+                    return;
+                }
+
+                try {
+                    this.showProgress();
+                    
+                    const formData = new FormData();
+                    formData.append('frontId', this.frontFile);
+                    if (this.backFile) {
+                        formData.append('backId', this.backFile);
+                    }
+
+                    // Simulate user info for testing
+                    formData.append('userInfo', JSON.stringify({
+                        student_id: '2021-12345',
+                        full_name: 'Test Student',
+                        email: 'test@plv.edu.ph'
+                    }));
+
+                    const response = await fetch('/api/verification/upload-documents-test', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.showResults(result);
+                        showToast('Document verification completed!', 'success');
+                    } else {
+                        throw new Error(result.message || 'Verification failed');
+                    }
+
+                } catch (error) {
+                    console.error('Verification error:', error);
+                    showToast('Verification failed: ' + error.message, 'error');
+                    this.hideProgress();
+                }
+            }
+
+            showProgress() {
+                document.getElementById('progressSection').style.display = 'block';
+                document.getElementById('submitVerification').disabled = true;
+                
+                // Simulate progress
+                let progress = 0;
+                const progressFill = document.getElementById('progressFill');
+                const progressText = document.getElementById('progressText');
+                
+                const interval = setInterval(() => {
+                    progress += Math.random() * 20;
+                    if (progress > 90) progress = 90;
+                    
+                    progressFill.style.width = progress + '%';
+                    
+                    if (progress < 30) {
+                        progressText.textContent = 'Uploading documents...';
+                    } else if (progress < 60) {
+                        progressText.textContent = 'Processing with OCR...';
+                    } else {
+                        progressText.textContent = 'Analyzing results...';
+                    }
+                }, 500);
+
+                // Store interval for cleanup
+                this.progressInterval = interval;
+            }
+
+            hideProgress() {
+                if (this.progressInterval) {
+                    clearInterval(this.progressInterval);
+                }
+                document.getElementById('progressSection').style.display = 'none';
+                document.getElementById('submitVerification').disabled = false;
+            }
+
+            showResults(result) {
+                this.hideProgress();
+                
+                const resultsSection = document.getElementById('resultsSection');
+                const resultsContent = document.getElementById('resultsContent');
+                
+                resultsContent.innerHTML = `
+                    <div class="result-card ${result.autoApproved ? 'success' : 'warning'}">
+                        <div class="result-header">
+                            <i class="fas ${result.autoApproved ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+                            <h4>${result.autoApproved ? 'Verification Approved' : 'Manual Review Required'}</h4>
+                        </div>
+                        <div class="result-details">
+                            <p><strong>Confidence Score:</strong> ${result.combinedConfidence}%</p>
+                            <p><strong>Status:</strong> ${result.autoApproved ? 'Automatically Approved' : 'Pending Admin Review'}</p>
+                            ${result.extractedText ? `<p><strong>Extracted Text:</strong> ${result.extractedText.substring(0, 200)}...</p>` : ''}
+                        </div>
+                    </div>
+                `;
+                
+                resultsSection.style.display = 'block';
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new SimpleVerificationManager();
+        });
+    </script>
+</body>
+</html>

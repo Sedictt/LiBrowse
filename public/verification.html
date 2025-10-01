@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Verification - Booqy</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/verification.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <a href="dashboard.html" class="brand-link">
+                    <div class="logo">
+                        <i class="fas fa-book"></i>
+                        <span>Booqy</span>
+                    </div>
+                </a>
+            </div>
+            <div class="nav-menu">
+                <a href="dashboard.html" class="nav-link">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="profile.html" class="nav-link">
+                    <i class="fas fa-user"></i> Profile
+                </a>
+                <a href="#" class="nav-link" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Page Header -->
+            <div class="page-header">
+                <h1><i class="fas fa-id-card"></i> Document Verification</h1>
+                <p class="subtitle">Upload your student ID for account verification using OCR technology</p>
+            </div>
+
+            <!-- Verification Status -->
+            <div id="verificationStatusContainer" class="verification-status-container">
+                <!-- Status will be loaded dynamically -->
+            </div>
+
+            <!-- Verification Container -->
+            <div id="verificationContainer" class="verification-container">
+                <!-- Instructions -->
+                <div class="verification-instructions">
+                    <div class="instruction-card">
+                        <div class="instruction-icon">
+                            <i class="fas fa-info-circle"></i>
+                        </div>
+                        <div class="instruction-content">
+                            <h3>Before You Start</h3>
+                            <ul>
+                                <li>Ensure your student ID is clearly visible and well-lit</li>
+                                <li>Upload high-quality images (JPG, PNG) or PDF documents</li>
+                                <li>Maximum file size: 5MB per image</li>
+                                <li>Front side of ID is required, back side is optional</li>
+                                <li>Our OCR system will automatically extract and verify your information</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Document Upload Form -->
+                <form id="documentUploadForm" class="document-upload-form">
+                    <div class="upload-section">
+                        <h3><i class="fas fa-upload"></i> Upload Student ID Documents</h3>
+                        
+                        <!-- Front ID Upload -->
+                        <div class="file-upload-group">
+                            <label for="frontIdFile" class="file-upload-label">
+                                <div class="upload-area" id="frontIdUploadArea">
+                                    <div class="upload-icon">
+                                        <i class="fas fa-id-card"></i>
+                                    </div>
+                                    <div class="upload-text">
+                                        <strong>Front Side of Student ID</strong>
+                                        <span>Click to select or drag and drop</span>
+                                        <small>JPG, PNG, PDF (Max 5MB)</small>
+                                    </div>
+                                </div>
+                                <input type="file" id="frontIdFile" name="frontId" accept=".jpg,.jpeg,.png,.pdf" required>
+                            </label>
+                            <div id="frontIdError" class="file-error" style="display: none;"></div>
+                            <div id="frontIdPreview" class="file-preview-container"></div>
+                        </div>
+
+                        <!-- Back ID Upload -->
+                        <div class="file-upload-group">
+                            <label for="backIdFile" class="file-upload-label">
+                                <div class="upload-area" id="backIdUploadArea">
+                                    <div class="upload-icon">
+                                        <i class="fas fa-id-card"></i>
+                                    </div>
+                                    <div class="upload-text">
+                                        <strong>Back Side of Student ID</strong>
+                                        <span>Optional - Click to select or drag and drop</span>
+                                        <small>JPG, PNG, PDF (Max 5MB)</small>
+                                    </div>
+                                </div>
+                                <input type="file" id="backIdFile" name="backId" accept=".jpg,.jpeg,.png,.pdf">
+                            <div id="backIdError" class="file-error" style="display: none;"></div>
+                            <div id="backIdPreview" class="file-preview-container"></div>
+                        </div>
+                    </div>
+
+                    <!-- Upload Progress -->
+                    <div class="upload-progress" id="uploadProgress" style="display: none;">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar">
+                                <div id="uploadProgressBar" class="progress-fill"></div>
+                            </div>
+                            <div class="progress-text" id="uploadProgressText">Uploading...</div>
+                        </div>
+                    </div>
+
+                    <!-- Debug Toggle -->
+                    <div class="debug-toggle" style="margin: 15px 0; text-align: center;">
+                        <label style="display: inline-flex; align-items: center; cursor: pointer; color: #666; font-size: 0.9rem;">
+                            <input type="checkbox" id="debugMode" style="margin-right: 8px;">
+                            <span>🔬 Show OCR Debug Info</span>
+                        </label>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="form-actions">
+                        <button type="submit" id="uploadDocumentsBtn" class="btn btn-primary btn-large" disabled>
+                            <i class="fas fa-upload"></i>
+                            Upload Documents for Verification
+                        </button>
+                    </div>
+
+                    <!-- Debug Output -->
+                    <div class="debug-output" id="debugOutput" style="display: none; margin-top: 20px; padding: 15px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333;">
+                        <h4 style="color: #667eea; margin-bottom: 10px; font-size: 1.1rem;">🔍 OCR Processing Details</h4>
+                        <div class="debug-log" id="debugLog" style="font-family: 'Consolas', monospace; font-size: 0.85rem; color: #90EE90; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; background: #0d1117; padding: 10px; border-radius: 4px;"></div>
+                    </div>
+                </form>
+
+                <!-- OCR Information -->
+                <div class="ocr-info-section">
+                    <div class="info-card">
+                        <div class="info-header">
+                            <i class="fas fa-robot"></i>
+                            <h4>How OCR Verification Works</h4>
+                        </div>
+                        <div class="info-content">
+                            <div class="info-steps">
+                                <div class="step">
+                                    <div class="step-number">1</div>
+                                    <div class="step-content">
+                                        <strong>Image Processing</strong>
+                                        <p>Your uploaded documents are enhanced for optimal text recognition</p>
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-number">2</div>
+                                    <div class="step-content">
+                                        <strong>Text Extraction</strong>
+                                        <p>Advanced OCR technology extracts text from your student ID</p>
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-number">3</div>
+                                    <div class="step-content">
+                                        <strong>Data Validation</strong>
+                                        <p>Extracted information is compared with your registration details</p>
+                                    </div>
+                                </div>
+                                <div class="step">
+                                    <div class="step-number">4</div>
+                                    <div class="step-content">
+                                        <strong>Verification Decision</strong>
+                                        <p>High-confidence matches are auto-approved, others go to admin review</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Verification History -->
+                <div class="verification-actions">
+                    <button type="button" id="viewHistoryBtn" class="btn btn-outline-secondary">
+                        <i class="fas fa-history"></i>
+                        View Verification History
+                    </button>
+                    <button type="button" id="retryVerificationBtn" class="btn btn-outline-primary" style="display: none;">
+                        <i class="fas fa-redo"></i>
+                        Retry Verification
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Booqy</h4>
+                    <p>Smart Academic Book Exchange Platform</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Support</h4>
+                    <a href="#" class="footer-link">Help Center</a>
+                    <a href="#" class="footer-link">Contact Us</a>
+                </div>
+                <div class="footer-section">
+                    <h4>Security</h4>
+                    <p><i class="fas fa-shield-alt"></i> Your documents are processed securely and deleted after verification</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Booqy - PLV Book Exchange Platform. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Modal Container -->
+    <div id="modalContainer" class="modal-container"></div>
+
+    <!-- Scripts -->
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/verification.js"></script>
+    
+    <script>
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Allow access to verification page for testing
+            // In production, uncomment the authentication check below
+            /*
+            if (!isAuthenticated()) {
+                window.location.href = 'index.html';
+                return;
+            }
+            */
+        });
+
+        // Drag and drop functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            const uploadAreas = document.querySelectorAll('.upload-area');
+            
+            uploadAreas.forEach(area => {
+                area.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    area.classList.add('drag-over');
+                });
+
+                area.addEventListener('dragleave', () => {
+                    area.classList.remove('drag-over');
+                });
+
+                area.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    area.classList.remove('drag-over');
+                    
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        const fileInput = area.parentElement.querySelector('input[type="file"]');
+                        fileInput.files = files;
+                        fileInput.dispatchEvent(new Event('change'));
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
