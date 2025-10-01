@@ -1,4 +1,4 @@
-# PLV BookSwap - Peer-to-Peer Book Exchange Platform
+# LiBrowse - Peer-to-Peer Book Lending Platform
 
 A modern, secure book borrowing and lending platform designed specifically for Pamantasan ng Lungsod ng Valenzuela (PLV) students. Built with Node.js, Express.js, and MySQL.
 
