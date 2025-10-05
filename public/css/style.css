@@ -1818,21 +1818,21 @@ body {
 }
 
 /* Modals */
+/* =========================
+   MODALS
+========================= */
 .modal {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(5px);
+    inset: 0; /* shorthand for top, right, bottom, left */
     display: flex;
     align-items: center;
     justify-content: center;
+    background-color: rgba(15, 15, 15, 0.75);
+    backdrop-filter: blur(6px);
     opacity: 0;
     visibility: hidden;
-    z-index: 10002;
-    transition: var(--transition-smooth);
+    z-index: 1000;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 .modal.active {
@@ -1841,66 +1841,73 @@ body {
 }
 
 .modal-content {
-    background: var(--bg-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: var(--bg-secondary);
     border-radius: var(--radius-lg);
-    max-width: 500px;
-    width: 90%;
+    width: min(95%, 500px);
     max-height: 90vh;
     overflow-y: auto;
-    transform: scale(0.9);
-    transition: var(--transition-smooth);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    transform: translateY(20px) scale(0.96);
+    transition: transform 0.3s ease;
 }
 
 .modal.active .modal-content {
-    transform: scale(1);
+    transform: translateY(0) scale(1);
 }
 
 .modal-large {
-    max-width: 800px;
+    width: min(95%, 800px);
 }
 
+/* =========================
+   MODAL HEADER
+========================= */
 .modal-header {
-    padding: var(--spacing-lg);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .modal-header h3 {
-    font-size: 1.25rem;
+    font-size: 1.3rem;
     font-weight: 600;
+    margin: 0;
 }
 
 .modal-close {
     background: none;
     border: none;
+    font-size: 1.2rem;
     color: var(--text-secondary);
-    font-size: 1.25rem;
     cursor: pointer;
-    padding: var(--spacing-xs);
     border-radius: var(--radius-sm);
-    transition: var(--transition-fast);
+    padding: var(--spacing-xs);
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .modal-close:hover {
-    background: var(--bg-glass);
+    background-color: var(--bg-glass);
     color: var(--text-primary);
 }
 
+/* =========================
+   MODAL BODY & FOOTER
+========================= */
 .modal-body {
     padding: var(--spacing-lg);
 }
 
 .modal-footer {
-    padding: var(--spacing-lg);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
     text-align: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .modal-footer a {
-    color: #667eea;
+    color: var(--primary);
+    font-weight: 500;
     text-decoration: none;
 }
 
@@ -1908,22 +1915,18 @@ body {
     text-decoration: underline;
 }
 
-/* Forms */
+/* =========================
+   FORM ELEMENTS
+========================= */
 .form-group {
     margin-bottom: var(--spacing-lg);
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-md);
 }
 
 .form-group label {
     display: block;
     margin-bottom: var(--spacing-xs);
-    font-weight: 500;
     color: var(--text-primary);
+    font-weight: 500;
 }
 
 .form-group input,
@@ -1931,108 +1934,34 @@ body {
 .form-group textarea {
     width: 100%;
     padding: var(--spacing-md);
-    background: var(--bg-glass);
-    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background-color: var(--bg-glass);
     color: var(--text-primary);
-    font-size: 0.9rem;
-    transition: var(--transition-fast);
+    font-size: 0.95rem;
+    transition: border 0.2s ease, box-shadow 0.2s ease;
 }
 
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25);
 }
 
 .form-group input::placeholder {
     color: var(--text-muted);
 }
 
-.form-help {
-    display: block;
-    margin-top: var(--spacing-xs);
-    font-size: 0.875rem;
-    color: var(--text-muted);
-}
-
-/* Password Requirements */
-.password-requirements {
-    margin-top: var(--spacing-sm);
-    padding: var(--spacing-md);
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: var(--radius-sm);
-    font-size: 0.875rem;
-}
-
-.requirements-header {
-    font-weight: 500;
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-sm);
-}
-
-.requirement {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-xs);
-    color: var(--text-muted);
-    transition: var(--transition-fast);
-}
-
-.requirement:last-child {
-    margin-bottom: 0;
-}
-
-.requirement i {
-    font-size: 0.5rem;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--text-muted);
-}
-
-.requirement.valid {
-    color: var(--success);
-}
-
-.requirement.valid i {
-    background: var(--success);
-}
-
-.requirement.invalid {
-    color: var(--error);
-}
-
-.requirement.invalid i {
-    background: var(--error);
-}
-
-/* Password Match Indicator */
-.password-match {
-    margin-top: var(--spacing-xs);
-    font-size: 0.875rem;
-    font-weight: 500;
-    transition: var(--transition-fast);
-}
-
-.password-match.match {
-    color: var(--success);
-}
-
-.password-match.no-match {
-    color: var(--error);
-}
-
-/* Verification Options */
+/* =========================
+   VERIFICATION OPTIONS
+========================= */
 .verification-options {
     display: grid;
-    grid-template-columns: 1fr 1fr;
     gap: var(--spacing-lg);
-    margin: var(--spacing-lg) 0;
+    margin-top: var(--spacing-lg);
+    grid-template-columns: 1fr 1fr;
 }
 
 @media (max-width: 768px) {
@@ -2042,24 +1971,24 @@ body {
 }
 
 .verification-option {
-    background: var(--bg-glass);
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    border-radius: var(--radius-lg);
     padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    background-color: var(--bg-glass);
     text-align: center;
-    transition: var(--transition-smooth);
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     position: relative;
     overflow: hidden;
 }
 
 .verification-option:hover {
-    border-color: rgba(102, 126, 234, 0.5);
-    transform: translateY(-2px);
+    border-color: var(--primary);
+    transform: translateY(-3px);
     box-shadow: var(--shadow-lg);
 }
 
 .verification-option::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
@@ -2067,7 +1996,7 @@ body {
     height: 4px;
     background: var(--primary-gradient);
     opacity: 0;
-    transition: var(--transition-smooth);
+    transition: opacity 0.25s ease;
 }
 
 .verification-option:hover::before {
@@ -2075,44 +2004,44 @@ body {
 }
 
 .option-icon {
-    font-size: 3rem;
+    font-size: 2.5rem;
+    margin-bottom: var(--spacing-md);
     background: var(--primary-gradient);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: var(--spacing-md);
 }
 
 .option-content h4 {
+    margin-bottom: var(--spacing-xs);
     color: var(--text-primary);
-    margin-bottom: var(--spacing-sm);
-    font-size: 1.25rem;
+    font-size: 1.2rem;
 }
 
 .option-content p {
-    color: var(--text-secondary);
     margin-bottom: var(--spacing-md);
+    color: var(--text-secondary);
     font-size: 0.9rem;
 }
 
 .option-features {
     list-style: none;
-    margin-bottom: var(--spacing-lg);
     text-align: left;
+    margin-bottom: var(--spacing-lg);
 }
 
 .option-features li {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
+    font-size: 0.9rem;
     margin-bottom: var(--spacing-xs);
-    font-size: 0.875rem;
     color: var(--text-secondary);
 }
 
 .option-features i {
     color: var(--success);
-    font-size: 0.75rem;
+    font-size: 0.8rem;
 }
 
 /* Document Demo Notice */

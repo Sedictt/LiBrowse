@@ -1,44 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LiBrowse - Smart Academic Book Exchange for PLV</title>
-    <meta name="description" content="LiBrowse - The smart way for PLV students to lend and borrow academic books. Build your academic network through book sharing.">
-    <meta name="keywords" content="LiBrowse, PLV, book exchange, student books, academic books, university, lending, book sharing">
+    <meta name="description"
+        content="LiBrowse - The smart way for PLV students to lend and borrow academic books. Build your academic network through book sharing.">
+    <meta name="keywords"
+        content="LiBrowse, PLV, book exchange, student books, academic books, university, lending, book sharing">
     <meta name="author" content="LiBrowse Team">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="./css/style.css?v=2.3">
     <link rel="stylesheet" href="./css/new-landing.css?v=1.0">
     <style>
         /* Fallback styles to ensure basic functionality */
-        body { 
-            font-family: 'Inter', sans-serif; 
-            margin: 0; 
-            background: #0f0f23; 
-            color: white; 
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            background: #0f0f23;
+            color: white;
         }
-        .loading-screen { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: #0f0f23; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            z-index: 9999; 
+
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f0f23;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
         }
-        .navbar { 
-            background: rgba(26, 29, 41, 0.95); 
-            backdrop-filter: blur(20px); 
-            position: fixed; 
-            top: 0; 
-            width: 100%; 
-            z-index: 1000; 
+
+        .navbar {
+            background: rgba(26, 29, 41, 0.95);
+            backdrop-filter: blur(20px);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
         }
+
         .nav-container {
             max-width: 1200px;
             margin: 0 auto;
@@ -48,11 +55,13 @@
             justify-content: space-between;
             height: 70px;
         }
+
         .nav-menu {
             display: flex;
             align-items: center;
             gap: 1.5rem;
         }
+
         .nav-auth {
             display: flex;
             align-items: center;
@@ -60,6 +69,7 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Loading Screen -->
     <div id="loading-screen" class="loading-screen">
@@ -182,7 +192,7 @@
                             <span class="gradient-text-new">Shared Smarter</span>
                         </h1>
                         <p class="hero-subtitle">
-                            Connect with fellow PLV students to borrow and lend textbooks. 
+                            Connect with fellow PLV students to borrow and lend textbooks.
                             Save money, build connections, and make learning more accessible.
                         </p>
                         <div class="hero-buttons">
@@ -242,7 +252,8 @@
                 <div class="container">
                     <div class="section-header-new">
                         <h2 class="section-title-new">Why Choose LiBrowse?</h2>
-                        <p class="section-subtitle-new">Everything you need to share and borrow books with confidence</p>
+                        <p class="section-subtitle-new">Everything you need to share and borrow books with confidence
+                        </p>
                     </div>
                     <div class="features-grid">
                         <div class="feature-card">
@@ -251,7 +262,8 @@
                             </div>
                             <h3 class="feature-title">Safe & Secure</h3>
                             <p class="feature-description">
-                                Only verified PLV students can join. Your books are protected with our trust-based credit system.
+                                Only verified PLV students can join. Your books are protected with our trust-based
+                                credit system.
                             </p>
                         </div>
                         <div class="feature-card">
@@ -260,7 +272,8 @@
                             </div>
                             <h3 class="feature-title">Smart Search</h3>
                             <p class="feature-description">
-                                Find exactly what you need by course code, subject, program, or book condition in seconds.
+                                Find exactly what you need by course code, subject, program, or book condition in
+                                seconds.
                             </p>
                         </div>
                         <div class="feature-card">
@@ -357,7 +370,8 @@
                     <div class="cta-content">
                         <h2 class="cta-title">Ready to Start Sharing?</h2>
                         <p class="cta-description">
-                            Join hundreds of PLV students who are already saving money and building connections through book sharing.
+                            Join hundreds of PLV students who are already saving money and building connections through
+                            book sharing.
                         </p>
                         <button class="btn-new btn-cta" id="cta-register-btn">
                             <span>Create Free Account</span>
@@ -565,7 +579,7 @@
                                     <p id="profile-program" class="profile-program">Loading...</p>
                                 </div>
                             </div>
-                            
+
                             <div class="profile-credits">
                                 <div class="credits-header">
                                     <i class="fas fa-coins"></i>
@@ -650,47 +664,58 @@
 
     <!-- Modals -->
     <!-- Login Modal -->
-    <div class="modal" id="login-modal">
+    <div id="login-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Login to LiBrose</h3>
+                <h3>Login to LiBrowse</h3>
                 <button class="modal-close" data-modal="login-modal">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
+
             <div class="modal-body">
                 <form id="login-form">
+                    <!-- Email -->
                     <div class="form-group">
                         <label for="login-email">PLV Email</label>
                         <input type="email" id="login-email" name="email" placeholder="your.email@plv.edu.ph" required>
                     </div>
+
+                    <!-- Password -->
                     <div class="form-group">
                         <label for="login-password">Password</label>
-                        <input type="password" id="login-password" name="password" placeholder="Enter your password" required>
+                        <input type="password" id="login-password" name="password" placeholder="Enter your password"
+                            required>
                     </div>
-                    
-                    <!-- CAPTCHA for Login -->
-                    <div class="form-group captcha-container" id="login-captcha-container">
-                        <div class="g-recaptcha" id="login-recaptcha" data-sitekey=""></div>
-                        <div class="captcha-fallback" id="login-captcha-fallback" style="display: none;">
-                            <p><i class="fas fa-shield-alt"></i> CAPTCHA verification disabled in development mode</p>
+
+                    <!-- Captcha -->
+                    <div id="login-captcha-container" class="form-group captcha-container">
+                        <div id="login-recaptcha" class="g-recaptcha" data-sitekey=""></div>
+                        <div id="login-captcha-fallback" class="captcha-fallback" style="display:none;">
+                            <p>
+                                <i class="fas fa-shield-alt"></i> CAPTCHA verification disabled in development mode
+                            </p>
                         </div>
                     </div>
-                    
+
+                    <!-- Submit -->
                     <button type="submit" class="btn btn-primary btn-full">
-                        <i class="fas fa-sign-in-alt"></i>
-                        Login
+                        <i class="fas fa-sign-in-alt"></i> Login
                     </button>
                 </form>
+
                 <div class="modal-footer">
-                    <p>Don't have an account? <a href="#" id="switch-to-register">Register here</a></p>
+                    <p>Don’t have an account?
+                        <a href="#" id="switch-to-register">Register here</a>
+                    </p>
                 </div>
             </div>
         </div>
     </div>
 
+
     <!-- Register Modal -->
-    <div class="modal" id="register-modal">
+    <div id="register-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Join LiBrowse</h3>
@@ -698,8 +723,11 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
+
             <div class="modal-body">
                 <form id="register-form">
+
+                    <!-- Name Fields -->
                     <div class="form-row">
                         <div class="form-group">
                             <label for="register-firstname">First Name</label>
@@ -710,15 +738,23 @@
                             <input type="text" id="register-lastname" name="lastname" required>
                         </div>
                     </div>
+
+                    <!-- Email -->
                     <div class="form-group">
                         <label for="register-email">PLV Email</label>
-                        <input type="email" id="register-email" name="email" placeholder="your.email@plv.edu.ph" required>
+                        <input type="email" id="register-email" name="email" placeholder="your.email@plv.edu.ph"
+                            required>
                     </div>
+
+                    <!-- Student ID -->
                     <div class="form-group">
                         <label for="register-student-id">Student ID</label>
-                        <input type="text" id="register-student-id" name="student_id" placeholder="e.g., 21-1234" pattern="\d{2}-\d{4}" title="Format: 00-0000 (e.g., 21-1234)" required>
+                        <input type="text" id="register-student-id" name="student_id" placeholder="e.g., 21-1234"
+                            pattern="\d{2}-\d{4}" title="Format: 00-0000 (e.g., 21-1234)" required>
                         <small class="form-help">Format: 00-0000 (e.g., 21-1234)</small>
                     </div>
+
+                    <!-- Program -->
                     <div class="form-group">
                         <label for="register-program">Program</label>
                         <select id="register-program" name="program" required>
@@ -729,54 +765,60 @@
                             <option value="BSENG">BS Engineering</option>
                         </select>
                     </div>
+
+                    <!-- Password -->
                     <div class="form-group">
                         <label for="register-password">Password</label>
                         <input type="password" id="register-password" name="password" required>
+
+                        <!-- Password Requirements -->
                         <div class="password-requirements">
                             <div class="requirements-header">Password must contain:</div>
-                            <div class="requirement" id="req-length">
-                                <i class="fas fa-circle"></i>
-                                <span>At least 8 characters</span>
+                            <div id="req-length" class="requirement">
+                                <i class="fas fa-circle"></i> <span>At least 8 characters</span>
                             </div>
-                            <div class="requirement" id="req-uppercase">
-                                <i class="fas fa-circle"></i>
-                                <span>One uppercase letter (A-Z)</span>
+                            <div id="req-uppercase" class="requirement">
+                                <i class="fas fa-circle"></i> <span>One uppercase letter (A-Z)</span>
                             </div>
-                            <div class="requirement" id="req-lowercase">
-                                <i class="fas fa-circle"></i>
-                                <span>One lowercase letter (a-z)</span>
+                            <div id="req-lowercase" class="requirement">
+                                <i class="fas fa-circle"></i> <span>One lowercase letter (a-z)</span>
                             </div>
-                            <div class="requirement" id="req-number">
-                                <i class="fas fa-circle"></i>
-                                <span>One number (0-9)</span>
+                            <div id="req-number" class="requirement">
+                                <i class="fas fa-circle"></i> <span>One number (0-9)</span>
                             </div>
-                            <div class="requirement" id="req-special">
-                                <i class="fas fa-circle"></i>
-                                <span>One special character (!@#$%^&*)</span>
+                            <div id="req-special" class="requirement">
+                                <i class="fas fa-circle"></i> <span>One special character (!@#$%^&*)</span>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Confirm Password -->
                     <div class="form-group">
                         <label for="register-confirm-password">Confirm Password</label>
                         <input type="password" id="register-confirm-password" name="confirm_password" required>
-                        <div class="password-match" id="password-match-indicator"></div>
+                        <div id="password-match-indicator" class="password-match"></div>
                     </div>
-                    
-                    <!-- CAPTCHA for Registration -->
-                    <div class="form-group captcha-container" id="register-captcha-container">
-                        <div class="g-recaptcha" id="register-recaptcha" data-sitekey=""></div>
-                        <div class="captcha-fallback" id="register-captcha-fallback" style="display: none;">
-                            <p><i class="fas fa-shield-alt"></i> CAPTCHA verification disabled in development mode</p>
+
+                    <!-- Captcha -->
+                    <div id="register-captcha-container" class="form-group captcha-container">
+                        <div id="register-recaptcha" class="g-recaptcha" data-sitekey=""></div>
+                        <div id="register-captcha-fallback" class="captcha-fallback" style="display:none;">
+                            <p>
+                                <i class="fas fa-shield-alt"></i> CAPTCHA verification disabled in development mode
+                            </p>
                         </div>
                     </div>
-                    
+
+                    <!-- Submit -->
                     <button type="submit" class="btn btn-primary btn-full">
-                        <i class="fas fa-user-plus"></i>
-                        Register
+                        <i class="fas fa-user-plus"></i> Register
                     </button>
                 </form>
+
                 <div class="modal-footer">
-                    <p>Already have an account? <a href="#" id="switch-to-login">Login here</a></p>
+                    <p>Already have an account?
+                        <a href="#" id="switch-to-login">Login here</a>
+                    </p>
                 </div>
             </div>
         </div>
@@ -785,13 +827,14 @@
     <!-- Verification Choice Modal -->
     <div class="modal" id="verification-choice-modal">
         <div class="modal-content">
-            <div class="modal-header">
+            <header class="modal-header">
                 <h3>Choose Verification Method</h3>
-            </div>
-            <div class="modal-body">
+            </header>
+            <section class="modal-body">
                 <p>To complete your registration, please choose how you'd like to verify your account:</p>
-                
+
                 <div class="verification-options">
+                    <!-- OTP Verification Option -->
                     <div class="verification-option" id="otp-option">
                         <div class="option-icon">
                             <i class="fas fa-envelope"></i>
@@ -811,6 +854,7 @@
                         </button>
                     </div>
 
+                    <!-- Document Upload Option -->
                     <div class="verification-option" id="document-option">
                         <div class="option-icon">
                             <i class="fas fa-id-card"></i>
@@ -830,36 +874,39 @@
                         </button>
                     </div>
                 </div>
-            </div>
+            </section>
         </div>
     </div>
 
     <!-- OTP Verification Modal -->
     <div class="modal" id="otp-modal">
         <div class="modal-content">
-            <div class="modal-header">
+            <header class="modal-header">
                 <h3>Verify Your Email</h3>
                 <button class="modal-close" data-modal="otp-modal">
                     <i class="fas fa-arrow-left"></i>
                 </button>
-            </div>
-            <div class="modal-body">
+            </header>
+            <section class="modal-body">
                 <p>We've sent a verification code to your PLV email address. Please enter it below:</p>
+
                 <form id="otp-form">
                     <div class="form-group">
                         <label for="otp-code">Verification Code</label>
-                        <input type="text" id="otp-code" name="otp" placeholder="Enter 6-digit code" maxlength="6" required>
+                        <input type="text" id="otp-code" name="otp" placeholder="Enter 6-digit code" maxlength="6"
+                            required>
                     </div>
                     <button type="submit" class="btn btn-primary btn-full">
                         <i class="fas fa-check"></i>
                         Verify Email
                     </button>
                 </form>
-                <div class="modal-footer">
+
+                <footer class="modal-footer">
                     <p>Didn't receive the code? <a href="#" id="resend-otp">Resend OTP</a></p>
                     <p><a href="#" id="back-to-verification-choice">Choose different method</a></p>
-                </div>
-            </div>
+                </footer>
+            </section>
         </div>
     </div>
 
@@ -874,7 +921,7 @@
             </div>
             <div class="modal-body">
                 <p>Upload your Certificate of Registration (COR) or School ID for verification:</p>
-                
+
                 <form id="document-form">
                     <div class="form-group">
                         <label for="document-type">Document Type</label>
@@ -884,7 +931,7 @@
                             <option value="school_id">School ID</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="document-file">Upload Document</label>
                         <input type="file" id="document-file" name="document" accept="image/*,.pdf" required>
@@ -898,7 +945,8 @@
                         </div>
                         <div class="demo-content">
                             <h4>Demo Mode</h4>
-                            <p>This is a demonstration. In the full version, AI will automatically verify your document. For now, any uploaded document will be instantly approved.</p>
+                            <p>This is a demonstration. In the full version, AI will automatically verify your document.
+                                For now, any uploaded document will be instantly approved.</p>
                         </div>
                     </div>
 
@@ -907,7 +955,7 @@
                         Upload & Verify Document
                     </button>
                 </form>
-                
+
                 <div class="modal-footer">
                     <p><a href="#" id="back-to-verification-choice-2">Choose different method</a></p>
                 </div>
@@ -991,7 +1039,8 @@
                     </div>
                     <div class="form-group">
                         <label for="book-description">Description</label>
-                        <textarea id="book-description" name="description" rows="3" placeholder="Additional details about the book..."></textarea>
+                        <textarea id="book-description" name="description" rows="3"
+                            placeholder="Additional details about the book..."></textarea>
                     </div>
                     <div class="form-group">
                         <label for="book-image">Book Image</label>
@@ -1019,7 +1068,7 @@
             <div class="modal-body">
                 <form id="edit-book-form">
                     <input type="hidden" id="edit-book-id" name="book_id">
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="edit-book-title">Book Title</label>
@@ -1043,11 +1092,13 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label for="edit-book-course-code">Course Code</label>
-                            <input type="text" id="edit-book-course-code" name="course_code" required placeholder="e.g., IT101">
+                            <input type="text" id="edit-book-course-code" name="course_code" required
+                                placeholder="e.g., IT101">
                         </div>
                         <div class="form-group">
                             <label for="edit-book-subject">Subject</label>
-                            <input type="text" id="edit-book-subject" name="subject" placeholder="e.g., Programming Fundamentals">
+                            <input type="text" id="edit-book-subject" name="subject"
+                                placeholder="e.g., Programming Fundamentals">
                         </div>
                     </div>
                     <div class="form-row">
@@ -1079,7 +1130,8 @@
                     </div>
                     <div class="form-group">
                         <label for="edit-book-description">Description</label>
-                        <textarea id="edit-book-description" name="description" rows="3" placeholder="Additional details about the book..."></textarea>
+                        <textarea id="edit-book-description" name="description" rows="3"
+                            placeholder="Additional details about the book..."></textarea>
                     </div>
                     <div class="form-group">
                         <label for="edit-book-image">Update Book Image (Optional)</label>
@@ -1109,7 +1161,8 @@
                 <div class="book-details-container">
                     <div class="book-image-section">
                         <div class="book-cover-large">
-                            <img id="book-details-image" src="" alt="Book Cover" onerror="this.src='./images/book-placeholder.svg'">
+                            <img id="book-details-image" src="" alt="Book Cover"
+                                onerror="this.src='./images/book-placeholder.svg'">
                         </div>
                         <div class="book-actions-quick">
                             <button id="book-details-borrow-btn" class="btn btn-primary btn-full">
@@ -1122,7 +1175,7 @@
                             </button>
                         </div>
                     </div>
-                    
+
                     <div class="book-info-section">
                         <div class="book-title-section">
                             <h2 id="book-details-title">Book Title</h2>
@@ -1132,7 +1185,7 @@
                                 <span id="book-details-availability" class="meta-tag availability">Available</span>
                             </div>
                         </div>
-                        
+
                         <div class="book-details-grid">
                             <div class="detail-item">
                                 <i class="fas fa-graduation-cap"></i>
@@ -1177,7 +1230,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="credit-requirement-display">
                             <div class="credit-info">
                                 <i class="fas fa-coins"></i>
@@ -1188,12 +1241,12 @@
                             </div>
                             <div id="book-details-credit-status" class="credit-status"></div>
                         </div>
-                        
+
                         <div class="book-description-section">
                             <h4><i class="fas fa-align-left"></i> Description</h4>
                             <p id="book-details-description">Book description will appear here...</p>
                         </div>
-                        
+
                         <div class="book-owner-section">
                             <h4><i class="fas fa-user"></i> Owner Information</h4>
                             <div class="owner-info">
@@ -1230,19 +1283,21 @@
             </div>
             <div class="modal-body">
                 <div id="borrow-book-info" class="book-info-header"></div>
-                
+
                 <form id="borrow-form">
                     <input type="hidden" id="borrow-book-id" name="book_id">
-                    
+
                     <div class="form-group">
                         <label for="request-message">Reason for Borrowing *</label>
-                        <textarea id="request-message" name="request_message" rows="3" required placeholder="Explain why you need this book, how it will help your studies, and how you'll take care of it..."></textarea>
+                        <textarea id="request-message" name="request_message" rows="3" required
+                            placeholder="Explain why you need this book, how it will help your studies, and how you'll take care of it..."></textarea>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="borrower-contact">Your Contact Information *</label>
-                            <input type="text" id="borrower-contact" name="borrower_contact" required placeholder="Phone number or preferred contact method">
+                            <input type="text" id="borrower-contact" name="borrower_contact" required
+                                placeholder="Phone number or preferred contact method">
                         </div>
                         <div class="form-group">
                             <label for="pickup-method">Pickup Method *</label>
@@ -1253,23 +1308,25 @@
                             </select>
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="borrower-address">Your Address (Optional)</label>
-                        <textarea id="borrower-address" name="borrower_address" rows="2" placeholder="Your address for pickup/delivery arrangements"></textarea>
+                        <textarea id="borrower-address" name="borrower_address" rows="2"
+                            placeholder="Your address for pickup/delivery arrangements"></textarea>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="pickup-location">Preferred Meeting Location *</label>
-                            <input type="text" id="pickup-location" name="pickup_location" required placeholder="e.g., PLV Library, Main Campus Gate, etc.">
+                            <input type="text" id="pickup-location" name="pickup_location" required
+                                placeholder="e.g., PLV Library, Main Campus Gate, etc.">
                         </div>
                         <div class="form-group">
                             <label for="preferred-pickup-time">Preferred Pickup Time</label>
                             <input type="datetime-local" id="preferred-pickup-time" name="preferred_pickup_time">
                         </div>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="expected-return-date">Expected Return Date *</label>
@@ -1287,7 +1344,7 @@
                             </select>
                         </div>
                     </div>
-                    
+
                     <div class="credit-requirement-section">
                         <h4>Credit Requirements</h4>
                         <div class="credit-info-grid">
@@ -1302,7 +1359,7 @@
                         </div>
                         <div id="credit-status" class="credit-status-message"></div>
                     </div>
-                    
+
                     <button type="submit" id="submit-borrow-request" class="btn btn-primary btn-full">
                         <i class="fas fa-paper-plane"></i>
                         Send Borrow Request
@@ -1343,7 +1400,8 @@
                         <form id="chat-form">
                             <input type="hidden" id="chat-id" name="chat_id">
                             <div class="chat-input-wrapper">
-                                <input type="text" id="chat-message-input" name="message" placeholder="Type your message..." required>
+                                <input type="text" id="chat-message-input" name="message"
+                                    placeholder="Type your message..." required>
                                 <button type="submit" class="btn btn-primary btn-sm">
                                     <i class="fas fa-paper-plane"></i>
                                 </button>
@@ -1368,7 +1426,7 @@
                 <form id="report-form">
                     <input type="hidden" id="report-chat-id" name="chat_id">
                     <input type="hidden" id="report-user-id" name="reported_user_id">
-                    
+
                     <div class="form-group">
                         <label for="report-reason">Reason for Report *</label>
                         <select id="report-reason" name="reason" required>
@@ -1380,12 +1438,13 @@
                             <option value="other">Other</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="report-description">Additional Details</label>
-                        <textarea id="report-description" name="description" rows="4" placeholder="Please provide more details about the issue..."></textarea>
+                        <textarea id="report-description" name="description" rows="4"
+                            placeholder="Please provide more details about the issue..."></textarea>
                     </div>
-                    
+
                     <button type="submit" class="btn btn-primary btn-full">
                         <i class="fas fa-flag"></i>
                         Submit Report
@@ -1408,19 +1467,21 @@
                 <div class="warning-message">
                     <i class="fas fa-exclamation-triangle"></i>
                     <p><strong>Are you sure you want to cancel this transaction?</strong></p>
-                    <p>This action cannot be undone. The book will become available again and the chat will be closed.</p>
+                    <p>This action cannot be undone. The book will become available again and the chat will be closed.
+                    </p>
                 </div>
-                
+
                 <form id="cancel-transaction-form">
                     <input type="hidden" id="cancel-transaction-id" name="transaction_id">
-                    
+
                     <div class="form-group">
                         <label for="cancellation-reason">Reason for Cancellation *</label>
-                        <textarea id="cancellation-reason" name="cancellation_reason" rows="4" required 
-                                  placeholder="Please explain why you're cancelling this transaction (minimum 10 characters)..."></textarea>
-                        <small class="form-help">Be specific about the disagreement or issue that led to this cancellation.</small>
+                        <textarea id="cancellation-reason" name="cancellation_reason" rows="4" required
+                            placeholder="Please explain why you're cancelling this transaction (minimum 10 characters)..."></textarea>
+                        <small class="form-help">Be specific about the disagreement or issue that led to this
+                            cancellation.</small>
                     </div>
-                    
+
                     <div class="form-actions">
                         <button type="button" class="btn btn-outline" data-close-modal="cancel-transaction-modal">
                             Keep Transaction
@@ -1448,17 +1509,17 @@
                 <div id="status-update-content">
                     <!-- Dynamic content will be loaded here -->
                 </div>
-                
+
                 <form id="status-update-form">
                     <input type="hidden" id="update-transaction-id" name="transaction_id">
                     <input type="hidden" id="update-new-status" name="new_status">
-                    
+
                     <div class="form-group" id="status-notes-group" style="display: none;">
                         <label for="status-notes">Notes (Optional)</label>
-                        <textarea id="status-notes" name="notes" rows="3" 
-                                  placeholder="Add any additional notes about this status update..."></textarea>
+                        <textarea id="status-notes" name="notes" rows="3"
+                            placeholder="Add any additional notes about this status update..."></textarea>
                     </div>
-                    
+
                     <div class="form-group" id="return-condition-group" style="display: none;">
                         <label for="return-condition">Book Condition *</label>
                         <select id="return-condition" name="return_condition">
@@ -1470,7 +1531,7 @@
                             <option value="damaged">Damaged - Requires repair</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-actions">
                         <button type="button" class="btn btn-outline" data-close-modal="status-update-modal">
                             Cancel
@@ -1498,10 +1559,10 @@
                 <div class="feedback-transaction-info" id="feedback-transaction-info">
                     <!-- Transaction info will be populated here -->
                 </div>
-                
+
                 <form id="feedback-form">
                     <input type="hidden" id="feedback-transaction-id" name="transaction_id">
-                    
+
                     <div class="form-group">
                         <label for="feedback-rating">Overall Rating *</label>
                         <div class="rating-input">
@@ -1516,13 +1577,13 @@
                         </div>
                         <input type="hidden" id="feedback-rating" name="rating" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="feedback-comment">Comment</label>
-                        <textarea id="feedback-comment" name="comment" rows="4" 
-                                  placeholder="Share your experience with this transaction..."></textarea>
+                        <textarea id="feedback-comment" name="comment" rows="4"
+                            placeholder="Share your experience with this transaction..."></textarea>
                     </div>
-                    
+
                     <div class="form-group" id="book-condition-group" style="display: none;">
                         <label for="book-condition-rating">Book Condition When Returned</label>
                         <select id="book-condition-rating" name="book_condition_rating">
@@ -1534,7 +1595,7 @@
                             <option value="damaged">Damaged</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group" id="return-timeliness-group" style="display: none;">
                         <label for="return-timeliness">Return Timeliness</label>
                         <select id="return-timeliness" name="return_timeliness">
@@ -1544,14 +1605,14 @@
                             <option value="late">Returned Late</option>
                         </select>
                     </div>
-                    
+
                     <div class="credit-impact-info" id="credit-impact-info" style="display: none;">
                         <h4>Credit Impact</h4>
                         <div class="credit-preview" id="credit-preview">
                             <!-- Credit impact preview will be shown here -->
                         </div>
                     </div>
-                    
+
                     <div class="form-actions">
                         <button type="button" class="btn btn-outline" data-close-modal="feedback-modal">
                             Cancel
@@ -1585,7 +1646,7 @@
             const modals = document.querySelectorAll('.modal');
             const navToggle = document.getElementById('nav-toggle');
             const navMenu = document.getElementById('nav-menu');
-            
+
             modals.forEach(modal => {
                 const observer = new MutationObserver((mutations) => {
                     mutations.forEach((mutation) => {
@@ -1600,10 +1661,12 @@
                         }
                     });
                 });
-                
+
                 observer.observe(modal, { attributes: true });
             });
         });
     </script>
+
 </body>
+
 </html>
