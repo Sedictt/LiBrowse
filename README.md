@@ -1,4 +1,4 @@
-# PLV BookSwap - Peer-to-Peer Book Exchange Platform
+# LiBrowse - Smart Academic Book Exchange Platform
 
 A modern, secure book borrowing and lending platform designed specifically for Pamantasan ng Lungsod ng Valenzuela (PLV) students. Built with Node.js, Express.js, and MySQL.
 
@@ -218,7 +218,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🆘 Support
 
-For support or questions about the PLV BookSwap platform:
+For support or questions about the LiBrowse platform:
 1. Check the troubleshooting section below
 2. Review the API documentation
 3. Contact the development team
@@ -255,4 +255,4 @@ For support or questions about the PLV BookSwap platform:
 
 ---
 
-**Built with ❤️ for the PLV Community**
+**LiBrowse - Built with ❤️ for the PLV Community**

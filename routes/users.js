@@ -1,4 +1,4 @@
-// PLV BookSwap - Users Routes
+// LiBrowse - Users Routes
 const express = require('express');
 const { authenticateToken, sanitizeUser } = require('../middleware/auth');
 const { getConnection } = require('../config/database');

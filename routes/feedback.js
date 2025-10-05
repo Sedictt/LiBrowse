@@ -1,4 +1,4 @@
-// PLV BookSwap - Feedback Routes (Following SRS Specifications)
+// LiBrowse - Feedback Routes (Following SRS Specifications)
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { authenticateToken } = require('../middleware/auth');

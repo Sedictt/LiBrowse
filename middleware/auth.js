@@ -1,4 +1,4 @@
-// PLV BookSwap - Authentication Middleware
+// LiBrowse - Authentication Middleware
 const jwt = require('jsonwebtoken');
 const { promisify } = require('util');
 

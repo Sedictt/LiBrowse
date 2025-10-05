@@ -1,4 +1,4 @@
-// PLV BookSwap - Authentication Routes
+// LiBrowse - Authentication Routes
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -37,16 +37,16 @@ const sendOTPEmail = async (email, otp, name) => {
     const transporter = createEmailTransporter();
     
     const mailOptions = {
-        from: `"PLV BookSwap" <${process.env.EMAIL_USER}>`,
+        from: `"LiBrowse" <${process.env.EMAIL_USER}>`,
         to: email,
-        subject: 'PLV BookSwap - Email Verification',
+        subject: 'LiBrowse - Email Verification',
         html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; text-align: center;">
-                    <h1 style="color: white; margin: 0;">PLV BookSwap</h1>
+                    <h1 style="color: white; margin: 0;">LiBrowse</h1>
                 </div>
                 <div style="padding: 30px; background: #f8f9fa;">
-                    <h2 style="color: #333;">Welcome to PLV BookSwap, ${name}!</h2>
+                    <h2 style="color: #333;">Welcome to LiBrowse, ${name}!</h2>
                     <p style="color: #666; font-size: 16px;">
                         Thank you for joining our book exchange community. To complete your registration, 
                         please verify your email address using the code below:
@@ -58,12 +58,12 @@ const sendOTPEmail = async (email, otp, name) => {
                         </div>
                     </div>
                     <p style="color: #666; font-size: 14px;">
-                        This code will expire in 10 minutes. If you didn't create an account with PLV BookSwap, 
+                        This code will expire in 10 minutes. If you didn't create an account with LiBrowse, 
                         please ignore this email.
                     </p>
                     <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
                         <p style="color: #999; font-size: 12px; text-align: center;">
-                            PLV BookSwap - Connecting PLV Students Through Books
+                            LiBrowse - Connecting PLV Students Through Books
                         </p>
                     </div>
                 </div>

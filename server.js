@@ -67,7 +67,7 @@ app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        service: 'Booqy API'
+        service: 'LiBrowse API'
     });
 });
 
@@ -102,7 +102,7 @@ const startServer = async () => {
         }
 
         app.listen(PORT, () => {
-            console.log(`🚀 Booqy Server running on port ${PORT}`);
+            console.log(`🚀 LiBrowse Server running on port ${PORT}`);
             console.log(`📚 Access the application at: http://localhost:${PORT}`);
             console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
         });

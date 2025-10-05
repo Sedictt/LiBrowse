@@ -1,4 +1,4 @@
-// PLV BookSwap - Main Application Logic
+// LiBrowse - Main Application Logic
 class App {
     constructor() {
         this.currentSection = 'home';

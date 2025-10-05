@@ -1,4 +1,4 @@
-// PLV BookSwap - Transactions Routes (Following SRS Specifications)
+// LiBrowse - Transactions Routes (Following SRS Specifications)
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { authenticateToken } = require('../middleware/auth');

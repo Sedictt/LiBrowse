@@ -1,10 +1,12 @@
 {
-  "name": "plv-bookswap",
+  "name": "librowse",
   "version": "1.0.0",
-  "description": "PLV BookSwap - Peer-to-Peer Book Exchange Platform for Pamantasan ng Lungsod ng Valenzuela students",
+  "description": "LiBrowse - Smart Academic Book Exchange Platform for Pamantasan ng Lungsod ng Valenzuela students",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "demo": "node server-presentation.js",
+    "presentation": "node server-presentation.js",
     "dev": "nodemon server.js",
     "setup": "node scripts/setup.js",
     "init": "node scripts/start.js",
