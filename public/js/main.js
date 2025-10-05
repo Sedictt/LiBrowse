@@ -46,13 +46,81 @@ class App {
             });
         }
 
+        // Mobile auth buttons
+        const mobileLoginBtn = document.getElementById('mobile-login-btn');
+        const mobileRegisterBtn = document.getElementById('mobile-register-btn');
+        
+        if (mobileLoginBtn) {
+            mobileLoginBtn.addEventListener('click', () => {
+                authManager.openModal('login-modal');
+            });
+        }
+        
+        if (mobileRegisterBtn) {
+            mobileRegisterBtn.addEventListener('click', () => {
+                authManager.openModal('register-modal');
+            });
+        }
+
         // Mobile navigation toggle
         const navToggle = document.getElementById('nav-toggle');
         const navMenu = document.getElementById('nav-menu');
         
+        const closeMobileMenu = () => {
+            if (navToggle && navMenu) {
+                navToggle.classList.remove('active');
+                navMenu.classList.remove('active');
+                document.body.classList.remove('menu-open');
+            }
+        };
+        
         if (navToggle && navMenu) {
-            navToggle.addEventListener('click', () => {
-                navMenu.classList.toggle('active');
+            // Toggle menu when clicking hamburger
+            navToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = navMenu.classList.contains('active');
+                
+                if (isOpen) {
+                    closeMobileMenu();
+                } else {
+                    navToggle.classList.add('active');
+                    navMenu.classList.add('active');
+                    document.body.classList.add('menu-open');
+                }
+            });
+            
+            // Close menu when clicking on a nav link
+            const navLinks = navMenu.querySelectorAll('.nav-link');
+            navLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    closeMobileMenu();
+                });
+            });
+            
+            // Close menu when clicking overlay/backdrop
+            navMenu.addEventListener('click', (e) => {
+                // If clicking the backdrop (::before pseudo-element area)
+                if (e.target === navMenu) {
+                    closeMobileMenu();
+                }
+            });
+            
+            // Close when clicking outside
+            document.addEventListener('click', (e) => {
+                const isMenuOpen = navMenu.classList.contains('active');
+                const clickedInsideMenu = navMenu.contains(e.target);
+                const clickedToggle = navToggle.contains(e.target);
+                
+                if (isMenuOpen && !clickedInsideMenu && !clickedToggle) {
+                    closeMobileMenu();
+                }
+            });
+            
+            // Close with Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && navMenu.classList.contains('active')) {
+                    closeMobileMenu();
+                }
             });
         }
 

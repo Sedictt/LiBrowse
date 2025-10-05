@@ -120,6 +120,11 @@
                     <span>Notifications</span>
                     <span class="notification-badge" id="notification-badge">0</span>
                 </a>
+                <!-- Mobile Auth Buttons -->
+                <div class="mobile-auth-wrapper">
+                    <button class="btn btn-outline" id="mobile-login-btn">Login</button>
+                    <button class="btn btn-primary" id="mobile-register-btn">Register</button>
+                </div>
             </div>
             <div class="nav-auth" id="nav-auth">
                 <button class="btn btn-outline" id="login-btn">Login</button>
@@ -1574,5 +1579,31 @@
     <script src="./js/requests.js"></script>
     <script src="./js/monitoring.js"></script>
     <script src="./js/main.js"></script>
+    <script>
+        // Close mobile menu when modal opens
+        document.addEventListener('DOMContentLoaded', () => {
+            const modals = document.querySelectorAll('.modal');
+            const navToggle = document.getElementById('nav-toggle');
+            const navMenu = document.getElementById('nav-menu');
+            
+            modals.forEach(modal => {
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.attributeName === 'class') {
+                            if (modal.classList.contains('active') || modal.classList.contains('show')) {
+                                if (navToggle && navMenu) {
+                                    navToggle.classList.remove('active');
+                                    navMenu.classList.remove('active');
+                                    document.body.classList.remove('menu-open');
+                                }
+                            }
+                        }
+                    });
+                });
+                
+                observer.observe(modal, { attributes: true });
+            });
+        });
+    </script>
 </body>
 </html>
