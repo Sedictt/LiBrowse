@@ -8,8 +8,9 @@
     <meta name="keywords" content="LiBrowse, PLV, book exchange, student books, academic books, university, lending, book sharing">
     <meta name="author" content="LiBrowse Team">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./css/style.css?v=2.3">
+    <link rel="stylesheet" href="./css/new-landing.css?v=1.0">
     <style>
         /* Fallback styles to ensure basic functionality */
         body { 
@@ -156,84 +157,207 @@
     <main class="main-content">
         <!-- Home Section -->
         <section id="home-section" class="section active">
-            <div class="hero">
-                <div class="hero-content">
-                    <div class="hero-text">
-                        <h1 class="hero-title">
-                            Share Knowledge,<br>
-                            <span class="gradient-text">Build Community</span>
-                        </h1>
-                        <p class="hero-description">
-                            LiBrose connects PLV students through smart book sharing. Lend your books, borrow what you need, and build a trusted academic community.
-                        </p>
-                        <div class="hero-actions">
-                            <button class="btn btn-primary btn-large" id="get-started-btn">
-                                <i class="fas fa-rocket"></i>
-                                Get Started
-                            </button>
-                            <button class="btn btn-outline btn-large" id="browse-books-btn">
-                                <i class="fas fa-search"></i>
-                                Browse Books
-                            </button>
-                        </div>
+            <!-- Hero Section -->
+            <div class="hero-new">
+                <div class="hero-background">
+                    <div class="hero-shapes">
+                        <div class="shape shape-1"></div>
+                        <div class="shape shape-2"></div>
+                        <div class="shape shape-3"></div>
                     </div>
-                    <div class="hero-visual">
-                        <div class="floating-card card-1">
-                            <i class="fas fa-book"></i>
-                            <span>Mathematics</span>
+                </div>
+                <div class="container">
+                    <div class="hero-content-new">
+                        <div class="hero-badge">
+                            <i class="fas fa-university"></i>
+                            <span>For PLV Students</span>
                         </div>
-                        <div class="floating-card card-2">
-                            <i class="fas fa-laptop-code"></i>
-                            <span>Programming</span>
+                        <h1 class="hero-title-new">
+                            Your Academic Books,
+                            <span class="gradient-text-new">Shared Smarter</span>
+                        </h1>
+                        <p class="hero-subtitle">
+                            Connect with fellow PLV students to borrow and lend textbooks. 
+                            Save money, build connections, and make learning more accessible.
+                        </p>
+                        <div class="hero-buttons">
+                            <button class="btn-new btn-primary-new" id="get-started-btn">
+                                <span>Get Started Free</span>
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                            <button class="btn-new btn-secondary-new" id="learn-more-btn">
+                                <i class="fas fa-play-circle"></i>
+                                <span>How It Works</span>
+                            </button>
                         </div>
-                        <div class="floating-card card-3">
-                            <i class="fas fa-calculator"></i>
-                            <span>Accounting</span>
+                        <div class="hero-features">
+                            <div class="hero-feature-item">
+                                <i class="fas fa-check-circle"></i>
+                                <span>100% Free</span>
+                            </div>
+                            <div class="hero-feature-item">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Verified Students</span>
+                            </div>
+                            <div class="hero-feature-item">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Secure Platform</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Stats Section -->
-            <div class="stats-section">
+            <div class="stats-section-new">
                 <div class="container">
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-users"></i>
-                            </div>
-                            <div class="stat-content">
-                                <div class="stat-number" id="total-users">0</div>
-                                <div class="stat-label">Active Users</div>
-                            </div>
+                    <div class="stats-grid-new">
+                        <div class="stat-card-new">
+                            <div class="stat-number-new" id="total-users">150+</div>
+                            <div class="stat-label-new">Active Students</div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-book"></i>
-                            </div>
-                            <div class="stat-content">
-                                <div class="stat-number" id="total-books">0</div>
-                                <div class="stat-label">Books Available</div>
-                            </div>
+                        <div class="stat-card-new">
+                            <div class="stat-number-new" id="total-books">320+</div>
+                            <div class="stat-label-new">Books Shared</div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-exchange-alt"></i>
-                            </div>
-                            <div class="stat-content">
-                                <div class="stat-number" id="total-transactions">0</div>
-                                <div class="stat-label">Successful Exchanges</div>
-                            </div>
+                        <div class="stat-card-new">
+                            <div class="stat-number-new" id="total-transactions">245+</div>
+                            <div class="stat-label-new">Successful Exchanges</div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">
+                        <div class="stat-card-new">
+                            <div class="stat-number-new" id="avg-rating">4.7★</div>
+                            <div class="stat-label-new">Average Rating</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Features Section -->
+            <div class="features-section">
+                <div class="container">
+                    <div class="section-header-new">
+                        <h2 class="section-title-new">Why Choose LiBrowse?</h2>
+                        <p class="section-subtitle-new">Everything you need to share and borrow books with confidence</p>
+                    </div>
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <h3 class="feature-title">Safe & Secure</h3>
+                            <p class="feature-description">
+                                Only verified PLV students can join. Your books are protected with our trust-based credit system.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            <h3 class="feature-title">Smart Search</h3>
+                            <p class="feature-description">
+                                Find exactly what you need by course code, subject, program, or book condition in seconds.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <i class="fas fa-comments"></i>
+                            </div>
+                            <h3 class="feature-title">Direct Chat</h3>
+                            <p class="feature-description">
+                                Message book owners directly to arrange pickups and discuss book details privately.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">
                                 <i class="fas fa-star"></i>
                             </div>
-                            <div class="stat-content">
-                                <div class="stat-number" id="avg-rating">0.0</div>
-                                <div class="stat-label">Average Rating</div>
+                            <h3 class="feature-title">Rating System</h3>
+                            <p class="feature-description">
+                                Build your reputation through ratings and reviews from fellow students.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <i class="fas fa-bell"></i>
+                            </div>
+                            <h3 class="feature-title">Real-time Notifications</h3>
+                            <p class="feature-description">
+                                Get instant alerts for requests, messages, and important updates about your books.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <i class="fas fa-mobile-alt"></i>
+                            </div>
+                            <h3 class="feature-title">Mobile Friendly</h3>
+                            <p class="feature-description">
+                                Access LiBrowse anywhere, anytime from your phone, tablet, or computer.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- How It Works Section -->
+            <div class="how-it-works-section">
+                <div class="container">
+                    <div class="section-header-new">
+                        <h2 class="section-title-new">How It Works</h2>
+                        <p class="section-subtitle-new">Start sharing books in 3 simple steps</p>
+                    </div>
+                    <div class="steps-grid">
+                        <div class="step-card">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h3 class="step-title">Create Account</h3>
+                                <p class="step-description">
+                                    Sign up with your PLV email address and verify your student status in minutes.
+                                </p>
+                            </div>
+                            <div class="step-icon">
+                                <i class="fas fa-user-plus"></i>
                             </div>
                         </div>
+                        <div class="step-card">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h3 class="step-title">List or Browse Books</h3>
+                                <p class="step-description">
+                                    Add books you want to lend or search for books you need for your courses.
+                                </p>
+                            </div>
+                            <div class="step-icon">
+                                <i class="fas fa-book-open"></i>
+                            </div>
+                        </div>
+                        <div class="step-card">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h3 class="step-title">Connect & Exchange</h3>
+                                <p class="step-description">
+                                    Send requests, chat with book owners, and arrange safe exchanges on campus.
+                                </p>
+                            </div>
+                            <div class="step-icon">
+                                <i class="fas fa-handshake"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA Section -->
+            <div class="cta-section">
+                <div class="container">
+                    <div class="cta-content">
+                        <h2 class="cta-title">Ready to Start Sharing?</h2>
+                        <p class="cta-description">
+                            Join hundreds of PLV students who are already saving money and building connections through book sharing.
+                        </p>
+                        <button class="btn-new btn-cta" id="cta-register-btn">
+                            <span>Create Free Account</span>
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
                     </div>
                 </div>
             </div>

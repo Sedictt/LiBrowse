@@ -27,6 +27,25 @@ class App {
             });
         }
 
+        // Learn more button - scroll to how it works section
+        const learnMoreBtn = document.getElementById('learn-more-btn');
+        if (learnMoreBtn) {
+            learnMoreBtn.addEventListener('click', () => {
+                const howItWorksSection = document.querySelector('.how-it-works-section');
+                if (howItWorksSection) {
+                    howItWorksSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        }
+
+        // CTA Register button
+        const ctaRegisterBtn = document.getElementById('cta-register-btn');
+        if (ctaRegisterBtn) {
+            ctaRegisterBtn.addEventListener('click', () => {
+                authManager.openModal('register-modal');
+            });
+        }
+
         // Mobile navigation toggle
         const navToggle = document.getElementById('nav-toggle');
         const navMenu = document.getElementById('nav-menu');
