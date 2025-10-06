@@ -1899,6 +1899,12 @@ body {
     padding: var(--spacing-lg);
 }
 
+#login-modal .modal-footer,
+#register-modal .modal-footer {
+    display: block;   /* disable flex */
+    text-align: center;
+}
+
 .modal-footer {
     text-align: center;
     padding: var(--spacing-md) var(--spacing-lg);

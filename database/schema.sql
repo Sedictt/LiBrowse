@@ -15,7 +15,7 @@ CREATE TABLE users (
     phone_no VARCHAR(20),
     profile_pic VARCHAR(200),
     status ENUM('active','inactive','banned') DEFAULT 'active',
-    is_verified BOOLEAN DEFAULT FALSE,
+    is_verified BOOLEAN DEFAULT TRUE,
     ver_token VARCHAR(200),
     ver_token_expiry DATETIME,
     credits INT DEFAULT 50,
@@ -65,10 +65,10 @@ CREATE TABLE transactions (
     reason_deny TEXT,
     return_state ENUM('new','used_good','used_fair','damaged') NULL,
     date_req TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    date_approve TIMESTAMP,
-    date_borrowed TIMESTAMP,
+    date_approve TIMESTAMP NULL,
+    date_borrowed TIMESTAMP NULL,
     date_expected DATE,
-    date_returned TIMESTAMP,
+    date_returned TIMESTAMP NULL,
     created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_txn_book FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
@@ -178,3 +178,22 @@ CREATE INDEX idx_txn_status ON transactions(status);
 CREATE INDEX idx_feedback_rating ON feedback(rating);
 CREATE INDEX idx_credit_user_time ON credit_history(user_id, created);
 CREATE INDEX idx_msg_chat_time ON chat_messages(chat_id, created);
+
+INSERT INTO users 
+(email, student_no, fname, lname, pass_hash, course, year, phone_no, is_verified)
+VALUES
+(
+  'testuser@plv.edu.ph',
+  '21-5679',
+  'Test',
+  'User',
+  '$2a$10$wHnNn4Zcml91GVyTdfhcuOV1pW6uZBZPUIWb7pJUNVYjvqZgQk0Cq', -- same hash for "test1234"
+  'BSIT',
+  2,
+  '09997776666',
+  1
+);
+
+SELECT * 
+FROM users
+WHERE email = 'testuser@plv.edu.ph';
