@@ -1921,6 +1921,14 @@ body {
     text-decoration: underline;
 }
 
+.error-message {
+  color: #ff4d4f;
+  font-size: 0.85rem;
+  margin-top: 4px;
+  display: block;
+}
+
+
 /* =========================
    FORM ELEMENTS
 ========================= */
