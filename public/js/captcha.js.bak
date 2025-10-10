@@ -1,0 +1,63 @@
+﻿// CAPTCHA handling for LiBrowse (frontend only)
+// In development mode, disable real CAPTCHA and show a fallback message.
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Show fallback message and hide reCAPTCHA widgets if present
+  document.querySelectorAll('.captcha-fallback').forEach(el => {
+    el.style.display = 'block';
+  });
+
+  document.querySelectorAll('.g-recaptcha').forEach(el => {
+    el.style.display = 'none';
+  });
+
+  console.log('CAPTCHA disabled - Development mode');
+});
+
+// Expose minimal helpers for callers
+window.captcha = {
+  validateCaptcha: () => true,
+  resetCaptcha: () => {}
+};
+
+// server.js or routes/auth.js
+const express = require("express");
+const axios = require("axios");
+const router = express.Router();
+
+router.post("/login", async (req, res) => {
+  const { email, password, "g-recaptcha-response": token } = req.body;
+
+  // 1ï¸âƒ£ Check that the frontend sent a CAPTCHA token
+  if (!token) {
+    return res.status(400).json({ message: "Missing reCAPTCHA token" });
+  }
+
+  // 2ï¸âƒ£ Verify the token with Google using your secret key
+  const secretKey = "6Lfyh-UrAAAAABJk5ffM7J68RXY9tFQtm5Yui57k"; // backend-only key
+  const verifyURL = "https://www.google.com/recaptcha/api/siteverify";
+
+  try {
+    const params = new URLSearchParams();
+    params.append("secret", secretKey);
+    params.append("response", token);
+
+    const { data } = await axios.post(verifyURL, params);
+
+// Initialize CAPTCHA when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    // Immediately show fallback and hide reCAPTCHA containers
+    const fallbacks = document.querySelectorAll('.captcha-fallback');
+    fallbacks.forEach(fallback => {
+        fallback.style.display = 'block';
+    });
+    
+    const containers = document.querySelectorAll('.g-recaptcha');
+    containers.forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    console.log('CAPTCHA disabled - Development mode');
+});
+
+module.exports = router;
