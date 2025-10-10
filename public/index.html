@@ -729,33 +729,54 @@ document.addEventListener("DOMContentLoaded", () => {
   const passwordPattern =
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    let valid = true;
     emailError.textContent = "";
     passwordError.textContent = "";
 
+    const email = emailInput.value.trim();
+    const password = passwordInput.value.trim();
+
     // Email validation
-    if (!emailInput.value.endsWith("@plv.edu.ph")) {
+    if (!email.endsWith("@plv.edu.ph")) {
       emailError.textContent = "Please use your PLV email address.";
-      valid = false;
+      return;
     }
 
     // Password validation
-    if (!passwordPattern.test(passwordInput.value)) {
+    if (!passwordPattern.test(password)) {
       passwordError.textContent =
         "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.";
-      valid = false;
+      return;
     }
 
-    if (valid) {
-      // simulate server check
-      alert("Login successful (for demo)");
-      form.reset();
+    try {
+      // Call backend via api.js
+      const response = await api.login(email, password);
+
+      if (response.token && response.user) {
+        // Save auth state
+        localStorage.setItem("token", response.token);
+        localStorage.setItem("user", JSON.stringify(response.user));
+
+        // Optionally close modal
+        const modal = document.getElementById("login-modal");
+        if (modal) modal.classList.remove("active");
+
+        // Notify success
+        alert("✅ Login successful!");
+        window.location.reload(); // reload UI or redirect
+      } else {
+        passwordError.textContent = response.error || "Login failed.";
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      passwordError.textContent = "Invalid email or password.";
     }
   });
 });
 </script>
+
 
 
     <!-- Register Modal -->

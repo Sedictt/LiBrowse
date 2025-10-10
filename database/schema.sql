@@ -183,17 +183,18 @@ INSERT INTO users
 (email, student_no, fname, lname, pass_hash, course, year, phone_no, is_verified)
 VALUES
 (
-  'testuser@plv.edu.ph',
-  '21-5679',
-  'Test',
+  'secureuser@plv.edu.ph',
+  '21-9876',
+  'Secure',
   'User',
-  '$2a$10$wHnNn4Zcml91GVyTdfhcuOV1pW6uZBZPUIWb7pJUNVYjvqZgQk0Cq', -- same hash for "test1234"
+  '$2b$10$RXWZDb/Ddv0S68bYcIrkm.G/Vp4Q5DY9K5rK0VC8qj98Z6I9tDG3i', -- bcrypt hash for "Secure123!"
   'BSIT',
-  2,
-  '09997776666',
+  3,
+  '09112223344',
   1
 );
 
-SELECT * 
-FROM users
-WHERE email = 'testuser@plv.edu.ph';
+SELECT id, email, pass_hash, is_verified FROM users WHERE email = 'secureuser@plv.edu.ph';
+UPDATE users 
+SET pass_hash = '$2b$10$RXWZDb/Ddv0S68bYcIrkm.G/Vp4Q5DY9K5rK0VC8qj98Z6I9tDG3i'
+WHERE email = 'secureuser@plv.edu.ph';usersusers
