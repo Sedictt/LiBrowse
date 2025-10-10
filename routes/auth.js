@@ -4,11 +4,29 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const axios = require('axios');
 const { getOne, executeQuery } = require('../config/database'); // Correct path to database.js
 require('dotenv').config();
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
+const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET_KEY || '';
+
+async function verifyCaptcha(token) {
+    // If not configured, allow by default
+    if (!RECAPTCHA_SECRET) return true;
+    if (!token) return false;
+    try {
+        const params = new URLSearchParams();
+        params.append('secret', RECAPTCHA_SECRET);
+        params.append('response', token);
+        const { data } = await axios.post('https://www.google.com/recaptcha/api/siteverify', params);
+        return !!data.success;
+    } catch (e) {
+        console.error('reCAPTCHA verify error:', e.message);
+        return false;
+    }
+}
 
 // ============================
 // Helper: Generate JWT Token
@@ -48,7 +66,13 @@ function authenticateToken(req, res, next) {
 // ============================
 router.post('/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, captcha_token } = req.body;
+
+        // Verify CAPTCHA if enabled
+        const captchaOk = await verifyCaptcha(captcha_token);
+        if (!captchaOk) {
+            return res.status(400).json({ error: 'Invalid CAPTCHA' });
+        }
 
         // 1. Check if user exists
         const user = await getOne("SELECT * FROM users WHERE email = ?", [email]);
@@ -149,7 +173,13 @@ router.get('/profile', authenticateToken, async (req, res) => {
 // ============================
 router.post('/register', async (req, res) => {
     try {
-        const { email, student_no, fname, lname, password, course, year } = req.body;
+        const { email, student_no, fname, lname, password, course, year, captcha_token } = req.body;
+
+        // Verify CAPTCHA if enabled
+        const captchaOk = await verifyCaptcha(captcha_token);
+        if (!captchaOk) {
+            return res.status(400).json({ error: 'Invalid CAPTCHA' });
+        }
 
         // Validate required fields
         if (!email || !student_no || !fname || !lname || !password || !course) {

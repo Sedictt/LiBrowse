@@ -79,6 +79,7 @@ app.use('/api/verification', require('./routes/verification'));
 app.use('/api/verification', require('./routes/emailVerification'));
 app.use('/api/verification', require('./routes/sendgridVerification'));
 app.use('/api/stats', require('./routes/stats'));
+app.use('/api/config', require('./routes/config'));
 
 // =======================
 // Main App Route

@@ -31,6 +31,74 @@ class AuthManager {
         }
     }
 
+    showVerificationSuccessModal(opts = {}) {
+        const existing = document.getElementById('verification-success-modal');
+        if (!existing) {
+            const modalHTML = `
+                <div id="verification-success-modal" class="modal">
+                    <div class="modal-content" style="max-width: 520px;">
+                        <div class="modal-header">
+                            <h3>${opts.title || 'Verification Successful'}</h3>
+                            <button class="modal-close" onclick="authManager.closeModal('verification-success-modal')">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body" style="text-align: center; padding: 30px 20px;">
+                            <i class="fas fa-check-circle" style="font-size: 64px; color: #10B981; margin-bottom: 15px;"></i>
+                            <h4 style="color: #10B981; margin: 0 0 10px;">You're Verified!</h4>
+                            <p style="color: var(--text-muted); margin-bottom: 20px;">${opts.message || 'Your account is now verified.'}</p>
+                            <div style="display:flex; gap: 12px; justify-content: center;">
+                                <button class="btn btn-primary" onclick="authManager.closeModal('verification-success-modal')">
+                                    Continue
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = modalHTML;
+            document.body.appendChild(wrapper.firstElementChild);
+        } else {
+            const titleEl = existing.querySelector('.modal-header h3');
+            const bodyP = existing.querySelector('.modal-body p');
+            if (titleEl && opts.title) titleEl.textContent = opts.title;
+            if (bodyP && opts.message) bodyP.textContent = opts.message;
+        }
+
+        this.openModal('verification-success-modal');
+    }
+
+    updateVerificationStatusUI(status, message) {
+        const container = document.getElementById('verification-status-display');
+        if (!container) return;
+
+        let html = '';
+        if (status === 'verified') {
+            html = `
+                <div class="status-card verified" style="padding: 20px; background: rgba(16, 185, 129, 0.12); border: 2px solid rgba(16, 185, 129, 0.35); border-radius: 8px; text-align: center;">
+                    <i class="fas fa-check-circle" style="font-size: 48px; color: #10B981; margin-bottom: 15px;"></i>
+                    <h4 style="color: #10B981; margin-bottom: 10px;">Verified</h4>
+                    <p style="color: #a0aec0;">${message || 'Your account is verified.'}</p>
+                </div>`;
+        } else if (status === 'pending_review') {
+            html = `
+                <div class="status-card pending" style="padding: 20px; background: rgba(251, 191, 36, 0.1); border: 2px solid rgba(251, 191, 36, 0.3); border-radius: 8px; text-align: center;">
+                    <i class="fas fa-clock" style="font-size: 48px; color: #fbbf24; margin-bottom: 15px;"></i>
+                    <h4 style="color: #fbbf24; margin-bottom: 10px;">Verification Pending</h4>
+                    <p style="color: #a0aec0;">${message || 'Admin review in progress.'}</p>
+                </div>`;
+        } else if (status === 'error') {
+            html = `
+                <div class="status-card error" style="padding: 20px; background: rgba(239, 68, 68, 0.12); border: 2px solid rgba(239, 68, 68, 0.35); border-radius: 8px; text-align: center;">
+                    <i class="fas fa-times-circle" style="font-size: 48px; color: #EF4444; margin-bottom: 15px;"></i>
+                    <h4 style="color: #EF4444; margin-bottom: 10px;">Verification Failed</h4>
+                    <p style="color: #a0aec0;">${message || 'Please try again with a clearer image.'}</p>
+                </div>`;
+        }
+
+        if (html) container.innerHTML = html;
+    }
+
     setupAuthEvents() {
         // Listen for API auth errors (401/403) and prompt login
         window.addEventListener('auth:unauthorized', (e) => {
@@ -191,7 +259,17 @@ class AuthManager {
         }
 
         try {
-            const response = await api.login(email, password);
+            // Collect reCAPTCHA token if enabled
+            const captchaToken = (window.captcha && window.captcha.enabled)
+                ? window.captcha.getResponse('login')
+                : null;
+
+            if (window.captcha && window.captcha.enabled && !captchaToken) {
+                this.showToast('Please complete the CAPTCHA', 'error');
+                return;
+            }
+
+            const response = await api.login(email, password, captchaToken);
             
             if (response.token && response.user) {
                 const u = response.user || {};
@@ -221,6 +299,10 @@ class AuthManager {
         } catch (error) {
             console.error('Login error:', error);
             this.showToast(error.message || 'Login failed. Please try again.', 'error');
+        } finally {
+            if (window.captcha && window.captcha.enabled) {
+                window.captcha.reset('login');
+            }
         }
     }
 
@@ -275,7 +357,17 @@ class AuthManager {
 
         try {
             console.log('📤 Sending registration request...');
-            const response = await api.register(formData);
+            // Collect reCAPTCHA token if enabled
+            const captchaToken = (window.captcha && window.captcha.enabled)
+                ? window.captcha.getResponse('register')
+                : null;
+
+            if (window.captcha && window.captcha.enabled && !captchaToken) {
+                this.showToast('Please complete the CAPTCHA', 'error');
+                return;
+            }
+
+            const response = await api.register(formData, captchaToken);
             console.log('📥 Registration response:', response);
             
             if (response.message && response.requiresVerification) {
@@ -322,6 +414,10 @@ class AuthManager {
         } catch (error) {
             console.error('❌ Registration error:', error);
             this.showToast(error.message || 'Registration failed. Please try again.', 'error');
+        } finally {
+            if (window.captcha && window.captcha.enabled) {
+                window.captcha.reset('register');
+            }
         }
     }
 
@@ -581,8 +677,27 @@ class AuthManager {
                 
                 if (response.autoApproved) {
                     this.showToast('✓ Verification successful! Your account is now verified.', 'success');
+                    // Update local user state
+                    try {
+                        const userStr = localStorage.getItem('user');
+                        if (userStr) {
+                            const u = JSON.parse(userStr);
+                            u.is_verified = true;
+                            localStorage.setItem('user', JSON.stringify(u));
+                            this.currentUser = u;
+                        }
+                    } catch (_) {}
+                    // Update UI status card
+                    this.updateVerificationStatusUI('verified', 'Your account is verified.');
+                    // Show success modal
+                    this.showVerificationSuccessModal({
+                        title: 'Verification Successful',
+                        message: 'Your Student ID has been verified. You now have full access to LiBrowse features.',
+                    });
                 } else {
                     this.showToast('Documents uploaded! Admin review in progress.', 'info');
+                    // Update UI status card
+                    this.updateVerificationStatusUI('pending_review', response.message || 'Admin review in progress.');
                 }
                 
                 // Reload user data
@@ -591,6 +706,7 @@ class AuthManager {
                 }
             } else {
                 this.showToast(response.message || 'Upload failed', 'error');
+                this.updateVerificationStatusUI('error', response.message || 'Verification failed.');
             }
             
         } catch (error) {

@@ -61,25 +61,29 @@ class ApiClient {
     }
 
     // Auth endpoints
-    async login(email, password) {
+    async login(email, password, captchaToken) {
+        const payload = { email, password };
+        if (captchaToken) payload.captcha_token = captchaToken;
         return this.request('/auth/login', {
             method: 'POST',
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify(payload)
         });
     }
 
-    async register(userData) {
+    async register(userData, captchaToken) {
+        const payload = {
+            email: userData.email,
+            student_no: userData.student_id,
+            fname: userData.firstname,
+            lname: userData.lastname,
+            password: userData.password,
+            course: userData.program,
+            year: userData.year || 1
+        };
+        if (captchaToken) payload.captcha_token = captchaToken;
         return this.request('/auth/register', {
             method: 'POST',
-            body: JSON.stringify({
-                email: userData.email,
-                student_no: userData.student_id,
-                fname: userData.firstname,
-                lname: userData.lastname,
-                password: userData.password,
-                course: userData.program,
-                year: userData.year || 1
-            })
+            body: JSON.stringify(payload)
         });
     }
 

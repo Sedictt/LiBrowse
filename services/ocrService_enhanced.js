@@ -307,6 +307,70 @@ class EnhancedOCRService {
         return bestResult;
     }
 
+    // ============================
+    // Helpers: normalization & fuzzy
+    // ============================
+    normalizeText(str) {
+        return (str || '')
+            .toUpperCase()
+            .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+            .replace(/[^A-Z0-9\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    normalizeDigits(str) {
+        if (!str) return '';
+        // Map common OCR lookalikes to digits, then keep digits only
+        const map = {
+            'O': '0', 'Q': '0', 'D': '0',
+            'I': '1', 'L': '1', 'l': '1',
+            'Z': '2',
+            'S': '5',
+            'B': '8',
+            'G': '6',
+            'T': '7'
+        };
+        const up = String(str).toUpperCase();
+        let out = '';
+        for (const ch of up) {
+            if (/[0-9]/.test(ch)) out += ch;
+            else if (map[ch]) out += map[ch];
+        }
+        return out;
+    }
+
+    levenshtein(a, b) {
+        const m = a.length, n = b.length;
+        if (m === 0) return n;
+        if (n === 0) return m;
+        const dp = Array.from({ length: m + 1 }, () => new Array(n + 1));
+        for (let i = 0; i <= m; i++) dp[i][0] = i;
+        for (let j = 0; j <= n; j++) dp[0][j] = j;
+        for (let i = 1; i <= m; i++) {
+            for (let j = 1; j <= n; j++) {
+                const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+                dp[i][j] = Math.min(
+                    dp[i - 1][j] + 1,
+                    dp[i][j - 1] + 1,
+                    dp[i - 1][j - 1] + cost
+                );
+            }
+        }
+        return dp[m][n];
+    }
+
+    tokenNearIncludes(haystack, needle) {
+        // Exact presence
+        if (haystack.includes(needle)) return true;
+        // Simple fuzzy: allow one edit in contiguous haystack substrings of same length
+        for (let i = 0; i <= haystack.length - needle.length; i++) {
+            const seg = haystack.slice(i, i + needle.length);
+            if (this.levenshtein(seg, needle) <= 1) return true;
+        }
+        return false;
+    }
+
     /**
      * Extract student information from OCR text
      */
@@ -319,12 +383,19 @@ class EnhancedOCRService {
                 studentId: false,
                 name: false,
                 university: false
-            }
+            },
+            nearMatches: {
+                studentId: false,
+                name: false
+            },
+            nameTokensMatched: 0,
+            nameTokensTotal: 0
         };
 
         if (!text) return info;
 
-        const cleanText = text.toUpperCase().replace(/[^A-Z0-9\s]/g, ' ');
+        const cleanText = this.normalizeText(text);
+        const cleanNoSpaces = cleanText.replace(/\s+/g, '');
         
         console.log('🔍 [ENHANCED OCR] Clean text for processing:', cleanText.substring(0, 200) + '...');
         console.log('🔍 [ENHANCED OCR] User info for matching:', userInfo);
@@ -343,26 +414,34 @@ class EnhancedOCRService {
             const matches = cleanText.match(pattern);
             if (matches) {
                 info.studentId = matches[0];
-                const ocrDigits = matches[0].replace(/[^0-9]/g, '');
-                const userDigits = (userInfo.student_id || userInfo.student_no || '').replace(/[^0-9]/g, '');
-                info.matches.studentId = !!(ocrDigits && userDigits && ocrDigits === userDigits);
+                const ocrDigits = this.normalizeDigits(matches[0]);
+                const userDigits = this.normalizeDigits((userInfo.student_id || userInfo.student_no || ''));
+                if (ocrDigits && userDigits) {
+                    if (ocrDigits === userDigits) {
+                        info.matches.studentId = true;
+                    } else if (ocrDigits.length === userDigits.length && this.levenshtein(ocrDigits, userDigits) <= 1) {
+                        info.nearMatches.studentId = true;
+                    }
+                }
                 
                 console.log('🔍 [ENHANCED OCR] Student ID found:', matches[0]);
                 console.log('🔍 [ENHANCED OCR] OCR digits:', ocrDigits);
                 console.log('🔍 [ENHANCED OCR] User digits:', userDigits);
-                console.log('🔍 [ENHANCED OCR] ID Match:', info.matches.studentId);
+                console.log('🔍 [ENHANCED OCR] ID Match:', info.matches.studentId, 'Near:', info.nearMatches.studentId);
                 break;
             }
         }
 
-        // Look for name matches
+        // Look for name matches (prefer DB/user-provided full name first)
         let nameToMatch = null;
         let nameSource = 'user_input';
-        
-        // Try to extract name from PLV email
-        if (userInfo.email && userInfo.email.includes('@plv.edu.ph')) {
+
+        if (userInfo.full_name) {
+            nameToMatch = userInfo.full_name;
+            nameSource = 'user_input';
+            console.log('🔍 [ENHANCED OCR] Using user-provided name:', nameToMatch);
+        } else if (userInfo.email && userInfo.email.includes('@plv.edu.ph')) {
             const emailLocalPart = userInfo.email.split('@')[0];
-            
             if (emailLocalPart.includes('.')) {
                 const emailNameParts = emailLocalPart.split('.').map(part => 
                     part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
@@ -371,46 +450,52 @@ class EnhancedOCRService {
             } else {
                 nameToMatch = emailLocalPart.charAt(0).toUpperCase() + emailLocalPart.slice(1).toLowerCase();
             }
-            
             nameSource = 'plv_email';
             console.log('🔍 [ENHANCED OCR] Extracted name from PLV email:', nameToMatch);
         }
         
-        // Fallback to user-provided full name
-        if (!nameToMatch && userInfo.full_name) {
-            nameToMatch = userInfo.full_name;
-            nameSource = 'user_input';
-            console.log('🔍 [ENHANCED OCR] Using user-provided name:', nameToMatch);
-        }
-        
         if (nameToMatch) {
-            const normalizedName = nameToMatch.toUpperCase().trim();
+            const normalizedName = this.normalizeText(nameToMatch);
             let nameParts = normalizedName.split(' ').filter(part => part.length > 1);
-            
-            let nameMatches = 0;
-            const foundParts = [];
-            
+            // Remove suffix tokens at the end if present
+            const suffixes = new Set(['JR', 'SR', 'II', 'III', 'IV']);
+            while (nameParts.length > 1 && suffixes.has(nameParts[nameParts.length - 1])) {
+                nameParts.pop();
+            }
+            const first = nameParts[0];
+            const last = nameParts[nameParts.length - 1];
+
+            let tokenMatches = 0;
+            let firstMatch = false;
+            let lastMatch = false;
+
             console.log('🔍 [ENHANCED OCR] Name parts to match:', nameParts);
-            
+
             for (const part of nameParts) {
-                if (cleanText.includes(part)) {
-                    nameMatches++;
-                    foundParts.push(part);
-                    console.log('🔍 [ENHANCED OCR] ✓ Found name part:', part);
+                const partNoSpace = part.replace(/\s+/g, '');
+                const found = this.tokenNearIncludes(cleanText, part) || this.tokenNearIncludes(cleanNoSpaces, partNoSpace);
+                if (found) {
+                    tokenMatches++;
+                    if (part === first) firstMatch = true;
+                    if (part === last) lastMatch = true;
+                    console.log('🔍 [ENHANCED OCR] ✓ Found/near name part:', part);
                 } else {
                     console.log('🔍 [ENHANCED OCR] ✗ Missing name part:', part);
                 }
             }
-            
-            // Require ALL name parts to be found
-            const requiredMatches = nameParts.length;
-            info.matches.name = nameMatches === requiredMatches && requiredMatches > 0;
-            if (info.matches.name) {
+
+            info.nameTokensMatched = tokenMatches;
+            info.nameTokensTotal = nameParts.length;
+
+            // Consider a strong name match if first AND last names are present
+            info.matches.name = firstMatch && lastMatch;
+            info.nearMatches.name = !info.matches.name && tokenMatches > 0;
+            if (info.matches.name || info.nearMatches.name) {
                 info.name = nameToMatch;
                 info.nameSource = nameSource;
             }
-            
-            console.log('🔍 [ENHANCED OCR] Name Match Result:', info.matches.name ? '✓ SUCCESS' : '✗ FAILED');
+
+            console.log('🔍 [ENHANCED OCR] Name Match Result:', info.matches.name ? '✓ STRONG' : (info.nearMatches.name ? '△ PARTIAL' : '✗ FAILED'));
         }
 
         // Look for university indicators
@@ -457,6 +542,9 @@ class EnhancedOCRService {
         if (extractedInfo.matches.studentId) {
             confidence += 30;
             details.studentIdMatch = true;
+        } else if (extractedInfo.nearMatches && extractedInfo.nearMatches.studentId) {
+            confidence += 15; // partial credit for near ID match
+            failureReasons.push('Student ID appears close but not exact. Please ensure the ID number is clearly visible.');
         } else {
             if (extractedInfo.studentId) {
                 failureReasons.push(`Student ID mismatch. Found "${extractedInfo.studentId}" but expected your registered ID.`);
@@ -470,6 +558,9 @@ class EnhancedOCRService {
             confidence += 20;
             details.nameMatch = true;
             details.nameSource = extractedInfo.nameSource;
+        } else if (extractedInfo.nearMatches && extractedInfo.nearMatches.name) {
+            confidence += 10; // partial credit for partial/fuzzy name match
+            failureReasons.push('Name partially matched. Please upload a clearer image showing your full name.');
         } else {
             failureReasons.push('Name not found in document. Please ensure your full name is clearly visible.');
         }
@@ -494,6 +585,7 @@ class EnhancedOCRService {
             confidence: finalConfidence,
             details,
             failureReasons,
+            // Keep auto-approval strict: require solid ID + name
             isAcceptable: finalConfidence >= 70 && details.studentIdMatch && details.nameMatch
         };
     }
