@@ -694,14 +694,23 @@
           <a href="#" id="forgot-password-link">Forgot your password?</a>
         </div>
 	
-	<!-- Captcha --> 
-	<div id="login-captcha-container" class="form-group captcha-container"> 
-	<div id="login-recaptcha" class="g-recaptcha" data-sitekey="">
-	</div> 
-	<div id="login-captcha-fallback" class="captcha-fallback" style="display:none;"> <p> 
-	<i class="fas fa-shield-alt"></i> CAPTCHA verification disabled in development mode </p>
-	 </div> 
-	 </div>
+	<!-- Captcha -->
+<div id="login-captcha-container" class="form-group captcha-container">
+  <div 
+    id="login-recaptcha" 
+    class="g-recaptcha" 
+    data-sitekey="6Lfyh-UrAAAAAEksshfYmFwcKt0S3p3cIlXKMsoF">
+  </div>
+
+  <div id="login-captcha-fallback" class="captcha-fallback" style="display:none;">
+    <p>
+      <i class="fas fa-shield-alt"></i> CAPTCHA verification disabled in development mode
+    </p>
+  </div>
+</div>
+
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
 
         <!-- Submit -->
         <button type="submit" class="btn btn-primary btn-full">
