@@ -662,100 +662,103 @@
         </section>
     </main>
 
-<!-- Modals -->
-   <!-- Login Modal -->
-<div id="login-modal" class="modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3>Login to LiBrowse</h3>
-      <button class="modal-close" data-modal="login-modal">
-        <i class="fas fa-times"></i>
-      </button>
+    <!-- Modals -->
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Login to LiBrowse</h3>
+                <button class="modal-close" data-modal="login-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <form id="login-form">
+                    <!-- Email -->
+                    <div class="form-group">
+                        <label for="login-email">PLV Email</label>
+                        <input type="email" id="login-email" name="email" placeholder="your.email@plv.edu.ph" required>
+                        <small id="email-error" class="error-message"></small>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" name="password" placeholder="Enter your password"
+                            required>
+                        <small id="password-error" class="error-message"></small>
+                    </div>
+
+                    <!-- Forgot Password -->
+                    <div class="form-group forgot-password">
+                        <a href="#" id="forgot-password-link">Forgot your password?</a>
+                    </div>
+
+                    <!-- Captcha -->
+                    <div id="login-captcha-container" class="form-group captcha-container">
+                        <div id="login-recaptcha" class="g-recaptcha" data-sitekey="">
+                        </div>
+                        <div id="login-captcha-fallback" class="captcha-fallback" style="display:none;">
+                            <p>
+                                <i class="fas fa-shield-alt"></i> CAPTCHA verification disabled in development mode
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="btn btn-primary btn-full">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                </form>
+
+                <div class="modal-footer">
+                    <p>Don’t have an account? <a href="#" id="switch-to-register">Register here</a></p>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="modal-body">
-      <form id="login-form">
-        <!-- Email -->
-        <div class="form-group">
-          <label for="login-email">PLV Email</label>
-          <input type="email" id="login-email" name="email" placeholder="your.email@plv.edu.ph" required>
-          <small id="email-error" class="error-message"></small>
-        </div>
+    <!-- Script -->
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.getElementById("login-form");
+            const emailInput = document.getElementById("login-email");
+            const passwordInput = document.getElementById("login-password");
+            const emailError = document.getElementById("email-error");
+            const passwordError = document.getElementById("password-error");
 
-        <!-- Password -->
-        <div class="form-group">
-          <label for="login-password">Password</label>
-          <input type="password" id="login-password" name="password" placeholder="Enter your password" required>
-          <small id="password-error" class="error-message"></small>
-                  </div>
+            // Password validation pattern
+            const passwordPattern =
+                /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
 
-        <!-- Forgot Password -->
-        <div class="form-group forgot-password">
-          <a href="#" id="forgot-password-link">Forgot your password?</a>
-        </div>
-	
-	<!-- Captcha --> 
-	<div id="login-captcha-container" class="form-group captcha-container"> 
-	<div id="login-recaptcha" class="g-recaptcha" data-sitekey="">
-	</div> 
-	<div id="login-captcha-fallback" class="captcha-fallback" style="display:none;"> <p> 
-	<i class="fas fa-shield-alt"></i> CAPTCHA verification disabled in development mode </p>
-	 </div> 
-	 </div>
+            form.addEventListener("submit", (e) => {
+                e.preventDefault();
+                let valid = true;
+                emailError.textContent = "";
+                passwordError.textContent = "";
 
-        <!-- Submit -->
-        <button type="submit" class="btn btn-primary btn-full">
-          <i class="fas fa-sign-in-alt"></i> Login
-        </button>
-      </form>
+                // Email validation
+                if (!emailInput.value.endsWith("@plv.edu.ph")) {
+                    emailError.textContent = "Please use your PLV email address.";
+                    valid = false;
+                }
 
-      <div class="modal-footer">
-        <p>Don’t have an account? <a href="#" id="switch-to-register">Register here</a></p>
-      </div>
-    </div>
-  </div>
-</div>
+                // Password validation
+                if (!passwordPattern.test(passwordInput.value)) {
+                    passwordError.textContent =
+                        "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.";
+                    valid = false;
+                }
 
-<!-- Script -->
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("login-form");
-  const emailInput = document.getElementById("login-email");
-  const passwordInput = document.getElementById("login-password");
-  const emailError = document.getElementById("email-error");
-  const passwordError = document.getElementById("password-error");
-
-  // Password validation pattern
-  const passwordPattern =
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
-
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    let valid = true;
-    emailError.textContent = "";
-    passwordError.textContent = "";
-
-    // Email validation
-    if (!emailInput.value.endsWith("@plv.edu.ph")) {
-      emailError.textContent = "Please use your PLV email address.";
-      valid = false;
-    }
-
-    // Password validation
-    if (!passwordPattern.test(passwordInput.value)) {
-      passwordError.textContent =
-        "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.";
-      valid = false;
-    }
-
-    if (valid) {
-      // simulate server check
-      alert("Login successful (for demo)");
-      form.reset();
-    }
-  });
-});
-</script>
+                if (valid) {
+                    // simulate server check
+                    alert("Login successful (for demo)");
+                    form.reset();
+                }
+            });
+        });
+    </script>
 
 
     <!-- Register Modal -->
@@ -813,7 +816,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     <!-- Password -->
                     <div class="form-group">
                         <label for="register-password">Password</label>
-                        <input type="password" id="register-password" name="password" required>
+                        <div style="position: relative;">
+                            <input type="password" id="register-password" name="password" required>
+                            <span id="toggle-password"
+                                style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer;">
+                                <i class="fas fa-eye-slash"></i>
+                            </span>
+                        </div>
 
                         <!-- Password Requirements -->
                         <div class="password-requirements">
@@ -839,7 +848,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     <!-- Confirm Password -->
                     <div class="form-group">
                         <label for="register-confirm-password">Confirm Password</label>
-                        <input type="password" id="register-confirm-password" name="confirm_password" required>
+                        <div style="position: relative;">
+                            <input type="password" id="register-confirm-password" name="confirm_password" required>
+                            <span id="toggle-confirm-password"
+                                style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer;">
+                                <i class="fas fa-eye-slash"></i>
+                            </span>
+                        </div>
                         <div id="password-match-indicator" class="password-match"></div>
                     </div>
 
@@ -868,88 +883,112 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
     </div>
 
-    <!-- SCRIPT FOR VALIDATION IN REGISTRATION-->
-
+    <!-- SCRIPT FOR VALIDATION AND SHOW/HIDE PASSWORD -->
     <script>
-    // Get elements
-    const passwordInput = document.getElementById("register-password");
-    const confirmPasswordInput = document.getElementById("register-confirm-password");
-    const matchIndicator = document.getElementById("password-match-indicator");
+        // Get elements
+        const passwordInput = document.getElementById("register-password");
+        const confirmPasswordInput = document.getElementById("register-confirm-password");
+        const matchIndicator = document.getElementById("password-match-indicator");
 
-    // Password requirement elements
-    const reqLength = document.getElementById("req-length");
-    const reqUppercase = document.getElementById("req-uppercase");
-    const reqLowercase = document.getElementById("req-lowercase");
-    const reqNumber = document.getElementById("req-number");
-    const reqSpecial = document.getElementById("req-special");
+        const togglePassword = document.getElementById("toggle-password");
+        const toggleConfirmPassword = document.getElementById("toggle-confirm-password");
 
-    // Helper function to update requirement colors
-    function updateRequirement(element, condition) {
-        if (condition) {
-            element.style.color = "green";
-            element.querySelector("i").className = "fas fa-check-circle";
-        } else {
-            element.style.color = "red";
-            element.querySelector("i").className = "fas fa-times-circle";
-        }
-    }
+        // Password requirement elements
+        const reqLength = document.getElementById("req-length");
+        const reqUppercase = document.getElementById("req-uppercase");
+        const reqLowercase = document.getElementById("req-lowercase");
+        const reqNumber = document.getElementById("req-number");
+        const reqSpecial = document.getElementById("req-special");
 
-    // Check password requirements in real time
-    passwordInput.addEventListener("input", () => {
-        const value = passwordInput.value;
+        // Toggle Password Visibility with proper icons
+        togglePassword.addEventListener("click", () => {
+            if (passwordInput.type === "password") {
+                passwordInput.type = "text";
+                togglePassword.innerHTML = '<i class="fas fa-eye"></i>'; // open eye
+            } else {
+                passwordInput.type = "password";
+                togglePassword.innerHTML = '<i class="fas fa-eye-slash"></i>'; // closed eye
+            }
+        });
 
-        const hasLength = value.length >= 8;
-        const hasUppercase = /[A-Z]/.test(value);
-        const hasLowercase = /[a-z]/.test(value);
-        const hasNumber = /[0-9]/.test(value);
-        const hasSpecial = /[!@#$%^&*]/.test(value);
+        toggleConfirmPassword.addEventListener("click", () => {
+            if (confirmPasswordInput.type === "password") {
+                confirmPasswordInput.type = "text";
+                toggleConfirmPassword.innerHTML = '<i class="fas fa-eye"></i>'; // open eye
+            } else {
+                confirmPasswordInput.type = "password";
+                toggleConfirmPassword.innerHTML = '<i class="fas fa-eye-slash"></i>'; // closed eye
+            }
+        });
 
-        updateRequirement(reqLength, hasLength);
-        updateRequirement(reqUppercase, hasUppercase);
-        updateRequirement(reqLowercase, hasLowercase);
-        updateRequirement(reqNumber, hasNumber);
-        updateRequirement(reqSpecial, hasSpecial);
-
-        // Update password match while typing
-        checkPasswordMatch();
-    });
-
-    // Check confirm password match
-    confirmPasswordInput.addEventListener("input", checkPasswordMatch);
-
-    function checkPasswordMatch() {
-        if (confirmPasswordInput.value === "") {
-            matchIndicator.textContent = "";
-            return;
+        // Helper function to update requirement colors
+        function updateRequirement(element, condition) {
+            if (condition) {
+                element.style.color = "green";
+                element.querySelector("i").className = "fas fa-check-circle";
+            } else {
+                element.style.color = "red";
+                element.querySelector("i").className = "fas fa-times-circle";
+            }
         }
 
-        if (passwordInput.value === confirmPasswordInput.value) {
-            matchIndicator.textContent = "✅ Passwords match";
-            matchIndicator.style.color = "green";
-        } else {
-            matchIndicator.textContent = "❌ Passwords do not match";
-            matchIndicator.style.color = "red";
+        // Check password requirements in real time
+        passwordInput.addEventListener("input", () => {
+            const value = passwordInput.value;
+
+            const hasLength = value.length >= 8;
+            const hasUppercase = /[A-Z]/.test(value);
+            const hasLowercase = /[a-z]/.test(value);
+            const hasNumber = /[0-9]/.test(value);
+            const hasSpecial = /[!@#$%^&*]/.test(value);
+
+            updateRequirement(reqLength, hasLength);
+            updateRequirement(reqUppercase, hasUppercase);
+            updateRequirement(reqLowercase, hasLowercase);
+            updateRequirement(reqNumber, hasNumber);
+            updateRequirement(reqSpecial, hasSpecial);
+
+            // Update password match while typing
+            checkPasswordMatch();
+        });
+
+        // Check confirm password match
+        confirmPasswordInput.addEventListener("input", checkPasswordMatch);
+
+        function checkPasswordMatch() {
+            if (confirmPasswordInput.value === "") {
+                matchIndicator.textContent = "";
+                return;
+            }
+
+            if (passwordInput.value === confirmPasswordInput.value) {
+                matchIndicator.textContent = "✅ Passwords match";
+                matchIndicator.style.color = "green";
+            } else {
+                matchIndicator.textContent = "❌ Passwords do not match";
+                matchIndicator.style.color = "red";
+            }
         }
-    }
 
-    // Optional: Prevent form submission if validations fail
-    document.getElementById("register-form").addEventListener("submit", function (e) {
-        const value = passwordInput.value;
+        // Prevent form submission if validations fail
+        document.getElementById("register-form").addEventListener("submit", function (e) {
+            const value = passwordInput.value;
 
-        const valid =
-            value.length >= 8 &&
-            /[A-Z]/.test(value) &&
-            /[a-z]/.test(value) &&
-            /[0-9]/.test(value) &&
-            /[!@#$%^&*]/.test(value) &&
-            passwordInput.value === confirmPasswordInput.value;
+            const valid =
+                value.length >= 8 &&
+                /[A-Z]/.test(value) &&
+                /[a-z]/.test(value) &&
+                /[0-9]/.test(value) &&
+                /[!@#$%^&*]/.test(value) &&
+                passwordInput.value === confirmPasswordInput.value;
 
-        if (!valid) {
-            e.preventDefault();
-            alert("Please make sure your password meets all the requirements and matches the confirmation.");
-        }
-    });
-</script>
+            if (!valid) {
+                e.preventDefault();
+                alert("Please make sure your password meets all the requirements and matches the confirmation.");
+            }
+        });
+    </script>
+
 
 
     <!-- Verification Choice Modal -->
