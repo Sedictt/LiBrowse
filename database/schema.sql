@@ -15,7 +15,9 @@ CREATE TABLE users (
     phone_no VARCHAR(20),
     profile_pic VARCHAR(200),
     status ENUM('active','inactive','banned') DEFAULT 'active',
-    is_verified BOOLEAN DEFAULT TRUE,
+    is_verified BOOLEAN DEFAULT FALSE,
+    verification_status ENUM('pending','verified','pending_review','rejected') DEFAULT 'pending',
+    verification_method ENUM('otp','document_upload','admin') DEFAULT NULL,
     ver_token VARCHAR(200),
     ver_token_expiry DATETIME,
     credits INT DEFAULT 50,
@@ -179,6 +181,34 @@ CREATE INDEX idx_feedback_rating ON feedback(rating);
 CREATE INDEX idx_credit_user_time ON credit_history(user_id, created);
 CREATE INDEX idx_msg_chat_time ON chat_messages(chat_id, created);
 
+-- Verification documents table for OCR ID verification
+CREATE TABLE verification_documents (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    front_id_path VARCHAR(255) NOT NULL,
+    back_id_path VARCHAR(255),
+    front_ocr_text TEXT,
+    back_ocr_text TEXT,
+    front_extracted_info JSON,
+    back_extracted_info JSON,
+    front_confidence DECIMAL(5,2),
+    back_confidence DECIMAL(5,2),
+    combined_confidence DECIMAL(5,2),
+    status ENUM('pending_review','verified','rejected') DEFAULT 'pending_review',
+    auto_approved BOOLEAN DEFAULT FALSE,
+    processed_at TIMESTAMP NULL,
+    admin_notes TEXT,
+    admin_reviewed_at TIMESTAMP NULL,
+    admin_reviewed_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_verification_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_verification_admin FOREIGN KEY (admin_reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_verification_user ON verification_documents(user_id);
+CREATE INDEX idx_verification_status ON verification_documents(status);
+
 INSERT INTO users 
 (email, student_no, fname, lname, pass_hash, course, year, phone_no, is_verified)
 VALUES
@@ -197,4 +227,4 @@ VALUES
 SELECT id, email, pass_hash, is_verified FROM users WHERE email = 'secureuser@plv.edu.ph';
 UPDATE users 
 SET pass_hash = '$2b$10$RXWZDb/Ddv0S68bYcIrkm.G/Vp4Q5DY9K5rK0VC8qj98Z6I9tDG3i'
-WHERE email = 'secureuser@plv.edu.ph';usersusers
+WHERE email = 'secureuser@plv.edu.ph';

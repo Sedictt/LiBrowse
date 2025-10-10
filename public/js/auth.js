@@ -9,10 +9,13 @@ class AuthManager {
     }
 
     init() {
+        console.log('🔧 AuthManager initializing...');
         this.checkAuth();
         this.setupModalEventListeners();
         this.setupAuthButtons();
         this.setupFormValidation();
+        this.setupAuthEvents();
+        console.log('✅ AuthManager initialized');
     }
 
     checkAuth() {
@@ -26,6 +29,15 @@ class AuthManager {
         } else {
             this.updateUIForAuthState(false);
         }
+    }
+
+    setupAuthEvents() {
+        // Listen for API auth errors (401/403) and prompt login
+        window.addEventListener('auth:unauthorized', (e) => {
+            console.warn('⚠️ Unauthorized API access', e.detail);
+            this.showToast('Please login to continue.', 'warning');
+            this.openModal('login-modal');
+        });
     }
 
     setupAuthButtons() {
@@ -89,13 +101,19 @@ class AuthManager {
         // Login form
         const loginForm = document.getElementById('login-form');
         if (loginForm) {
+            console.log('✅ Login form found, attaching listener');
             loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+        } else {
+            console.warn('⚠️ Login form not found');
         }
 
         // Register form
         const registerForm = document.getElementById('register-form');
         if (registerForm) {
+            console.log('✅ Register form found, attaching listener');
             registerForm.addEventListener('submit', (e) => this.handleRegister(e));
+        } else {
+            console.warn('⚠️ Register form not found');
         }
     }
 
@@ -176,7 +194,20 @@ class AuthManager {
             const response = await api.login(email, password);
             
             if (response.token && response.user) {
-                this.setAuth(response.token, response.user);
+                const u = response.user || {};
+                // Normalize to frontend shape
+                const mappedUser = {
+                    id: u.id,
+                    email: u.email,
+                    firstname: u.firstname || u.fname || '',
+                    lastname: u.lastname || u.lname || '',
+                    student_id: u.student_id || u.student_no || '',
+                    program: u.program || u.course || '',
+                    year: u.year || 1,
+                    is_verified: u.is_verified ?? false,
+                    credits: u.credits ?? 100,
+                };
+                this.setAuth(response.token, mappedUser);
                 this.closeModal('login-modal');
                 this.showToast('Welcome back!', 'success');
                 
@@ -195,6 +226,7 @@ class AuthManager {
 
     async handleRegister(e) {
         e.preventDefault();
+        console.log('🔵 Register form submitted');
         
         const formData = {
             firstname: document.getElementById('register-firstname').value,
@@ -205,23 +237,36 @@ class AuthManager {
             password: document.getElementById('register-password').value,
             confirm_password: document.getElementById('register-confirm-password').value
         };
+        
+        console.log('📝 Form data:', { ...formData, password: '***', confirm_password: '***' });
 
         // Validation
+        console.log('🔍 Starting validation...');
         if (Object.values(formData).some(val => !val)) {
+            console.log('❌ Validation failed: Empty fields');
             this.showToast('Please fill in all fields', 'error');
             return;
         }
 
+        console.log('✅ All fields filled');
+        
         if (!isValidPLVEmail(formData.email)) {
+            console.log('❌ Validation failed: Invalid PLV email');
             this.showToast('Please use your PLV email address', 'error');
             return;
         }
 
+        console.log('✅ PLV email valid');
+
         const passwordValidation = validatePassword(formData.password);
+        console.log('🔐 Password validation:', passwordValidation);
         if (!passwordValidation.isValid) {
+            console.log('❌ Validation failed: Password requirements not met');
             this.showToast('Please meet all password requirements', 'error');
             return;
         }
+
+        console.log('✅ Password valid');
 
         if (formData.password !== formData.confirm_password) {
             this.showToast('Passwords do not match', 'error');
@@ -229,23 +274,53 @@ class AuthManager {
         }
 
         try {
+            console.log('📤 Sending registration request...');
             const response = await api.register(formData);
+            console.log('📥 Registration response:', response);
             
-            if (response.token && response.user) {
-                this.setAuth(response.token, response.user);
-                this.pendingEmail = formData.email;
+            if (response.message && response.requiresVerification) {
+                // Store registration info temporarily
+                this.pendingRegistration = {
+                    userId: response.userId,
+                    email: response.email,
+                    ...formData
+                };
+                
+                this.closeModal('register-modal');
+                this.showToast('Registration successful! Please verify your account.', 'success');
+                
+                // Show verification choice modal
+                setTimeout(() => {
+                    this.showVerificationChoice();
+                }, 500);
+            } else if (response.token && response.user) {
+                // Direct login (if verification not required)
+                const u = response.user || {};
+                // Map backend fields to frontend shape
+                const mappedUser = {
+                    id: u.id,
+                    email: u.email,
+                    firstname: u.firstname || u.fname || '',
+                    lastname: u.lastname || u.lname || '',
+                    student_id: u.student_id || u.student_no || '',
+                    program: u.program || u.course || '',
+                    year: u.year || 1,
+                    is_verified: u.is_verified ?? false,
+                    credits: u.credits ?? 100,
+                };
+                this.setAuth(response.token, mappedUser);
                 this.closeModal('register-modal');
                 this.showToast('Registration successful!', 'success');
                 
-                // Open verification choice modal
-                setTimeout(() => {
-                    this.openModal('verification-choice-modal');
-                }, 500);
+                if (window.app) {
+                    window.app.loadCurrentSection();
+                }
             } else {
-                this.showToast(response.error || 'Registration failed', 'error');
+                console.warn('⚠️ Unexpected response format:', response);
+                this.showToast(response.error || response.message || 'Registration failed', 'error');
             }
         } catch (error) {
-            console.error('Registration error:', error);
+            console.error('❌ Registration error:', error);
             this.showToast(error.message || 'Registration failed. Please try again.', 'error');
         }
     }
@@ -321,8 +396,210 @@ class AuthManager {
         }
     }
 
-    showToast(message, type = 'info') {
-        showToast(message, type);
+    showToast(message, type = 'info', duration = 5000) {
+        console.log(`🔔 Toast: [${type}] ${message}`);
+        
+        // Check if toast container exists
+        const container = document.getElementById('toast-container');
+        if (!container) {
+            console.error('❌ Toast container not found!');
+            alert(message); // Fallback to alert
+            return;
+        }
+        
+        showToast(message, type, duration);
+    }
+
+    showVerificationChoice() {
+        // Create a simple verification choice UI
+        const message = `
+            <div style="text-align: center; padding: 20px;">
+                <h3 style="margin-bottom: 20px;">Choose Verification Method</h3>
+                <p style="margin-bottom: 30px; color: var(--text-muted);">
+                    To complete your registration, please verify your account using one of the methods below:
+                </p>
+                <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+                    <button onclick="authManager.startDocumentVerification()" 
+                            style="padding: 15px 30px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
+                        <i class="fas fa-id-card"></i> Upload Student ID
+                    </button>
+                    <button onclick="authManager.startOTPVerification()" 
+                            style="padding: 15px 30px; background: var(--secondary); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
+                        <i class="fas fa-envelope"></i> Email Verification
+                    </button>
+                </div>
+                <p style="margin-top: 20px; font-size: 14px; color: var(--text-muted);">
+                    You can verify later from your profile page
+                </p>
+            </div>
+        `;
+        
+        this.showToast(message, 'info', 10000);
+    }
+
+    startDocumentVerification() {
+        // Create document upload modal dynamically
+        this.showDocumentUploadModal();
+    }
+
+    startOTPVerification() {
+        this.showToast('OTP verification will be implemented soon', 'info');
+    }
+
+    showDocumentUploadModal() {
+        // Check if modal already exists
+        let modal = document.getElementById('document-upload-modal');
+        if (!modal) {
+            modal = this.createDocumentUploadModal();
+            document.body.appendChild(modal);
+        }
+        this.openModal('document-upload-modal');
+    }
+
+    createDocumentUploadModal() {
+        const modalHTML = `
+            <div id="document-upload-modal" class="modal">
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h3>Upload Student ID for Verification</h3>
+                        <button class="modal-close" onclick="authManager.closeModal('document-upload-modal')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p style="margin-bottom: 20px; color: var(--text-muted);">
+                            Please upload clear photos of your PLV Student ID. Our system will automatically verify your information.
+                        </p>
+                        
+                        <form id="document-upload-form" style="display: flex; flex-direction: column; gap: 20px;">
+                            <div class="form-group">
+                                <label for="front-id">Front of Student ID *</label>
+                                <input type="file" id="front-id" name="frontId" accept="image/*,.pdf" required 
+                                       style="padding: 10px; border: 2px dashed var(--border); border-radius: 8px; background: var(--bg-secondary);">
+                                <small style="color: var(--text-muted);">Accepted formats: JPG, PNG, PDF (Max 5MB)</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="back-id">Back of Student ID (Optional)</label>
+                                <input type="file" id="back-id" name="backId" accept="image/*,.pdf"
+                                       style="padding: 10px; border: 2px dashed var(--border); border-radius: 8px; background: var(--bg-secondary);">
+                                <small style="color: var(--text-muted);">Uploading both sides improves verification accuracy</small>
+                            </div>
+                            
+                            <div id="upload-status" style="display: none; padding: 15px; border-radius: 8px; background: var(--bg-secondary);">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Processing your documents...</span>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary" style="padding: 12px; font-size: 16px;">
+                                <i class="fas fa-upload"></i> Upload & Verify
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const div = document.createElement('div');
+        div.innerHTML = modalHTML;
+        const modalElement = div.firstElementChild;
+        
+        // Add form submit handler
+        const form = modalElement.querySelector('#document-upload-form');
+        form.addEventListener('submit', (e) => this.handleDocumentUpload(e));
+        
+        return modalElement;
+    }
+
+    async handleDocumentUpload(e) {
+        e.preventDefault();
+        
+        const form = e.target;
+        const frontIdInput = form.querySelector('#front-id');
+        const backIdInput = form.querySelector('#back-id');
+        const statusDiv = form.querySelector('#upload-status');
+        const submitBtn = form.querySelector('button[type="submit"]');
+        
+        if (!frontIdInput.files[0]) {
+            this.showToast('Please select the front of your Student ID', 'error');
+            return;
+        }
+        
+        // Show loading state
+        statusDiv.style.display = 'block';
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        
+        try {
+            // Create FormData
+            const formData = new FormData();
+            formData.append('frontId', frontIdInput.files[0]);
+            if (backIdInput.files[0]) {
+                formData.append('backId', backIdInput.files[0]);
+            }
+            
+            // First, we need to login to get a token since registration doesn't return one
+            // For now, let's show a message that they need to login first
+            if (!this.getToken()) {
+                // Try to login with the pending registration credentials
+                if (this.pendingRegistration) {
+                    try {
+                        const loginResponse = await api.login(
+                            this.pendingRegistration.email,
+                            this.pendingRegistration.password
+                        );
+                        
+                        if (loginResponse.token) {
+                            this.setAuth(loginResponse.token, loginResponse.user);
+                        }
+                    } catch (loginError) {
+                        console.error('Auto-login failed:', loginError);
+                        this.showToast('Please login first to upload documents', 'error');
+                        this.closeModal('document-upload-modal');
+                        this.openModal('login-modal');
+                        return;
+                    }
+                } else {
+                    this.showToast('Please login first to upload documents', 'error');
+                    this.closeModal('document-upload-modal');
+                    this.openModal('login-modal');
+                    return;
+                }
+            }
+            
+            // Upload documents
+            const response = await api.uploadVerificationDocuments(formData);
+            
+            statusDiv.style.display = 'none';
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Verify';
+            
+            if (response.success) {
+                this.closeModal('document-upload-modal');
+                
+                if (response.autoApproved) {
+                    this.showToast('✓ Verification successful! Your account is now verified.', 'success');
+                } else {
+                    this.showToast('Documents uploaded! Admin review in progress.', 'info');
+                }
+                
+                // Reload user data
+                if (window.app) {
+                    window.app.loadCurrentSection();
+                }
+            } else {
+                this.showToast(response.message || 'Upload failed', 'error');
+            }
+            
+        } catch (error) {
+            console.error('Document upload error:', error);
+            statusDiv.style.display = 'none';
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Verify';
+            this.showToast(error.message || 'Upload failed. Please try again.', 'error');
+        }
     }
 }
 

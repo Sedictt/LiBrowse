@@ -93,7 +93,16 @@ function validateCaptcha(formType = 'login') {
 
 // Initialize CAPTCHA when page loads
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        initCaptcha();
-    }, 500);
+    // Immediately show fallback and hide reCAPTCHA containers
+    const fallbacks = document.querySelectorAll('.captcha-fallback');
+    fallbacks.forEach(fallback => {
+        fallback.style.display = 'block';
+    });
+    
+    const containers = document.querySelectorAll('.g-recaptcha');
+    containers.forEach(container => {
+        container.style.display = 'none';
+    });
+    
+    console.log('CAPTCHA disabled - Development mode');
 });

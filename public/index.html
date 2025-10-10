@@ -552,7 +552,7 @@
         </section>
 
         <!-- Profile Section (Hidden for now) -->
-        <section id="profile-section" class="section" style="display: none;">
+        <section id="profile-section" class="section">
             <div class="container">
                 <div class="profile-content">
                     <div class="profile-sidebar">
@@ -638,7 +638,60 @@
                             <button class="tab-btn" data-tab="settings">Settings</button>
                         </div>
                         <div class="profile-tab-content">
-                            <!-- Profile content will be loaded here -->
+                            <!-- Personal Info Tab -->
+                            <div class="tab-content active" id="info-content" style="display: block;">
+                                <div class="info-section">
+                                    <h3>Personal Information</h3>
+                                    <p>View and manage your account information.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Verification Tab -->
+                            <div class="tab-content" id="verification-content" style="display: none;">
+                                <div class="verification-section" style="padding: 30px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                                    <h3 style="margin-bottom: 15px; color: #fff;">Account Verification</h3>
+                                    <p style="margin-bottom: 30px; color: #a0aec0;">Verify your account to access all features of LiBrowse.</p>
+                                    
+                                    <div class="verification-status" id="verification-status-display" style="margin-bottom: 30px;">
+                                        <div class="status-card pending" style="padding: 20px; background: rgba(251, 191, 36, 0.1); border: 2px solid rgba(251, 191, 36, 0.3); border-radius: 8px; text-align: center;">
+                                            <i class="fas fa-clock" style="font-size: 48px; color: #fbbf24; margin-bottom: 15px;"></i>
+                                            <h4 style="color: #fbbf24; margin-bottom: 10px;">Verification Pending</h4>
+                                            <p style="color: #a0aec0;">Please upload your Student ID to verify your account.</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="verification-actions" style="text-align: center;">
+                                        <button class="btn btn-primary" onclick="authManager.startDocumentVerification()" style="padding: 15px 30px; font-size: 16px;">
+                                            <i class="fas fa-id-card"></i>
+                                            Upload Student ID
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Books Tab -->
+                            <div class="tab-content" id="books-content">
+                                <div class="books-section">
+                                    <h3>My Books</h3>
+                                    <p>Manage your books here.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Reviews Tab -->
+                            <div class="tab-content" id="reviews-content">
+                                <div class="reviews-section">
+                                    <h3>Reviews</h3>
+                                    <p>Manage your reviews here.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Settings Tab -->
+                            <div class="tab-content" id="settings-content">
+                                <div class="settings-section">
+                                    <h3>Settings</h3>
+                                    <p>Manage your account settings here.</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -800,9 +853,10 @@
 
                     <!-- Email -->
                     <div class="form-group">
-                        <label for="register-email">PLV Email</label>
+                        <label for="register-email">PLV Email *</label>
                         <input type="email" id="register-email" name="email" placeholder="your.email@plv.edu.ph"
                             required>
+                        <small class="form-help" style="color: #fbbf24;">⚠️ Must use your PLV email address (@plv.edu.ph)</small>
                     </div>
 
                     <!-- Student ID -->
@@ -981,27 +1035,7 @@
     matchIndicator.style.color = "red";
             }
         }
-
-    // Prevent form submission if validations fail
-    document.getElementById("register-form").addEventListener("submit", function (e) {
-            const value = passwordInput.value;
-
-    const valid =
-                value.length >= 8 &&
-    /[A-Z]/.test(value) &&
-    /[a-z]/.test(value) &&
-    /[0-9]/.test(value) &&
-    /[!@#$%^&*]/.test(value) &&
-    passwordInput.value === confirmPasswordInput.value;
-
-    if (!valid) {
-        e.preventDefault();
-    alert("Please make sure your password meets all the requirements and matches the confirmation.");
-            }
-        });
     </script>
-
-
 
     <!-- Verification Choice Modal -->
     <div class="modal" id="verification-choice-modal">
@@ -1804,21 +1838,47 @@
                 </form>
             </div>
         </div>
-    </div>
-
     <!-- Toast Notifications -->
     <div class="toast-container" id="toast-container"></div>
 
     <!-- Scripts -->
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <script src="./js/utils.js"></script>
     <script src="./js/api.js"></script>
     <script src="./js/captcha.js"></script>
     <script src="./js/auth.js"></script>
+    <script src="./js/main.js"></script>
     <script src="./js/books.js"></script>
     <script src="./js/requests.js"></script>
     <script src="./js/monitoring.js"></script>
-    <script src="./js/main.js"></script>
+    
+    <!-- Profile Tab Switching Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Setup profile tab switching
+            const profileTabBtns = document.querySelectorAll('.profile-tabs .tab-btn');
+            profileTabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Remove active from all buttons
+                    profileTabBtns.forEach(b => b.classList.remove('active'));
+                    // Add active to clicked button
+                    btn.classList.add('active');
+                    
+                    // Hide all tab contents
+                    document.querySelectorAll('.profile-tab-content .tab-content').forEach(content => {
+                        content.style.display = 'none';
+                    });
+                    
+                    // Show selected tab content
+                    const tabName = btn.getAttribute('data-tab');
+                    const tabContent = document.getElementById(`${tabName}-content`);
+                    if (tabContent) {
+                        tabContent.style.display = 'block';
+                    }
+                });
+            });
+        });
+    </script>
+    
     <script>
         // Close mobile menu when modal opens
         document.addEventListener('DOMContentLoaded', () => {

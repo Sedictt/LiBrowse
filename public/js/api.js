@@ -25,11 +25,32 @@ class ApiClient {
                 ...options,
                 headers
             });
-
-            const data = await response.json();
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (_) {
+                // Non-JSON response
+                data = null;
+            }
 
             if (!response.ok) {
-                throw new Error(data.error || 'Request failed');
+                const message = (data && (data.error || data.message)) || 'Request failed';
+                const err = new Error(message);
+                // Attach additional context
+                err.status = response.status;
+                err.endpoint = endpoint;
+                err.body = data;
+
+                // Notify listeners on auth errors so UI can prompt login
+                if (response.status === 401 || response.status === 403) {
+                    try {
+                        window.dispatchEvent(new CustomEvent('auth:unauthorized', {
+                            detail: { status: response.status, endpoint }
+                        }));
+                    } catch (_) { /* noop for non-browser */ }
+                }
+
+                throw err;
             }
 
             return data;
@@ -50,8 +71,43 @@ class ApiClient {
     async register(userData) {
         return this.request('/auth/register', {
             method: 'POST',
-            body: JSON.stringify(userData)
+            body: JSON.stringify({
+                email: userData.email,
+                student_no: userData.student_id,
+                fname: userData.firstname,
+                lname: userData.lastname,
+                password: userData.password,
+                course: userData.program,
+                year: userData.year || 1
+            })
         });
+    }
+
+    async uploadVerificationDocuments(formData) {
+        const url = `${this.baseUrl}/verification/upload-documents`;
+        const headers = {
+            ...this.getAuthHeader()
+            // Don't set Content-Type for FormData, browser will set it with boundary
+        };
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || data.error || 'Upload failed');
+            }
+
+            return data;
+        } catch (error) {
+            console.error('Document upload failed:', error);
+            throw error;
+        }
     }
 
     async getProfile() {
