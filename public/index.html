@@ -868,6 +868,90 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
     </div>
 
+    <!-- SCRIPT FOR VALIDATION IN REGISTRATION-->
+
+    <script>
+    // Get elements
+    const passwordInput = document.getElementById("register-password");
+    const confirmPasswordInput = document.getElementById("register-confirm-password");
+    const matchIndicator = document.getElementById("password-match-indicator");
+
+    // Password requirement elements
+    const reqLength = document.getElementById("req-length");
+    const reqUppercase = document.getElementById("req-uppercase");
+    const reqLowercase = document.getElementById("req-lowercase");
+    const reqNumber = document.getElementById("req-number");
+    const reqSpecial = document.getElementById("req-special");
+
+    // Helper function to update requirement colors
+    function updateRequirement(element, condition) {
+        if (condition) {
+            element.style.color = "green";
+            element.querySelector("i").className = "fas fa-check-circle";
+        } else {
+            element.style.color = "red";
+            element.querySelector("i").className = "fas fa-times-circle";
+        }
+    }
+
+    // Check password requirements in real time
+    passwordInput.addEventListener("input", () => {
+        const value = passwordInput.value;
+
+        const hasLength = value.length >= 8;
+        const hasUppercase = /[A-Z]/.test(value);
+        const hasLowercase = /[a-z]/.test(value);
+        const hasNumber = /[0-9]/.test(value);
+        const hasSpecial = /[!@#$%^&*]/.test(value);
+
+        updateRequirement(reqLength, hasLength);
+        updateRequirement(reqUppercase, hasUppercase);
+        updateRequirement(reqLowercase, hasLowercase);
+        updateRequirement(reqNumber, hasNumber);
+        updateRequirement(reqSpecial, hasSpecial);
+
+        // Update password match while typing
+        checkPasswordMatch();
+    });
+
+    // Check confirm password match
+    confirmPasswordInput.addEventListener("input", checkPasswordMatch);
+
+    function checkPasswordMatch() {
+        if (confirmPasswordInput.value === "") {
+            matchIndicator.textContent = "";
+            return;
+        }
+
+        if (passwordInput.value === confirmPasswordInput.value) {
+            matchIndicator.textContent = "✅ Passwords match";
+            matchIndicator.style.color = "green";
+        } else {
+            matchIndicator.textContent = "❌ Passwords do not match";
+            matchIndicator.style.color = "red";
+        }
+    }
+
+    // Optional: Prevent form submission if validations fail
+    document.getElementById("register-form").addEventListener("submit", function (e) {
+        const value = passwordInput.value;
+
+        const valid =
+            value.length >= 8 &&
+            /[A-Z]/.test(value) &&
+            /[a-z]/.test(value) &&
+            /[0-9]/.test(value) &&
+            /[!@#$%^&*]/.test(value) &&
+            passwordInput.value === confirmPasswordInput.value;
+
+        if (!valid) {
+            e.preventDefault();
+            alert("Please make sure your password meets all the requirements and matches the confirmation.");
+        }
+    });
+</script>
+
+
     <!-- Verification Choice Modal -->
     <div class="modal" id="verification-choice-modal">
         <div class="modal-content">
