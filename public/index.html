@@ -662,122 +662,116 @@
         </section>
     </main>
 
-<!-- Modals -->
-   <!-- Login Modal -->
-<div id="login-modal" class="modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3>Login to LiBrowse</h3>
-      <button class="modal-close" data-modal="login-modal">
-        <i class="fas fa-times"></i>
-      </button>
+    <!-- Modals -->
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Login to LiBrowse</h3>
+                <button class="modal-close" data-modal="login-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <form id="login-form">
+                    <!-- Email -->
+                    <div class="form-group">
+                        <label for="login-email">PLV Email</label>
+                        <input type="email" id="login-email" name="email" placeholder="your.email@plv.edu.ph" required>
+                        <small id="email-error" class="error-message"></small>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" name="password" placeholder="Enter your password"
+                            required>
+                        <small id="password-error" class="error-message"></small>
+                    </div>
+
+                    <!-- Forgot Password -->
+                    <div class="form-group forgot-password">
+                        <a href="#" id="forgot-password-link">Forgot your password?</a>
+                    </div>
+
+                    <!-- Captcha -->
+                    <div id="login-captcha-container" class="form-group captcha-container">
+                        <div id="login-recaptcha" class="g-recaptcha" data-sitekey="">
+                        </div>
+                        <div id="login-captcha-fallback" class="captcha-fallback" style="display:none;">
+                            <p>
+                                <i class="fas fa-shield-alt"></i> CAPTCHA verification disabled in development mode
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="btn btn-primary btn-full">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                </form>
+
+                <div class="modal-footer">
+                    <p>Don’t have an account? <a href="#" id="switch-to-register">Register here</a></p>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="modal-body">
-      <form id="login-form">
-        <!-- Email -->
-        <div class="form-group">
-          <label for="login-email">PLV Email</label>
-          <input type="email" id="login-email" name="email" placeholder="your.email@plv.edu.ph" required>
-          <small id="email-error" class="error-message"></small>
-        </div>
+    <!-- Script -->
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("login-form");
+    const emailInput = document.getElementById("login-email");
+    const passwordInput = document.getElementById("login-password");
+    const emailError = document.getElementById("email-error");
+    const passwordError = document.getElementById("password-error");
 
-        <!-- Password -->
-        <div class="form-group">
-          <label for="login-password">Password</label>
-          <input type="password" id="login-password" name="password" placeholder="Enter your password" required>
-          <small id="password-error" class="error-message"></small>
-                  </div>
+    const passwordPattern =
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
 
-        <!-- Forgot Password -->
-        <div class="form-group forgot-password">
-          <a href="#" id="forgot-password-link">Forgot your password?</a>
-        </div>
-	
-	<!-- Captcha --> 
-	<div id="login-captcha-container" class="form-group captcha-container"> 
-	<div id="login-recaptcha" class="g-recaptcha" data-sitekey="">
-	</div> 
-	<div id="login-captcha-fallback" class="captcha-fallback" style="display:none;"> <p> 
-	<i class="fas fa-shield-alt"></i> CAPTCHA verification disabled in development mode </p>
-	 </div> 
-	 </div>
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        emailError.textContent = "";
+        passwordError.textContent = "";
 
-        <!-- Submit -->
-        <button type="submit" class="btn btn-primary btn-full">
-          <i class="fas fa-sign-in-alt"></i> Login
-        </button>
-      </form>
+        const email = emailInput.value.trim();
+        const password = passwordInput.value.trim();
 
-      <div class="modal-footer">
-        <p>Don’t have an account? <a href="#" id="switch-to-register">Register here</a></p>
-      </div>
-    </div>
-  </div>
-</div>
+        if (!email.endsWith("@plv.edu.ph")) {
+            emailError.textContent = "Please use your PLV email address.";
+            return;
+        }
 
-<!-- Script -->
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("login-form");
-  const emailInput = document.getElementById("login-email");
-  const passwordInput = document.getElementById("login-password");
-  const emailError = document.getElementById("email-error");
-  const passwordError = document.getElementById("password-error");
+        if (!passwordPattern.test(password)) {
+            passwordError.textContent =
+                "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.";
+            return;
+        }
 
-  // Password validation pattern
-  const passwordPattern =
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+        try {
+            const response = await api.login(email, password);
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    emailError.textContent = "";
-    passwordError.textContent = "";
+            if (response.token && response.user) {
+                localStorage.setItem("token", response.token);
+                localStorage.setItem("user", JSON.stringify(response.user));
 
-    const email = emailInput.value.trim();
-    const password = passwordInput.value.trim();
+                const modal = document.getElementById("login-modal");
+                if (modal) modal.classList.remove("active");
 
-    // Email validation
-    if (!email.endsWith("@plv.edu.ph")) {
-      emailError.textContent = "Please use your PLV email address.";
-      return;
-    }
-
-    // Password validation
-    if (!passwordPattern.test(password)) {
-      passwordError.textContent =
-        "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.";
-      return;
-    }
-
-    try {
-      // Call backend via api.js
-      const response = await api.login(email, password);
-
-      if (response.token && response.user) {
-        // Save auth state
-        localStorage.setItem("token", response.token);
-        localStorage.setItem("user", JSON.stringify(response.user));
-
-        // Optionally close modal
-        const modal = document.getElementById("login-modal");
-        if (modal) modal.classList.remove("active");
-
-        // Notify success
-        alert("✅ Login successful!");
-        window.location.reload(); // reload UI or redirect
-      } else {
-        passwordError.textContent = response.error || "Login failed.";
-      }
-    } catch (err) {
-      console.error("Login error:", err);
-      passwordError.textContent = "Invalid email or password.";
-    }
-  });
+                alert("✅ Login successful!");
+                window.location.reload();
+            } else {
+                passwordError.textContent = response.error || "Login failed.";
+            }
+        } catch (err) {
+            console.error("Login error:", err);
+            passwordError.textContent = "Invalid email or password.";
+        }
+    });
 });
 </script>
-
-
 
     <!-- Register Modal -->
     <div id="register-modal" class="modal">
@@ -834,7 +828,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     <!-- Password -->
                     <div class="form-group">
                         <label for="register-password">Password</label>
-                        <input type="password" id="register-password" name="password" required>
+                        <div style="position: relative;">
+                            <input type="password" id="register-password" name="password" required>
+                            <span id="toggle-password"
+                                style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer;">
+                                <i class="fas fa-eye-slash"></i>
+                            </span>
+                        </div>
 
                         <!-- Password Requirements -->
                         <div class="password-requirements">
@@ -860,7 +860,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     <!-- Confirm Password -->
                     <div class="form-group">
                         <label for="register-confirm-password">Confirm Password</label>
-                        <input type="password" id="register-confirm-password" name="confirm_password" required>
+                        <div style="position: relative;">
+                            <input type="password" id="register-confirm-password" name="confirm_password" required>
+                            <span id="toggle-confirm-password"
+                                style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer;">
+                                <i class="fas fa-eye-slash"></i>
+                            </span>
+                        </div>
                         <div id="password-match-indicator" class="password-match"></div>
                     </div>
 
@@ -889,13 +895,15 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
     </div>
 
-    <!-- SCRIPT FOR VALIDATION IN REGISTRATION-->
-
+    <!-- SCRIPT FOR VALIDATION AND SHOW/HIDE PASSWORD -->
     <script>
     // Get elements
     const passwordInput = document.getElementById("register-password");
     const confirmPasswordInput = document.getElementById("register-confirm-password");
     const matchIndicator = document.getElementById("password-match-indicator");
+
+    const togglePassword = document.getElementById("toggle-password");
+    const toggleConfirmPassword = document.getElementById("toggle-confirm-password");
 
     // Password requirement elements
     const reqLength = document.getElementById("req-length");
@@ -904,73 +912,95 @@ document.addEventListener("DOMContentLoaded", () => {
     const reqNumber = document.getElementById("req-number");
     const reqSpecial = document.getElementById("req-special");
 
+        // Toggle Password Visibility with proper icons
+        togglePassword.addEventListener("click", () => {
+            if (passwordInput.type === "password") {
+        passwordInput.type = "text";
+    togglePassword.innerHTML = '<i class="fas fa-eye"></i>'; // open eye
+            } else {
+        passwordInput.type = "password";
+    togglePassword.innerHTML = '<i class="fas fa-eye-slash"></i>'; // closed eye
+            }
+        });
+
+        toggleConfirmPassword.addEventListener("click", () => {
+            if (confirmPasswordInput.type === "password") {
+        confirmPasswordInput.type = "text";
+    toggleConfirmPassword.innerHTML = '<i class="fas fa-eye"></i>'; // open eye
+            } else {
+        confirmPasswordInput.type = "password";
+    toggleConfirmPassword.innerHTML = '<i class="fas fa-eye-slash"></i>'; // closed eye
+            }
+        });
+
     // Helper function to update requirement colors
     function updateRequirement(element, condition) {
-        if (condition) {
-            element.style.color = "green";
-            element.querySelector("i").className = "fas fa-check-circle";
-        } else {
-            element.style.color = "red";
-            element.querySelector("i").className = "fas fa-times-circle";
+            if (condition) {
+        element.style.color = "green";
+    element.querySelector("i").className = "fas fa-check-circle";
+            } else {
+        element.style.color = "red";
+    element.querySelector("i").className = "fas fa-times-circle";
+            }
         }
-    }
 
-    // Check password requirements in real time
-    passwordInput.addEventListener("input", () => {
-        const value = passwordInput.value;
+        // Check password requirements in real time
+        passwordInput.addEventListener("input", () => {
+            const value = passwordInput.value;
 
-        const hasLength = value.length >= 8;
-        const hasUppercase = /[A-Z]/.test(value);
-        const hasLowercase = /[a-z]/.test(value);
-        const hasNumber = /[0-9]/.test(value);
-        const hasSpecial = /[!@#$%^&*]/.test(value);
+            const hasLength = value.length >= 8;
+    const hasUppercase = /[A-Z]/.test(value);
+    const hasLowercase = /[a-z]/.test(value);
+    const hasNumber = /[0-9]/.test(value);
+    const hasSpecial = /[!@#$%^&*]/.test(value);
 
-        updateRequirement(reqLength, hasLength);
-        updateRequirement(reqUppercase, hasUppercase);
-        updateRequirement(reqLowercase, hasLowercase);
-        updateRequirement(reqNumber, hasNumber);
-        updateRequirement(reqSpecial, hasSpecial);
+    updateRequirement(reqLength, hasLength);
+    updateRequirement(reqUppercase, hasUppercase);
+    updateRequirement(reqLowercase, hasLowercase);
+    updateRequirement(reqNumber, hasNumber);
+    updateRequirement(reqSpecial, hasSpecial);
 
-        // Update password match while typing
-        checkPasswordMatch();
-    });
+    // Update password match while typing
+    checkPasswordMatch();
+        });
 
     // Check confirm password match
     confirmPasswordInput.addEventListener("input", checkPasswordMatch);
 
     function checkPasswordMatch() {
-        if (confirmPasswordInput.value === "") {
-            matchIndicator.textContent = "";
-            return;
+            if (confirmPasswordInput.value === "") {
+        matchIndicator.textContent = "";
+    return;
+            }
+
+    if (passwordInput.value === confirmPasswordInput.value) {
+        matchIndicator.textContent = "✅ Passwords match";
+    matchIndicator.style.color = "green";
+            } else {
+        matchIndicator.textContent = "❌ Passwords do not match";
+    matchIndicator.style.color = "red";
+            }
         }
 
-        if (passwordInput.value === confirmPasswordInput.value) {
-            matchIndicator.textContent = "✅ Passwords match";
-            matchIndicator.style.color = "green";
-        } else {
-            matchIndicator.textContent = "❌ Passwords do not match";
-            matchIndicator.style.color = "red";
-        }
-    }
-
-    // Optional: Prevent form submission if validations fail
+    // Prevent form submission if validations fail
     document.getElementById("register-form").addEventListener("submit", function (e) {
-        const value = passwordInput.value;
+            const value = passwordInput.value;
 
-        const valid =
-            value.length >= 8 &&
-            /[A-Z]/.test(value) &&
-            /[a-z]/.test(value) &&
-            /[0-9]/.test(value) &&
-            /[!@#$%^&*]/.test(value) &&
-            passwordInput.value === confirmPasswordInput.value;
+    const valid =
+                value.length >= 8 &&
+    /[A-Z]/.test(value) &&
+    /[a-z]/.test(value) &&
+    /[0-9]/.test(value) &&
+    /[!@#$%^&*]/.test(value) &&
+    passwordInput.value === confirmPasswordInput.value;
 
-        if (!valid) {
-            e.preventDefault();
-            alert("Please make sure your password meets all the requirements and matches the confirmation.");
-        }
-    });
-</script>
+    if (!valid) {
+        e.preventDefault();
+    alert("Please make sure your password meets all the requirements and matches the confirmation.");
+            }
+        });
+    </script>
+
 
 
     <!-- Verification Choice Modal -->
@@ -1793,25 +1823,25 @@ document.addEventListener("DOMContentLoaded", () => {
         // Close mobile menu when modal opens
         document.addEventListener('DOMContentLoaded', () => {
             const modals = document.querySelectorAll('.modal');
-            const navToggle = document.getElementById('nav-toggle');
-            const navMenu = document.getElementById('nav-menu');
+    const navToggle = document.getElementById('nav-toggle');
+    const navMenu = document.getElementById('nav-menu');
 
             modals.forEach(modal => {
                 const observer = new MutationObserver((mutations) => {
-                    mutations.forEach((mutation) => {
-                        if (mutation.attributeName === 'class') {
-                            if (modal.classList.contains('active') || modal.classList.contains('show')) {
-                                if (navToggle && navMenu) {
-                                    navToggle.classList.remove('active');
-                                    navMenu.classList.remove('active');
-                                    document.body.classList.remove('menu-open');
-                                }
-                            }
-                        }
-                    });
+        mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'class') {
+                if (modal.classList.contains('active') || modal.classList.contains('show')) {
+                    if (navToggle && navMenu) {
+                        navToggle.classList.remove('active');
+                        navMenu.classList.remove('active');
+                        document.body.classList.remove('menu-open');
+                    }
+                }
+            }
+        });
                 });
 
-                observer.observe(modal, { attributes: true });
+    observer.observe(modal, {attributes: true });
             });
         });
     </script>
