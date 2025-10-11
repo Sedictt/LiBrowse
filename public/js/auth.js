@@ -35,7 +35,7 @@ class AuthManager {
         const existing = document.getElementById('verification-success-modal');
         if (!existing) {
             const modalHTML = `
-                <div id="verification-success-modal" class="modal">
+                <div id="verification-success-modal" class="modal" style="z-index:10000;">
                     <div class="modal-content" style="max-width: 520px;">
                         <div class="modal-header">
                             <h3>${opts.title || 'Verification Successful'}</h3>
@@ -48,7 +48,7 @@ class AuthManager {
                             <h4 style="color: #10B981; margin: 0 0 10px;">You're Verified!</h4>
                             <p style="color: var(--text-muted); margin-bottom: 20px;">${opts.message || 'Your account is now verified.'}</p>
                             <div style="display:flex; gap: 12px; justify-content: center;">
-                                <button class="btn btn-primary" onclick="authManager.closeModal('verification-success-modal')">
+                                <button class="btn btn-primary" onclick="authManager.onVerificationSuccessContinue()">
                                     Continue
                                 </button>
                             </div>
@@ -66,6 +66,13 @@ class AuthManager {
         }
 
         this.openModal('verification-success-modal');
+    }
+
+    onVerificationSuccessContinue() {
+        this.closeModal('verification-success-modal');
+        if (window.app) {
+            window.app.loadCurrentSection();
+        }
     }
 
     updateVerificationStatusUI(status, message) {
@@ -690,20 +697,24 @@ class AuthManager {
                     // Update UI status card
                     this.updateVerificationStatusUI('verified', 'Your account is verified.');
                     // Show success modal
-                    this.showVerificationSuccessModal({
+                    // Slight delay to avoid race with closing upload modal
+                    console.log('🔔 Showing verification success modal...');
+                    setTimeout(() => this.showVerificationSuccessModal({
                         title: 'Verification Successful',
                         message: 'Your Student ID has been verified. You now have full access to LiBrowse features.',
-                    });
+                    }), 120);
                 } else {
                     this.showToast('Documents uploaded! Admin review in progress.', 'info');
                     // Update UI status card
                     this.updateVerificationStatusUI('pending_review', response.message || 'Admin review in progress.');
+                    // Reload user data for pending state only
+                    if (window.app) {
+                        window.app.loadCurrentSection();
+                    }
                 }
                 
-                // Reload user data
-                if (window.app) {
-                    window.app.loadCurrentSection();
-                }
+                // Note: we intentionally do not reload immediately on auto-approval
+                // to avoid hiding the success modal. Reload happens on Continue.
             } else {
                 this.showToast(response.message || 'Upload failed', 'error');
                 this.updateVerificationStatusUI('error', response.message || 'Verification failed.');
