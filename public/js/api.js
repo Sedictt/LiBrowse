@@ -125,6 +125,24 @@ class ApiClient {
         });
     }
 
+    // =====================================
+    // Email OTP Verification Endpoints
+    // =====================================
+
+    async sendOTP(email) {
+        return this.request('/auth/send-otp', {
+            method: 'POST',
+            body: JSON.stringify({ email })
+        });
+    }
+
+    async verifyOTP(email, otp) {
+        return this.request('/auth/verify-otp', {
+            method: 'POST',
+            body: JSON.stringify({ email, otp })
+        });
+    }
+
     // Books endpoints
     async getBooks(filters = {}) {
         const queryString = new URLSearchParams(filters).toString();

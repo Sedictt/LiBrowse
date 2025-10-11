@@ -255,4 +255,76 @@ router.post('/register', async (req, res) => {
     }
 });
 
+// ============================
+// EMAIL OTP VERIFICATION
+// ============================
+const nodemailer = require("nodemailer");
+
+// Generate random 6-digit OTP
+function generateOTP() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Send OTP via PLV email
+router.post("/send-otp", async (req, res) => {
+  try {
+    const { email } = req.body;
+    console.log("Attempting to send OTP to:", email);
+    
+    if (!email.endsWith("@plv.edu.ph")) {
+      return res.status(400).json({ error: "Must use PLV email" });
+    }
+
+    const user = await getOne("SELECT * FROM users WHERE email = ?", [email]);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const otp = generateOTP();
+    const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await executeQuery("UPDATE users SET ver_token = ?, ver_token_expiry = ? WHERE email = ?", [otp, expiry, email]);
+
+    // Configure your email transporter
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER, // e.g., your Gmail
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+
+    await transporter.sendMail({
+      from: `"LiBrowse Verification" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Your LiBrowse OTP Code",
+      html: `<h2>Your OTP Code</h2><p>Your one-time password is <b>${otp}</b>.</p><p>This code expires in 10 minutes.</p>`
+    });
+
+    return res.json({ message: "OTP sent to your PLV email" });
+  } catch (err) {
+    console.error("OTP send error:", err);
+    return res.status(500).json({ error: "Failed to send OTP" });
+  }
+});
+
+router.post("/verify-otp", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const user = await getOne("SELECT * FROM users WHERE email = ?", [email]);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (user.ver_token !== otp) {
+      return res.status(400).json({ error: "Invalid OTP" });
+    }
+
+    if (new Date() > new Date(user.ver_token_expiry)) {
+      return res.status(400).json({ error: "OTP expired" });
+    }
+
+    await executeQuery("UPDATE users SET is_verified = TRUE, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?", [email]);
+    return res.json({ message: "Email verified successfully" });
+  } catch (err) {
+    console.error("OTP verify error:", err);
+    return res.status(500).json({ error: "Failed to verify OTP" });
+  }
+});
 module.exports = router;

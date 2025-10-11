@@ -21,7 +21,7 @@ class AuthManager {
     checkAuth() {
         const token = localStorage.getItem('token');
         const user = localStorage.getItem('user');
-        
+
         if (token && user) {
             this.isAuthenticated = true;
             this.currentUser = JSON.parse(user);
@@ -119,11 +119,11 @@ class AuthManager {
         // Desktop login/register buttons
         const loginBtn = document.getElementById('login-btn');
         const registerBtn = document.getElementById('register-btn');
-        
+
         if (loginBtn) {
             loginBtn.addEventListener('click', () => this.openModal('login-modal'));
         }
-        
+
         if (registerBtn) {
             registerBtn.addEventListener('click', () => this.openModal('register-modal'));
         }
@@ -131,7 +131,7 @@ class AuthManager {
         // Modal switching links
         const switchToRegister = document.getElementById('switch-to-register');
         const switchToLogin = document.getElementById('switch-to-login');
-        
+
         if (switchToRegister) {
             switchToRegister.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -139,7 +139,7 @@ class AuthManager {
                 this.openModal('register-modal');
             });
         }
-        
+
         if (switchToLogin) {
             switchToLogin.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -157,7 +157,7 @@ class AuthManager {
         // User avatar dropdown
         const userAvatar = document.getElementById('user-avatar');
         const userDropdown = document.getElementById('user-dropdown');
-        
+
         if (userAvatar && userDropdown) {
             userAvatar.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -196,13 +196,13 @@ class AuthManager {
         // Password validation for registration
         const registerPassword = document.getElementById('register-password');
         const confirmPassword = document.getElementById('register-confirm-password');
-        
+
         if (registerPassword) {
             registerPassword.addEventListener('input', () => {
                 this.validatePasswordStrength(registerPassword.value);
             });
         }
-        
+
         if (confirmPassword && registerPassword) {
             confirmPassword.addEventListener('input', () => {
                 this.validatePasswordMatch(registerPassword.value, confirmPassword.value);
@@ -251,7 +251,7 @@ class AuthManager {
 
     async handleLogin(e) {
         e.preventDefault();
-        
+
         const email = document.getElementById('login-email').value;
         const password = document.getElementById('login-password').value;
 
@@ -277,7 +277,7 @@ class AuthManager {
             }
 
             const response = await api.login(email, password, captchaToken);
-            
+
             if (response.token && response.user) {
                 const u = response.user || {};
                 // Normalize to frontend shape
@@ -295,7 +295,7 @@ class AuthManager {
                 this.setAuth(response.token, mappedUser);
                 this.closeModal('login-modal');
                 this.showToast('Welcome back!', 'success');
-                
+
                 // Reload the current section
                 if (window.app) {
                     window.app.loadCurrentSection();
@@ -316,7 +316,7 @@ class AuthManager {
     async handleRegister(e) {
         e.preventDefault();
         console.log('🔵 Register form submitted');
-        
+
         const formData = {
             firstname: document.getElementById('register-firstname').value,
             lastname: document.getElementById('register-lastname').value,
@@ -326,7 +326,7 @@ class AuthManager {
             password: document.getElementById('register-password').value,
             confirm_password: document.getElementById('register-confirm-password').value
         };
-        
+
         console.log('📝 Form data:', { ...formData, password: '***', confirm_password: '***' });
 
         // Validation
@@ -338,7 +338,7 @@ class AuthManager {
         }
 
         console.log('✅ All fields filled');
-        
+
         if (!isValidPLVEmail(formData.email)) {
             console.log('❌ Validation failed: Invalid PLV email');
             this.showToast('Please use your PLV email address', 'error');
@@ -376,7 +376,7 @@ class AuthManager {
 
             const response = await api.register(formData, captchaToken);
             console.log('📥 Registration response:', response);
-            
+
             if (response.message && response.requiresVerification) {
                 // Store registration info temporarily
                 this.pendingRegistration = {
@@ -384,10 +384,10 @@ class AuthManager {
                     email: response.email,
                     ...formData
                 };
-                
+
                 this.closeModal('register-modal');
                 this.showToast('Registration successful! Please verify your account.', 'success');
-                
+
                 // Show verification choice modal
                 setTimeout(() => {
                     this.showVerificationChoice();
@@ -410,7 +410,7 @@ class AuthManager {
                 this.setAuth(response.token, mappedUser);
                 this.closeModal('register-modal');
                 this.showToast('Registration successful!', 'success');
-                
+
                 if (window.app) {
                     window.app.loadCurrentSection();
                 }
@@ -443,7 +443,7 @@ class AuthManager {
         this.currentUser = null;
         this.updateUIForAuthState(false);
         this.showToast('Logged out successfully', 'info');
-        
+
         // Redirect to home
         if (window.app) {
             window.app.navigateToSection('home');
@@ -454,7 +454,7 @@ class AuthManager {
         const navAuth = document.getElementById('nav-auth');
         const navUser = document.getElementById('nav-user');
         const navMenu = document.getElementById('nav-menu');
-        
+
         if (isAuthenticated) {
             if (navAuth) navAuth.classList.add('hidden');
             if (navUser) navUser.classList.remove('hidden');
@@ -501,7 +501,7 @@ class AuthManager {
 
     showToast(message, type = 'info', duration = 5000) {
         console.log(`🔔 Toast: [${type}] ${message}`);
-        
+
         // Check if toast container exists
         const container = document.getElementById('toast-container');
         if (!container) {
@@ -509,7 +509,7 @@ class AuthManager {
             alert(message); // Fallback to alert
             return;
         }
-        
+
         showToast(message, type, duration);
     }
 
@@ -536,7 +536,7 @@ class AuthManager {
                 </p>
             </div>
         `;
-        
+
         this.showToast(message, 'info', 10000);
     }
 
@@ -604,37 +604,37 @@ class AuthManager {
                 </div>
             </div>
         `;
-        
+
         const div = document.createElement('div');
         div.innerHTML = modalHTML;
         const modalElement = div.firstElementChild;
-        
+
         // Add form submit handler
         const form = modalElement.querySelector('#document-upload-form');
         form.addEventListener('submit', (e) => this.handleDocumentUpload(e));
-        
+
         return modalElement;
     }
 
     async handleDocumentUpload(e) {
         e.preventDefault();
-        
+
         const form = e.target;
         const frontIdInput = form.querySelector('#front-id');
         const backIdInput = form.querySelector('#back-id');
         const statusDiv = form.querySelector('#upload-status');
         const submitBtn = form.querySelector('button[type="submit"]');
-        
+
         if (!frontIdInput.files[0]) {
             this.showToast('Please select the front of your Student ID', 'error');
             return;
         }
-        
+
         // Show loading state
         statusDiv.style.display = 'block';
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-        
+
         try {
             // Create FormData
             const formData = new FormData();
@@ -642,7 +642,7 @@ class AuthManager {
             if (backIdInput.files[0]) {
                 formData.append('backId', backIdInput.files[0]);
             }
-            
+
             // First, we need to login to get a token since registration doesn't return one
             // For now, let's show a message that they need to login first
             if (!this.getToken()) {
@@ -653,7 +653,7 @@ class AuthManager {
                             this.pendingRegistration.email,
                             this.pendingRegistration.password
                         );
-                        
+
                         if (loginResponse.token) {
                             this.setAuth(loginResponse.token, loginResponse.user);
                         }
@@ -671,17 +671,17 @@ class AuthManager {
                     return;
                 }
             }
-            
+
             // Upload documents
             const response = await api.uploadVerificationDocuments(formData);
-            
+
             statusDiv.style.display = 'none';
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Verify';
-            
+
             if (response.success) {
                 this.closeModal('document-upload-modal');
-                
+
                 if (response.autoApproved) {
                     this.showToast('✓ Verification successful! Your account is now verified.', 'success');
                     // Update local user state
@@ -693,7 +693,7 @@ class AuthManager {
                             localStorage.setItem('user', JSON.stringify(u));
                             this.currentUser = u;
                         }
-                    } catch (_) {}
+                    } catch (_) { }
                     // Update UI status card
                     this.updateVerificationStatusUI('verified', 'Your account is verified.');
                     // Show success modal
@@ -712,14 +712,14 @@ class AuthManager {
                         window.app.loadCurrentSection();
                     }
                 }
-                
+
                 // Note: we intentionally do not reload immediately on auto-approval
                 // to avoid hiding the success modal. Reload happens on Continue.
             } else {
                 this.showToast(response.message || 'Upload failed', 'error');
                 this.updateVerificationStatusUI('error', response.message || 'Verification failed.');
             }
-            
+
         } catch (error) {
             console.error('Document upload error:', error);
             statusDiv.style.display = 'none';
@@ -728,7 +728,81 @@ class AuthManager {
             this.showToast(error.message || 'Upload failed. Please try again.', 'error');
         }
     }
+
+    async startOTPVerification() {
+        const email = this.pendingRegistration?.email || this.currentUser?.email;
+        if (!email) {
+            this.showToast("No email found for verification", "error");
+            return;
+        }
+
+        try {
+            const response = await api.sendOTP(email);
+            this.showToast(response.message, "success");
+            this.showOTPModal(email);
+        } catch (err) {
+            this.showToast(err.message || "Failed to send OTP", "error");
+        }
+    }
+
+    showOTPModal(email) {
+        const modal = document.createElement('div');
+        modal.innerHTML = `
+    <div class="modal active" id="otp-modal">
+      <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+          <h3>Email Verification</h3>
+          <button class="modal-close" onclick="authManager.closeModal('otp-modal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" style="text-align:center;">
+          <p>We’ve sent a 6-digit OTP to <b>${email}</b></p>
+          <input type="text" id="otp-input" placeholder="Enter OTP" maxlength="6" style="text-align:center; font-size:20px; letter-spacing:4px; margin-bottom:10px;">
+          <button class="btn btn-primary" onclick="authManager.verifyOTPCode('${email}')">Verify</button>
+          <p id="otp-timer" style="margin-top:10px; color:gray;">Expires in 10:00</p>
+          <button class="btn btn-link" id="resend-otp-btn" onclick="authManager.resendOTP('${email}')">Resend OTP</button>
+        </div>
+      </div>
+    </div>
+  `;
+        document.body.appendChild(modal);
+        this.startOTPTimer();
+    }
+
+    async verifyOTPCode(email) {
+        const otp = document.getElementById("otp-input").value;
+        try {
+            const response = await api.verifyOTP(email, otp);
+            this.showToast(response.message, "success");
+            this.closeModal("otp-modal");
+        } catch (err) {
+            this.showToast(err.message || "Invalid or expired OTP", "error");
+        }
+    }
+
+    async resendOTP(email) {
+        try {
+            const response = await api.sendOTP(email);
+            this.showToast("New OTP sent!", "info");
+            this.startOTPTimer();
+        } catch (err) {
+            this.showToast(err.message || "Failed to resend OTP", "error");
+        }
+    }
+
+    startOTPTimer() {
+        let timeLeft = 600; // 10 minutes
+        const timerDisplay = document.getElementById("otp-timer");
+        const interval = setInterval(() => {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            if (timerDisplay) timerDisplay.textContent = `Expires in ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            if (timeLeft-- <= 0) clearInterval(interval);
+        }, 1000);
+    }
+
 }
 
 // Create global authManager instance
+
+
 const authManager = new AuthManager();
