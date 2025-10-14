@@ -540,9 +540,20 @@ class AuthManager {
         this.showToast(message, 'info', 10000);
     }
 
-    startDocumentVerification() {
-        // Create document upload modal dynamically
-        this.showDocumentUploadModal();
+    async startOTPVerification() {
+        const email = this.pendingRegistration?.email || this.currentUser?.email;
+        if (!email) {
+            this.showToast("No email found for verification", "error");
+            return;
+        }
+
+        try {
+            const response = await api.sendOTP(email);
+            this.showToast(response.message, "success");
+            this.showOTPModal(email);
+        } catch (err) {
+            this.showToast(err.message || "Failed to send OTP", "error");
+        }
     }
 
     startOTPVerification() {
