@@ -540,6 +540,10 @@ class AuthManager {
         this.showToast(message, 'info', 10000);
     }
 
+    startDocumentVerification() {
+        this.showDocumentUploadModal();
+    }
+
     async startOTPVerification() {
         const email = this.pendingRegistration?.email || this.currentUser?.email;
         if (!email) {
@@ -554,10 +558,6 @@ class AuthManager {
         } catch (err) {
             this.showToast(err.message || "Failed to send OTP", "error");
         }
-    }
-
-    startOTPVerification() {
-        this.showToast('OTP verification will be implemented soon', 'info');
     }
 
     showDocumentUploadModal() {

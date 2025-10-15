@@ -269,19 +269,35 @@ function generateOTP() {
 router.post("/send-otp", async (req, res) => {
   try {
     const { email } = req.body;
-    console.log("Attempting to send OTP to:", email);
+    const startTs = Date.now();
+    console.log(`[OTP] send-otp: request received`, { email, env: process.env.NODE_ENV });
     
     if (!email.endsWith("@plv.edu.ph")) {
+      console.warn(`[OTP] send-otp: rejected non-PLV email`, { email });
       return res.status(400).json({ error: "Must use PLV email" });
     }
 
     const user = await getOne("SELECT * FROM users WHERE email = ?", [email]);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user) {
+      console.warn(`[OTP] send-otp: user not found`, { email });
+      return res.status(404).json({ error: "User not found" });
+    }
+    console.log(`[OTP] send-otp: user found`, { id: user.id, verified: !!user.is_verified });
 
     const otp = generateOTP();
     const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    console.log(`[OTP] send-otp: OTP generated`, {
+      otp: process.env.NODE_ENV === 'production' ? '******' : otp,
+      expiresAt: expiry.toISOString()
+    });
 
-    await executeQuery("UPDATE users SET ver_token = ?, ver_token_expiry = ? WHERE email = ?", [otp, expiry, email]);
+    try {
+      await executeQuery("UPDATE users SET ver_token = ?, ver_token_expiry = ? WHERE email = ?", [otp, expiry, email]);
+      console.log(`[OTP] send-otp: DB updated with token+expiry`);
+    } catch (dbErr) {
+      console.error(`[OTP] send-otp: failed to update DB`, { error: dbErr.message });
+      throw dbErr;
+    }
 
     // Configure your email transporter
     const transporter = nodemailer.createTransport({
@@ -292,16 +308,41 @@ router.post("/send-otp", async (req, res) => {
       }
     });
 
-    await transporter.sendMail({
+    try {
+      const verifyOk = await transporter.verify();
+      console.log(`[OTP] send-otp: transporter.verify()`, { ok: !!verifyOk });
+    } catch (tvErr) {
+      console.warn(`[OTP] send-otp: transporter.verify failed`, { error: tvErr.message });
+      // continue to attempt sendMail regardless; verify can be flaky in some envs
+    }
+
+    const mailOptions = {
       from: `"LiBrowse Verification" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: "Your LiBrowse OTP Code",
       html: `<h2>Your OTP Code</h2><p>Your one-time password is <b>${otp}</b>.</p><p>This code expires in 10 minutes.</p>`
-    });
+    };
 
-    return res.json({ message: "OTP sent to your PLV email" });
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`[OTP] send-otp: email sent`, {
+        messageId: info?.messageId,
+        accepted: info?.accepted,
+        rejected: info?.rejected
+      });
+      console.log(`[OTP] send-otp: completed in ${Date.now() - startTs}ms`);
+      return res.json({ message: "OTP sent to your PLV email" });
+    } catch (mailErr) {
+      console.error(`[OTP] send-otp: sendMail failed`, {
+        error: mailErr.message,
+        code: mailErr.code,
+        command: mailErr.command,
+        response: mailErr.response
+      });
+      throw mailErr;
+    }
   } catch (err) {
-    console.error("OTP send error:", err);
+    console.error("[OTP] send-otp: error", err);
     return res.status(500).json({ error: "Failed to send OTP" });
   }
 });
@@ -309,21 +350,33 @@ router.post("/send-otp", async (req, res) => {
 router.post("/verify-otp", async (req, res) => {
   try {
     const { email, otp } = req.body;
+    console.log(`[OTP] verify-otp: request received`, { email, otp: process.env.NODE_ENV === 'production' ? '******' : otp });
     const user = await getOne("SELECT * FROM users WHERE email = ?", [email]);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user) {
+      console.warn(`[OTP] verify-otp: user not found`, { email });
+      return res.status(404).json({ error: "User not found" });
+    }
 
     if (user.ver_token !== otp) {
+      console.warn(`[OTP] verify-otp: invalid otp`, { email });
       return res.status(400).json({ error: "Invalid OTP" });
     }
 
     if (new Date() > new Date(user.ver_token_expiry)) {
+      console.warn(`[OTP] verify-otp: expired otp`, { email, expiry: user.ver_token_expiry });
       return res.status(400).json({ error: "OTP expired" });
     }
 
-    await executeQuery("UPDATE users SET is_verified = TRUE, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?", [email]);
-    return res.json({ message: "Email verified successfully" });
+    try {
+      await executeQuery("UPDATE users SET is_verified = TRUE, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?", [email]);
+      console.log(`[OTP] verify-otp: verification success`, { email });
+      return res.json({ message: "Email verified successfully" });
+    } catch (dbErr) {
+      console.error(`[OTP] verify-otp: failed to update user verification`, { error: dbErr.message });
+      throw dbErr;
+    }
   } catch (err) {
-    console.error("OTP verify error:", err);
+    console.error("[OTP] verify-otp: error", err);
     return res.status(500).json({ error: "Failed to verify OTP" });
   }
 });

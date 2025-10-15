@@ -1501,31 +1501,27 @@ class App {
         const methodsSection = document.querySelector('.verification-methods');
         const emailSection = document.getElementById('email-verification-section');
         const documentSection = document.getElementById('document-verification-section');
-        
+
         if (methodsSection) methodsSection.style.display = 'block';
         if (emailSection) emailSection.style.display = 'none';
         if (documentSection) documentSection.style.display = 'none';
     }
 
-    async sendVerificationCode() {
-        const sendBtn = document.getElementById('send-verification-code');
-        const originalText = sendBtn.innerHTML;
-        
-        try {
-            sendBtn.disabled = true;
-            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        async sendVerificationCode() {
+            const sendBtn = document.getElementById('send-verification-code');
+            const originalText = sendBtn.innerHTML;
+            
+            try {
+                sendBtn.disabled = true;
+                sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
 
-            const response = await fetch('/api/verification/send-email-code', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authManager.getToken()}`
+                const user = authManager.getCurrentUser();
+                if (!user || !user.email) {
+                    throw new Error('No email found for verification');
                 }
-            });
 
-            const result = await response.json();
+                await api.sendOTP(user.email);
 
-            if (result.success) {
                 // Show code input step
                 document.getElementById('send-code-step').style.display = 'none';
                 document.getElementById('verify-code-step').style.display = 'block';
@@ -1533,66 +1529,40 @@ class App {
                 // Start resend timer
                 this.startResendTimer();
                 
-                // Show development code for PLV emails
-                if (result.devCode && result.isPLVEmail) {
-                    const codeInput = document.getElementById('verification-code');
-                    if (codeInput) {
-                        codeInput.value = result.devCode;
-                        codeInput.style.backgroundColor = 'rgba(255, 184, 0, 0.1)';
-                        codeInput.style.borderColor = 'rgba(255, 184, 0, 0.3)';
-                    }
-                    showToast(`PLV Email: Code auto-filled for development (${result.devCode})`, 'warning');
-                } else {
-                    showToast(result.message || 'Verification code sent to your email!', 'success');
-                }
-                
-                // Show note if provided
-                if (result.note) {
-                    setTimeout(() => {
-                        showToast(result.note, 'info');
-                    }, 2000);
-                }
-            } else {
-                throw new Error(result.message || 'Failed to send verification code');
+                showToast('Verification code sent to your email!', 'success');
+            
+            } catch (error) {
+                console.error('Send verification code error:', error);
+                showToast(`Error: ${error.message}`, 'error');
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = originalText;
+            }
+        }
+
+        async verifyEmailCode() {
+            const codeInput = document.getElementById('verification-code');
+            const verifyBtn = document.getElementById('verify-code-btn');
+            const code = codeInput.value.trim();
+            
+            if (code.length !== 6) {
+                showToast('Please enter a 6-digit verification code', 'error');
+                return;
             }
 
-        } catch (error) {
-            console.error('Send verification code error:', error);
-            showToast(`Error: ${error.message}`, 'error');
-        } finally {
-            sendBtn.disabled = false;
-            sendBtn.innerHTML = originalText;
-        }
-    }
+            const originalText = verifyBtn.innerHTML;
+            
+            try {
+                verifyBtn.disabled = true;
+                verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
 
-    async verifyEmailCode() {
-        const codeInput = document.getElementById('verification-code');
-        const verifyBtn = document.getElementById('verify-code-btn');
-        const code = codeInput.value.trim();
-        
-        if (code.length !== 6) {
-            showToast('Please enter a 6-digit verification code', 'error');
-            return;
-        }
+                const user = authManager.getCurrentUser();
+                if (!user || !user.email) {
+                    throw new Error('No email found for verification');
+                }
 
-        const originalText = verifyBtn.innerHTML;
-        
-        try {
-            verifyBtn.disabled = true;
-            verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+                await api.verifyOTP(user.email, code);
 
-            const response = await fetch('/api/verification/verify-email-code', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authManager.getToken()}`
-                },
-                body: JSON.stringify({ code })
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
                 // Show success step
                 document.getElementById('verify-code-step').style.display = 'none';
                 document.getElementById('email-success-step').style.display = 'block';
@@ -1608,59 +1578,47 @@ class App {
                 setTimeout(() => {
                     this.loadProfileTabContent('verification');
                 }, 2000);
-                
-            } else {
-                throw new Error(result.message || 'Invalid verification code');
+
+            } catch (error) {
+                console.error('Verify email code error:', error);
+                showToast(`Error: ${error.message}`, 'error');
+            } finally {
+                verifyBtn.disabled = false;
+                verifyBtn.innerHTML = originalText;
             }
-
-        } catch (error) {
-            console.error('Verify email code error:', error);
-            showToast(`Error: ${error.message}`, 'error');
-        } finally {
-            verifyBtn.disabled = false;
-            verifyBtn.innerHTML = originalText;
         }
-    }
 
-    async resendVerificationCode() {
-        const resendBtn = document.getElementById('resend-code-btn');
-        const originalText = resendBtn.innerHTML;
-        
-        try {
-            resendBtn.disabled = true;
-            resendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        async resendVerificationCode() {
+            const resendBtn = document.getElementById('resend-code-btn');
+            const originalText = resendBtn.innerHTML;
+            
+            try {
+                resendBtn.disabled = true;
+                resendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
 
-            const response = await fetch('/api/verification/send-email-code', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authManager.getToken()}`
+                const user = authManager.getCurrentUser();
+                if (!user || !user.email) {
+                    throw new Error('No email found for verification');
                 }
-            });
 
-            const result = await response.json();
+                await api.sendOTP(user.email);
 
-            if (result.success) {
                 // Restart resend timer
                 this.startResendTimer();
                 showToast('New verification code sent!', 'success');
-            } else {
-                throw new Error(result.message || 'Failed to resend verification code');
+
+            } catch (error) {
+                console.error('Resend verification code error:', error);
+                showToast(`Error: ${error.message}`, 'error');
+            } finally {
+                resendBtn.innerHTML = originalText;
             }
-
-        } catch (error) {
-            console.error('Resend verification code error:', error);
-            showToast(`Error: ${error.message}`, 'error');
-        } finally {
-            resendBtn.innerHTML = originalText;
         }
-    }
 
-    startResendTimer() {
-        const resendBtn = document.getElementById('resend-code-btn');
-        const timerSpan = document.getElementById('resend-timer');
-        let seconds = 60;
-        
+        startResendTimer() {
+            const resendBtn = document.getElementById('resend-code-btn');
+            const timerSpan = document.getElementById('resend-timer');
+            let seconds = 60;
         if (this.resendTimer) {
             clearInterval(this.resendTimer);
         }

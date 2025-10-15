@@ -1,27 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/database');
+const { pool, executeQuery } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 
 // Get platform statistics (admin only)
 router.get('/platform', authenticateToken, async (req, res) => {
     try {
         // Total users
-        const [userCount] = await pool.query('SELECT COUNT(*) as count FROM users');
+        const [userCount] = await pool.execute('SELECT COUNT(*) as count FROM users');
         
         // Total books
-        const [bookCount] = await pool.query('SELECT COUNT(*) as count FROM books');
+        const [bookCount] = await pool.execute('SELECT COUNT(*) as count FROM books');
         
         // Total transactions
-        const [transactionCount] = await pool.query('SELECT COUNT(*) as count FROM transactions');
+        const [transactionCount] = await pool.execute('SELECT COUNT(*) as count FROM transactions');
         
         // Active transactions
-        const [activeTransactions] = await pool.query(
+        const [activeTransactions] = await pool.execute(
             'SELECT COUNT(*) as count FROM transactions WHERE status = "borrowed"'
         );
         
         // Average rating
-        const [avgRating] = await pool.query(
+        const [avgRating] = await pool.execute(
             'SELECT AVG(rating) as average FROM feedback WHERE rating IS NOT NULL'
         );
         
@@ -44,31 +44,31 @@ router.get('/user', authenticateToken, async (req, res) => {
         const userId = req.user.id;
         
         // Books owned
-        const [ownedBooks] = await pool.query(
+        const [ownedBooks] = await pool.execute(
             'SELECT COUNT(*) as count FROM books WHERE user_id = ?',
             [userId]
         );
         
         // Books lent
-        const [lentBooks] = await pool.query(
+        const [lentBooks] = await pool.execute(
             'SELECT COUNT(*) as count FROM transactions WHERE lender_id = ? AND status = "borrowed"',
             [userId]
         );
         
         // Books borrowed
-        const [borrowedBooks] = await pool.query(
+        const [borrowedBooks] = await pool.execute(
             'SELECT COUNT(*) as count FROM transactions WHERE borrower_id = ? AND status = "borrowed"',
             [userId]
         );
         
         // Total transactions
-        const [totalTransactions] = await pool.query(
+        const [totalTransactions] = await pool.execute(
             'SELECT COUNT(*) as count FROM transactions WHERE lender_id = ? OR borrower_id = ?',
             [userId, userId]
         );
         
         // User credits
-        const [user] = await pool.query(
+        const [user] = await pool.execute(
             'SELECT credits FROM users WHERE id = ?',
             [userId]
         );
