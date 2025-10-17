@@ -170,6 +170,17 @@ class AuthManager {
                 }
             });
         }
+
+        // Forgot password link
+        const forgotPasswordLink = document.getElementById('forgot-password-link');
+        if (forgotPasswordLink) {
+            forgotPasswordLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.closeModal('login-modal');
+                this.openModal('forgot-password-modal');
+            });
+        }
+
     }
 
     setupModalEventListeners() {
@@ -190,6 +201,24 @@ class AuthManager {
         } else {
             console.warn('⚠️ Register form not found');
         }
+
+        // Forgot Password form
+        const forgotPasswordSubmit = document.getElementById('forgot-password-submit');
+        if (forgotPasswordSubmit) {
+            forgotPasswordSubmit.addEventListener('click', async () => {
+                const email = document.getElementById('forgot-password-email').value;
+                if (!email) return this.showToast("Please enter your email", "error");
+
+                try {
+                    const res = await api.forgotPassword(email);
+                    this.showToast(res.message || "Reset link sent!", "success");
+                    this.closeModal('forgot-password-modal');
+                } catch (err) {
+                    this.showToast(err.message || "Failed to send reset link", "error");
+                }
+            });
+        }
+
     }
 
     setupFormValidation() {
@@ -810,7 +839,45 @@ class AuthManager {
             if (timeLeft-- <= 0) clearInterval(interval);
         }, 1000);
     }
+    async handleForgotPassword() {
+        const email = document.getElementById('forgot-password-email').value;
+        if (!email) {
+            this.showToast("Please enter your email", "error");
+            return;
+        }
 
+        try {
+            const response = await api.request('/auth/forgot-password', {
+                method: 'POST',
+                body: JSON.stringify({ email })
+            });
+            this.showToast(response.message, 'success');
+            this.closeModal('forgot-password-modal');
+        } catch (err) {
+            this.showToast(err.message || "Failed to send reset link", "error");
+        }
+    }
+
+}
+// Forgot Password form
+document.getElementById("forgot-password-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("forgot-email").value;
+    try {
+        const response = await api.forgotPassword(email);
+        alert(response.message);
+    } catch (err) {
+        alert(err.message || "Error sending reset link");
+    }
+});
+// Forgot password link
+const forgotPasswordLink = document.getElementById('forgot-password-link');
+if (forgotPasswordLink) {
+    forgotPasswordLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.closeModal('login-modal');
+        this.openModal('forgot-password-modal');
+    });
 }
 
 // Create global authManager instance

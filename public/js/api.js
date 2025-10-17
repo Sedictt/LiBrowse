@@ -244,6 +244,21 @@ class ApiClient {
     async delete(endpoint) {
         return this.request(endpoint, { method: 'DELETE' });
     }
+
+    async forgotPassword(email) {
+        return this.request('/auth/forgot-password', {
+            method: 'POST',
+            body: JSON.stringify({ email })
+        });
+    }
+
+    async resetPassword(email, token, newPassword) {
+        return this.request('/auth/reset-password', {
+            method: 'POST',
+            body: JSON.stringify({ email, token, newPassword })
+        });
+    }
+
 }
 
 // Create global API instance

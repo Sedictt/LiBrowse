@@ -645,30 +645,38 @@
                                     <p>View and manage your account information.</p>
                                 </div>
                             </div>
-                            
+
                             <!-- Verification Tab -->
                             <div class="tab-content" id="verification-content" style="display: none;">
-                                <div class="verification-section" style="padding: 30px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                                <div class="verification-section"
+                                    style="padding: 30px; background: rgba(255,255,255,0.05); border-radius: 12px;">
                                     <h3 style="margin-bottom: 15px; color: #fff;">Account Verification</h3>
-                                    <p style="margin-bottom: 30px; color: #a0aec0;">Verify your account to access all features of LiBrowse.</p>
-                                    
-                                    <div class="verification-status" id="verification-status-display" style="margin-bottom: 30px;">
-                                        <div class="status-card pending" style="padding: 20px; background: rgba(251, 191, 36, 0.1); border: 2px solid rgba(251, 191, 36, 0.3); border-radius: 8px; text-align: center;">
-                                            <i class="fas fa-clock" style="font-size: 48px; color: #fbbf24; margin-bottom: 15px;"></i>
+                                    <p style="margin-bottom: 30px; color: #a0aec0;">Verify your account to access all
+                                        features of LiBrowse.</p>
+
+                                    <div class="verification-status" id="verification-status-display"
+                                        style="margin-bottom: 30px;">
+                                        <div class="status-card pending"
+                                            style="padding: 20px; background: rgba(251, 191, 36, 0.1); border: 2px solid rgba(251, 191, 36, 0.3); border-radius: 8px; text-align: center;">
+                                            <i class="fas fa-clock"
+                                                style="font-size: 48px; color: #fbbf24; margin-bottom: 15px;"></i>
                                             <h4 style="color: #fbbf24; margin-bottom: 10px;">Verification Pending</h4>
-                                            <p style="color: #a0aec0;">Please upload your Student ID to verify your account.</p>
+                                            <p style="color: #a0aec0;">Please upload your Student ID to verify your
+                                                account.</p>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="verification-actions" style="text-align: center;">
-                                        <button class="btn btn-primary" onclick="authManager.startDocumentVerification()" style="padding: 15px 30px; font-size: 16px;">
+                                        <button class="btn btn-primary"
+                                            onclick="authManager.startDocumentVerification()"
+                                            style="padding: 15px 30px; font-size: 16px;">
                                             <i class="fas fa-id-card"></i>
                                             Upload Student ID
                                         </button>
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Books Tab -->
                             <div class="tab-content" id="books-content">
                                 <div class="books-section">
@@ -676,7 +684,7 @@
                                     <p>Manage your books here.</p>
                                 </div>
                             </div>
-                            
+
                             <!-- Reviews Tab -->
                             <div class="tab-content" id="reviews-content">
                                 <div class="reviews-section">
@@ -684,7 +692,7 @@
                                     <p>Manage your reviews here.</p>
                                 </div>
                             </div>
-                            
+
                             <!-- Settings Tab -->
                             <div class="tab-content" id="settings-content">
                                 <div class="settings-section">
@@ -774,57 +782,75 @@
 
     <!-- Script -->
     <script>
-    document.addEventListener("DOMContentLoaded", () => {
-    const form = document.getElementById("login-form");
-    const emailInput = document.getElementById("login-email");
-    const passwordInput = document.getElementById("login-password");
-    const emailError = document.getElementById("email-error");
-    const passwordError = document.getElementById("password-error");
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.getElementById("login-form");
+            const emailInput = document.getElementById("login-email");
+            const passwordInput = document.getElementById("login-password");
+            const emailError = document.getElementById("email-error");
+            const passwordError = document.getElementById("password-error");
 
-    const passwordPattern =
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+            const passwordPattern =
+                /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
 
-    form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        emailError.textContent = "";
-        passwordError.textContent = "";
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                emailError.textContent = "";
+                passwordError.textContent = "";
 
-        const email = emailInput.value.trim();
-        const password = passwordInput.value.trim();
+                const email = emailInput.value.trim();
+                const password = passwordInput.value.trim();
 
-        if (!email.endsWith("@plv.edu.ph")) {
-            emailError.textContent = "Please use your PLV email address.";
-            return;
-        }
+                if (!email.endsWith("@plv.edu.ph")) {
+                    emailError.textContent = "Please use your PLV email address.";
+                    return;
+                }
 
-        if (!passwordPattern.test(password)) {
-            passwordError.textContent =
-                "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.";
-            return;
-        }
+                if (!passwordPattern.test(password)) {
+                    passwordError.textContent =
+                        "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.";
+                    return;
+                }
 
-        try {
-            const response = await api.login(email, password);
+                try {
+                    const response = await api.login(email, password);
 
-            if (response.token && response.user) {
-                localStorage.setItem("token", response.token);
-                localStorage.setItem("user", JSON.stringify(response.user));
+                    if (response.token && response.user) {
+                        localStorage.setItem("token", response.token);
+                        localStorage.setItem("user", JSON.stringify(response.user));
 
-                const modal = document.getElementById("login-modal");
-                if (modal) modal.classList.remove("active");
+                        const modal = document.getElementById("login-modal");
+                        if (modal) modal.classList.remove("active");
 
-                alert("âœ… Login successful!");
-                window.location.reload();
-            } else {
-                passwordError.textContent = response.error || "Login failed.";
-            }
-        } catch (err) {
-            console.error("Login error:", err);
-            passwordError.textContent = "Invalid email or password.";
-        }
-    });
-});
-</script>
+                        alert("âœ… Login successful!");
+                        window.location.reload();
+                    } else {
+                        passwordError.textContent = response.error || "Login failed.";
+                    }
+                } catch (err) {
+                    console.error("Login error:", err);
+                    passwordError.textContent = "Invalid email or password.";
+                }
+            });
+        });
+    </script>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgot-password-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Forgot Password</h3>
+                <button class="modal-close" data-modal="forgot-password-modal"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="forgot-password-form">
+                    <label for="forgot-email">Enter your PLV email:</label>
+                    <input type="email" id="forgot-email" placeholder="your.email@plv.edu.ph" required />
+                    <button type="submit" class="btn btn-primary">Send Reset Link</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Register Modal -->
     <div id="register-modal" class="modal">
@@ -856,7 +882,8 @@
                         <label for="register-email">PLV Email *</label>
                         <input type="email" id="register-email" name="email" placeholder="your.email@plv.edu.ph"
                             required>
-                        <small class="form-help" style="color: #fbbf24;">âš ï¸ Must use your PLV email address (@plv.edu.ph)</small>
+                        <small class="form-help" style="color: #fbbf24;">âš ï¸ Must use your PLV email address
+                            (@plv.edu.ph)</small>
                     </div>
 
                     <!-- Student ID -->
@@ -951,50 +978,50 @@
 
     <!-- SCRIPT FOR VALIDATION AND SHOW/HIDE PASSWORD -->
     <script>
-    // Get elements
-    const passwordInput = document.getElementById("register-password");
-    const confirmPasswordInput = document.getElementById("register-confirm-password");
-    const matchIndicator = document.getElementById("password-match-indicator");
+        // Get elements
+        const passwordInput = document.getElementById("register-password");
+        const confirmPasswordInput = document.getElementById("register-confirm-password");
+        const matchIndicator = document.getElementById("password-match-indicator");
 
-    const togglePassword = document.getElementById("toggle-password");
-    const toggleConfirmPassword = document.getElementById("toggle-confirm-password");
+        const togglePassword = document.getElementById("toggle-password");
+        const toggleConfirmPassword = document.getElementById("toggle-confirm-password");
 
-    // Password requirement elements
-    const reqLength = document.getElementById("req-length");
-    const reqUppercase = document.getElementById("req-uppercase");
-    const reqLowercase = document.getElementById("req-lowercase");
-    const reqNumber = document.getElementById("req-number");
-    const reqSpecial = document.getElementById("req-special");
+        // Password requirement elements
+        const reqLength = document.getElementById("req-length");
+        const reqUppercase = document.getElementById("req-uppercase");
+        const reqLowercase = document.getElementById("req-lowercase");
+        const reqNumber = document.getElementById("req-number");
+        const reqSpecial = document.getElementById("req-special");
 
         // Toggle Password Visibility with proper icons
         togglePassword.addEventListener("click", () => {
             if (passwordInput.type === "password") {
-        passwordInput.type = "text";
-    togglePassword.innerHTML = '<i class="fas fa-eye"></i>'; // open eye
+                passwordInput.type = "text";
+                togglePassword.innerHTML = '<i class="fas fa-eye"></i>'; // open eye
             } else {
-        passwordInput.type = "password";
-    togglePassword.innerHTML = '<i class="fas fa-eye-slash"></i>'; // closed eye
+                passwordInput.type = "password";
+                togglePassword.innerHTML = '<i class="fas fa-eye-slash"></i>'; // closed eye
             }
         });
 
         toggleConfirmPassword.addEventListener("click", () => {
             if (confirmPasswordInput.type === "password") {
-        confirmPasswordInput.type = "text";
-    toggleConfirmPassword.innerHTML = '<i class="fas fa-eye"></i>'; // open eye
+                confirmPasswordInput.type = "text";
+                toggleConfirmPassword.innerHTML = '<i class="fas fa-eye"></i>'; // open eye
             } else {
-        confirmPasswordInput.type = "password";
-    toggleConfirmPassword.innerHTML = '<i class="fas fa-eye-slash"></i>'; // closed eye
+                confirmPasswordInput.type = "password";
+                toggleConfirmPassword.innerHTML = '<i class="fas fa-eye-slash"></i>'; // closed eye
             }
         });
 
-    // Helper function to update requirement colors
-    function updateRequirement(element, condition) {
+        // Helper function to update requirement colors
+        function updateRequirement(element, condition) {
             if (condition) {
-        element.style.color = "green";
-    element.querySelector("i").className = "fas fa-check-circle";
+                element.style.color = "green";
+                element.querySelector("i").className = "fas fa-check-circle";
             } else {
-        element.style.color = "red";
-    element.querySelector("i").className = "fas fa-times-circle";
+                element.style.color = "red";
+                element.querySelector("i").className = "fas fa-times-circle";
             }
         }
 
@@ -1003,36 +1030,36 @@
             const value = passwordInput.value;
 
             const hasLength = value.length >= 8;
-    const hasUppercase = /[A-Z]/.test(value);
-    const hasLowercase = /[a-z]/.test(value);
-    const hasNumber = /[0-9]/.test(value);
-    const hasSpecial = /[!@#$%^&*]/.test(value);
+            const hasUppercase = /[A-Z]/.test(value);
+            const hasLowercase = /[a-z]/.test(value);
+            const hasNumber = /[0-9]/.test(value);
+            const hasSpecial = /[!@#$%^&*]/.test(value);
 
-    updateRequirement(reqLength, hasLength);
-    updateRequirement(reqUppercase, hasUppercase);
-    updateRequirement(reqLowercase, hasLowercase);
-    updateRequirement(reqNumber, hasNumber);
-    updateRequirement(reqSpecial, hasSpecial);
+            updateRequirement(reqLength, hasLength);
+            updateRequirement(reqUppercase, hasUppercase);
+            updateRequirement(reqLowercase, hasLowercase);
+            updateRequirement(reqNumber, hasNumber);
+            updateRequirement(reqSpecial, hasSpecial);
 
-    // Update password match while typing
-    checkPasswordMatch();
+            // Update password match while typing
+            checkPasswordMatch();
         });
 
-    // Check confirm password match
-    confirmPasswordInput.addEventListener("input", checkPasswordMatch);
+        // Check confirm password match
+        confirmPasswordInput.addEventListener("input", checkPasswordMatch);
 
-    function checkPasswordMatch() {
+        function checkPasswordMatch() {
             if (confirmPasswordInput.value === "") {
-        matchIndicator.textContent = "";
-    return;
+                matchIndicator.textContent = "";
+                return;
             }
 
-    if (passwordInput.value === confirmPasswordInput.value) {
-        matchIndicator.textContent = "âœ… Passwords match";
-    matchIndicator.style.color = "green";
+            if (passwordInput.value === confirmPasswordInput.value) {
+                matchIndicator.textContent = "âœ… Passwords match";
+                matchIndicator.style.color = "green";
             } else {
-        matchIndicator.textContent = "âŒ Passwords do not match";
-    matchIndicator.style.color = "red";
+                matchIndicator.textContent = "âŒ Passwords do not match";
+                matchIndicator.style.color = "red";
             }
         }
     </script>
@@ -1838,73 +1865,73 @@
                 </form>
             </div>
         </div>
-    <!-- Toast Notifications -->
-    <div class="toast-container" id="toast-container"></div>
+        <!-- Toast Notifications -->
+        <div class="toast-container" id="toast-container"></div>
 
-    <!-- Scripts -->
-    <script src="./js/utils.js"></script>
-    <script src="./js/api.js"></script>
-    <script src="./js/captcha.js"></script>
-    <script src="./js/auth.js"></script>
-    <script src="./js/main.js"></script>
-    <script src="./js/books.js"></script>
-    <script src="./js/requests.js"></script>
-    <script src="./js/monitoring.js"></script>
-    
-    <!-- Profile Tab Switching Script -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Setup profile tab switching
-            const profileTabBtns = document.querySelectorAll('.profile-tabs .tab-btn');
-            profileTabBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    // Remove active from all buttons
-                    profileTabBtns.forEach(b => b.classList.remove('active'));
-                    // Add active to clicked button
-                    btn.classList.add('active');
-                    
-                    // Hide all tab contents
-                    document.querySelectorAll('.profile-tab-content .tab-content').forEach(content => {
-                        content.style.display = 'none';
+        <!-- Scripts -->
+        <script src="./js/utils.js"></script>
+        <script src="./js/api.js"></script>
+        <script src="./js/captcha.js"></script>
+        <script src="./js/auth.js"></script>
+        <script src="./js/main.js"></script>
+        <script src="./js/books.js"></script>
+        <script src="./js/requests.js"></script>
+        <script src="./js/monitoring.js"></script>
+
+        <!-- Profile Tab Switching Script -->
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                // Setup profile tab switching
+                const profileTabBtns = document.querySelectorAll('.profile-tabs .tab-btn');
+                profileTabBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        // Remove active from all buttons
+                        profileTabBtns.forEach(b => b.classList.remove('active'));
+                        // Add active to clicked button
+                        btn.classList.add('active');
+
+                        // Hide all tab contents
+                        document.querySelectorAll('.profile-tab-content .tab-content').forEach(content => {
+                            content.style.display = 'none';
+                        });
+
+                        // Show selected tab content
+                        const tabName = btn.getAttribute('data-tab');
+                        const tabContent = document.getElementById(`${tabName}-content`);
+                        if (tabContent) {
+                            tabContent.style.display = 'block';
+                        }
                     });
-                    
-                    // Show selected tab content
-                    const tabName = btn.getAttribute('data-tab');
-                    const tabContent = document.getElementById(`${tabName}-content`);
-                    if (tabContent) {
-                        tabContent.style.display = 'block';
-                    }
                 });
             });
-        });
-    </script>
-    
-    <script>
-        // Close mobile menu when modal opens
-        document.addEventListener('DOMContentLoaded', () => {
-            const modals = document.querySelectorAll('.modal');
-    const navToggle = document.getElementById('nav-toggle');
-    const navMenu = document.getElementById('nav-menu');
+        </script>
 
-            modals.forEach(modal => {
-                const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.attributeName === 'class') {
-                if (modal.classList.contains('active') || modal.classList.contains('show')) {
-                    if (navToggle && navMenu) {
-                        navToggle.classList.remove('active');
-                        navMenu.classList.remove('active');
-                        document.body.classList.remove('menu-open');
-                    }
-                }
-            }
-        });
+        <script>
+            // Close mobile menu when modal opens
+            document.addEventListener('DOMContentLoaded', () => {
+                const modals = document.querySelectorAll('.modal');
+                const navToggle = document.getElementById('nav-toggle');
+                const navMenu = document.getElementById('nav-menu');
+
+                modals.forEach(modal => {
+                    const observer = new MutationObserver((mutations) => {
+                        mutations.forEach((mutation) => {
+                            if (mutation.attributeName === 'class') {
+                                if (modal.classList.contains('active') || modal.classList.contains('show')) {
+                                    if (navToggle && navMenu) {
+                                        navToggle.classList.remove('active');
+                                        navMenu.classList.remove('active');
+                                        document.body.classList.remove('menu-open');
+                                    }
+                                }
+                            }
+                        });
+                    });
+
+                    observer.observe(modal, { attributes: true });
                 });
-
-    observer.observe(modal, {attributes: true });
             });
-        });
-    </script>
+        </script>
 
 </body>
 

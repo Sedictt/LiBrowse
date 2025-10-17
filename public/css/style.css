@@ -5100,3 +5100,28 @@ body {
         max-width: calc(100vw - 40px);
     }
 }
+
+/* Forgot Password Modal (optional tweaks) */
+#forgot-password-modal .modal-content {
+  max-width: 400px;
+  text-align: center;
+}
+
+#forgot-password-modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+#forgot-password-modal input {
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 100%;
+}
+
+#forgot-password-modal button {
+  padding: 10px;
+  font-size: 16px;
+}
