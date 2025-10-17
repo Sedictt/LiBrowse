@@ -1043,7 +1043,6 @@
 
             // Update password match while typing
             checkPasswordMatch();
-<<<<<<< HEAD
         });
 
         // Check confirm password match
@@ -1063,27 +1062,6 @@
                 matchIndicator.style.color = "red";
             }
         }
-=======
-                });
-
-            // Check confirm password match
-            confirmPasswordInput.addEventListener("input", checkPasswordMatch);
-
-            function checkPasswordMatch() {
-                    if (confirmPasswordInput.value === "") {
-                matchIndicator.textContent = "";
-            return;
-                    }
-
-            if (passwordInput.value === confirmPasswordInput.value) {
-                matchIndicator.textContent = "âœ… Passwords match";
-            matchIndicator.style.color = "green";
-                    } else {
-                matchIndicator.textContent = "âŒ Passwords do not match";
-            matchIndicator.style.color = "red";
-                    }
-                }
->>>>>>> 4f0231926b94e3b59dd2352b716dcabd3a9ecd85
     </script>
 
     <script>
