@@ -7,6 +7,8 @@ const bcrypt = require('bcryptjs');
 const axios = require('axios');
 const { getOne, executeQuery } = require('../config/database'); // Correct path to database.js
 require('dotenv').config();
+const { sendMail } = require('../services/mailer');
+const path = require('path');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
@@ -258,7 +260,7 @@ router.post('/register', async (req, res) => {
 // ============================
 // EMAIL OTP VERIFICATION
 // ============================
-const nodemailer = require("nodemailer");
+// Using unified mailer with Gmail primary, SendGrid fallback
 
 // Generate random 6-digit OTP
 function generateOTP() {
@@ -299,48 +301,32 @@ router.post("/send-otp", async (req, res) => {
       throw dbErr;
     }
 
-    // Configure your email transporter
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER, // e.g., your Gmail
-        pass: process.env.EMAIL_PASSWORD
-      }
+    // Build message
+    const subject = "Your LiBrowse OTP Code";
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height:1.6">
+        <h2>Your OTP Code</h2>
+        <p>Your one-time password is <b style="font-size:20px;">${otp}</b>.</p>
+        <p>This code expires in 10 minutes.</p>
+        <p style="color:#6b7280;font-size:12px">If you didn't request this, you can safely ignore this email.</p>
+      </div>
+    `;
+    const text = `Your LiBrowse OTP is ${otp}. It expires in 10 minutes.`;
+
+    const mailResult = await sendMail({
+      to: email,
+      subject,
+      html,
+      text,
+      replyTo: process.env.EMAIL_USER
     });
 
-    try {
-      const verifyOk = await transporter.verify();
-      console.log(`[OTP] send-otp: transporter.verify()`, { ok: !!verifyOk });
-    } catch (tvErr) {
-      console.warn(`[OTP] send-otp: transporter.verify failed`, { error: tvErr.message });
-      // continue to attempt sendMail regardless; verify can be flaky in some envs
+    console.log(`[OTP] send-otp: mail result`, mailResult);
+    if (!mailResult.ok) {
+      return res.status(502).json({ error: "Failed to send OTP email", details: mailResult.details || mailResult.error });
     }
-
-    const mailOptions = {
-      from: `"LiBrowse Verification" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Your LiBrowse OTP Code",
-      html: `<h2>Your OTP Code</h2><p>Your one-time password is <b>${otp}</b>.</p><p>This code expires in 10 minutes.</p>`
-    };
-
-    try {
-      const info = await transporter.sendMail(mailOptions);
-      console.log(`[OTP] send-otp: email sent`, {
-        messageId: info?.messageId,
-        accepted: info?.accepted,
-        rejected: info?.rejected
-      });
-      console.log(`[OTP] send-otp: completed in ${Date.now() - startTs}ms`);
-      return res.json({ message: "OTP sent to your PLV email" });
-    } catch (mailErr) {
-      console.error(`[OTP] send-otp: sendMail failed`, {
-        error: mailErr.message,
-        code: mailErr.code,
-        command: mailErr.command,
-        response: mailErr.response
-      });
-      throw mailErr;
-    }
+    console.log(`[OTP] send-otp: completed in ${Date.now() - startTs}ms`);
+    return res.json({ message: "OTP sent to your PLV email" });
   } catch (err) {
     console.error("[OTP] send-otp: error", err);
     return res.status(500).json({ error: "Failed to send OTP" });
