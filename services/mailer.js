@@ -1,4 +1,4 @@
-/services/mailer.js
+//services/mailer.js
 // Unified mailer with Gmail (Nodemailer) primary and SendGrid fallback
 const nodemailer = require('nodemailer');
 const sgMail = require('@sendgrid/mail');
