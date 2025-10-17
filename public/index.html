@@ -1003,39 +1003,79 @@
             const value = passwordInput.value;
 
             const hasLength = value.length >= 8;
-    const hasUppercase = /[A-Z]/.test(value);
-    const hasLowercase = /[a-z]/.test(value);
-    const hasNumber = /[0-9]/.test(value);
-    const hasSpecial = /[!@#$%^&*]/.test(value);
+            const hasUppercase = /[A-Z]/.test(value);
+            const hasLowercase = /[a-z]/.test(value);
+            const hasNumber = /[0-9]/.test(value);
+            const hasSpecial = /[!@#$%^&*]/.test(value);
 
-    updateRequirement(reqLength, hasLength);
-    updateRequirement(reqUppercase, hasUppercase);
-    updateRequirement(reqLowercase, hasLowercase);
-    updateRequirement(reqNumber, hasNumber);
-    updateRequirement(reqSpecial, hasSpecial);
+            updateRequirement(reqLength, hasLength);
+            updateRequirement(reqUppercase, hasUppercase);
+            updateRequirement(reqLowercase, hasLowercase);
+            updateRequirement(reqNumber, hasNumber);
+            updateRequirement(reqSpecial, hasSpecial);
 
-    // Update password match while typing
-    checkPasswordMatch();
-        });
+            // Update password match while typing
+            checkPasswordMatch();
+                });
 
-    // Check confirm password match
-    confirmPasswordInput.addEventListener("input", checkPasswordMatch);
+            // Check confirm password match
+            confirmPasswordInput.addEventListener("input", checkPasswordMatch);
 
-    function checkPasswordMatch() {
-            if (confirmPasswordInput.value === "") {
-        matchIndicator.textContent = "";
-    return;
-            }
+            function checkPasswordMatch() {
+                    if (confirmPasswordInput.value === "") {
+                matchIndicator.textContent = "";
+            return;
+                    }
 
-    if (passwordInput.value === confirmPasswordInput.value) {
-        matchIndicator.textContent = "âœ… Passwords match";
-    matchIndicator.style.color = "green";
-            } else {
-        matchIndicator.textContent = "âŒ Passwords do not match";
-    matchIndicator.style.color = "red";
-            }
-        }
+            if (passwordInput.value === confirmPasswordInput.value) {
+                matchIndicator.textContent = "âœ… Passwords match";
+            matchIndicator.style.color = "green";
+                    } else {
+                matchIndicator.textContent = "âŒ Passwords do not match";
+            matchIndicator.style.color = "red";
+                    }
+                }
     </script>
+
+    <script>
+    // Handle registration form submission
+    const registerForm = document.getElementById("register-form");
+
+    registerForm.addEventListener("submit", function (e) {
+        e.preventDefault(); // Prevents form from refreshing the page
+
+        // OPTIONAL: Add validation or backend request here using fetch()
+
+        // Simulate success (replace this with actual API callback)
+        showSuccessMessage("Your account has been successfully registered!");
+        
+        // Reset form after submission
+        registerForm.reset();
+    });
+
+    function showSuccessMessage(message) {
+        // Create message container
+        const successMsg = document.createElement("div");
+        successMsg.textContent = message;
+        successMsg.className = "success-message";
+        
+        // Style the message
+        successMsg.style.backgroundColor = "#d1fae5";
+        successMsg.style.color = "#065f46";
+        successMsg.style.padding = "12px";
+        successMsg.style.textAlign = "center";
+        successMsg.style.marginTop = "15px";
+        successMsg.style.borderRadius = "6px";
+        successMsg.style.border = "1px solid #10b981";
+        
+        // Insert below the form
+        registerForm.parentNode.insertBefore(successMsg, registerForm.nextSibling);
+
+        // Remove message after 4 seconds
+        setTimeout(() => successMsg.remove(), 4000);
+    }
+    </script>
+
 
     <!-- Verification Choice Modal -->
     <div class="modal" id="verification-choice-modal">
