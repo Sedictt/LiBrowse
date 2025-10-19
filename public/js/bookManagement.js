@@ -24,6 +24,15 @@ class BookManagement {
         if (booksTab) {
             booksTab.addEventListener('click', () => this.loadMyBooks());
         }
+
+        // Ensure image preview works for both static and dynamic modals
+        document.addEventListener('change', (e) => {
+            const t = e.target;
+            if (!t) return;
+            if (t.id === 'book-image' || t.id === 'book-image-input') {
+                this.handleImagePreview(e);
+            }
+        });
     }
 
     showAddBookModal() {
@@ -62,14 +71,17 @@ class BookManagement {
                                     </div>`}
                                 </div>
                                 <input type="file" id="book-image-input" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" style="display: none;">
-                                <button type="button" class="btn btn-outline" onclick="document.getElementById('book-image-input').click()">
-                                    <i class="fas fa-upload"></i>
-                                    ${book?.image_url ? 'Change Image' : 'Upload Image'}
-                                </button>
-                                ${book?.image_url ? `<button type="button" class="btn btn-ghost" onclick="bookManagement.removeImage()">
-                                    <i class="fas fa-trash"></i>
-                                    Remove Image
-                                </button>` : ''}
+                                <div class="upload-button-group">
+                                    <button type="button" class="btn btn-outline" id="upload-image-btn" onclick="document.getElementById('book-image-input').click()">
+                                        <i class="fas fa-upload"></i>
+                                        ${book?.image_url ? 'Change Image' : 'Upload Image'}
+                                    </button>
+                                    ${book?.image_url ? `<button type="button" class="btn btn-ghost" onclick="bookManagement.removeImage()">
+                                        <i class="fas fa-trash"></i>
+                                        Remove Image
+                                    </button>` : ''}
+                                </div>
+                                <div id="selected-file-name" style="margin-top: 8px; font-size: 0.85rem; color: rgba(255,255,255,0.6); text-align: center;"></div>
                             </div>
                         </div>
 
@@ -212,6 +224,8 @@ class BookManagement {
         const file = event.target.files[0];
         if (!file) return;
 
+        console.log('📸 Image selected:', file.name, file.type, file.size);
+
         // Validate file size (5MB)
         if (file.size > 5 * 1024 * 1024) {
             showToast('Image size must be less than 5MB', 'error');
@@ -227,18 +241,144 @@ class BookManagement {
             return;
         }
 
+        // Find preview element next to the input (prefer class-based to avoid duplicate IDs)
+        let preview;
+        const containerEl = event.target.closest('.image-upload-container');
+        if (containerEl) {
+            preview = containerEl.querySelector('.image-preview, .file-preview');
+        }
+
+        // Fallback to modal scope
+        if (!preview) {
+            const modalEl = event.target.closest('.modal');
+            if (modalEl) {
+                preview = modalEl.querySelector('#book-image-preview');
+            }
+        }
+
+        // Final fallback (in case of duplicate IDs elsewhere)
+        if (!preview) {
+            preview = document.getElementById('book-image-preview');
+        }
+
+        if (!preview) {
+            console.error('❌ Preview element not found!');
+            showToast('Preview element not found', 'error');
+            return;
+        }
+
+        console.log('✅ Preview element found:', preview);
+
+        // If using .file-preview pattern from global styles, make it visible
+        if (preview.classList && preview.classList.contains('file-preview')) {
+            preview.classList.add('active');
+        }
+        // Force visibility in case other CSS keeps it hidden
+        preview.style.removeProperty('display');
+        preview.style.display = 'block';
+        preview.style.visibility = 'visible';
+        console.log('👁️ Preview classes:', preview.className);
+
+        // Show loading state
+        preview.innerHTML = `
+            <div class="image-placeholder" style="opacity: 0.7;">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                <p>Loading preview...</p>
+            </div>
+        `;
+
         // Show preview
         const reader = new FileReader();
         reader.onload = (e) => {
-            const preview = document.getElementById('book-image-preview');
-            preview.innerHTML = `<img src="${e.target.result}" alt="Book cover preview">`;
-            this.imagePreview = file;
+            console.log('✅ FileReader loaded successfully');
+            
+            // Create image element to ensure it loads
+            const img = new Image();
+            img.onload = () => {
+                console.log('✅ Image element loaded successfully');
+                console.log('📐 Image dimensions:', img.width, 'x', img.height);
+                
+                // Update preview with image
+                preview.innerHTML = `
+                    <img src="${e.target.result}" alt="Book cover preview">
+                    <div class="image-preview-overlay">
+                        <i class="fas fa-check-circle" style="color: #10B981; font-size: 24px;"></i>
+                    </div>
+                `;
+                this.imagePreview = file;
+                
+                // Detailed debugging
+                console.log('📸 Preview HTML updated');
+                console.log('📸 Preview element:', preview);
+                console.log('📸 Preview innerHTML:', preview.innerHTML);
+                
+                const imgElement = preview.querySelector('img');
+                console.log('📸 Image element found:', imgElement);
+                if (imgElement) {
+                    console.log('📸 Image src length:', imgElement.src.length);
+                    console.log('📸 Image computed style:', window.getComputedStyle(imgElement).display);
+                    console.log('📸 Image dimensions:', imgElement.offsetWidth, 'x', imgElement.offsetHeight);
+                }
+                
+                console.log('📸 Preview computed style:', window.getComputedStyle(preview).display);
+                console.log('📸 Preview dimensions:', preview.offsetWidth, 'x', preview.offsetHeight);
+            };
+            
+            img.onerror = () => {
+                console.error('❌ Failed to load image element');
+                showToast('Failed to load image preview', 'error');
+                preview.innerHTML = `
+                    <div class="image-placeholder">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        <p>Failed to load image</p>
+                        <small>Please try another file</small>
+                    </div>
+                `;
+            };
+            
+            img.src = e.target.result;
+            
+            // Update file name display - try multiple methods
+            let fileNameDisplay = document.getElementById('selected-file-name');
+            if (!fileNameDisplay) {
+                const activeModal = document.querySelector('.modal.active');
+                if (activeModal) {
+                    fileNameDisplay = activeModal.querySelector('#selected-file-name');
+                }
+            }
+            
+            if (fileNameDisplay) {
+                const fileSize = (file.size / 1024).toFixed(1);
+                fileNameDisplay.innerHTML = `<i class="fas fa-check-circle" style="color: #10B981;"></i> ${file.name} (${fileSize} KB)`;
+                fileNameDisplay.style.color = '#10B981';
+                console.log('✅ File name display updated');
+            } else {
+                console.warn('⚠️ File name display element not found');
+            }
+            
+            // Show success feedback
+            const fileSize = (file.size / 1024).toFixed(1);
+            showToast(`✓ Image selected: ${file.name} (${fileSize} KB)`, 'success');
         };
+        
+        reader.onerror = () => {
+            showToast('Failed to load image preview', 'error');
+            preview.innerHTML = `
+                <div class="image-placeholder">
+                    <i class="fas fa-book fa-3x"></i>
+                    <p>Click to upload book cover</p>
+                    <small>Max size: 5MB (JPG, PNG, GIF, WebP)</small>
+                </div>
+            `;
+        };
+        
         reader.readAsDataURL(file);
     }
 
     removeImage() {
-        const preview = document.getElementById('book-image-preview');
+        const activeModal = document.querySelector('.modal.active');
+        const preview = activeModal ? activeModal.querySelector('#book-image-preview') : document.getElementById('book-image-preview');
+        if (!preview) return;
         preview.innerHTML = `
             <div class="image-placeholder">
                 <i class="fas fa-book fa-3x"></i>
@@ -246,12 +386,32 @@ class BookManagement {
                 <small>Max size: 5MB (JPG, PNG, GIF, WebP)</small>
             </div>
         `;
-        document.getElementById('book-image-input').value = '';
+        const imageInput = activeModal ? activeModal.querySelector('#book-image-input') : document.getElementById('book-image-input');
+        if (imageInput) imageInput.value = '';
         this.imagePreview = null;
+        
+        // Clear file name display
+        const fileNameDisplay = activeModal ? activeModal.querySelector('#selected-file-name') : document.getElementById('selected-file-name');
+        if (fileNameDisplay) {
+            fileNameDisplay.innerHTML = '';
+        }
+        // Hide the file-preview container if that pattern is used
+        if (preview.classList && preview.classList.contains('file-preview')) {
+            preview.classList.remove('active');
+        }
+        
+        showToast('Image removed', 'info');
     }
 
     async addBook() {
+        const submitBtn = document.querySelector('#add-book-form button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        
         try {
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+            
             const form = document.getElementById('add-book-form');
             const formData = new FormData(form);
 
@@ -259,6 +419,9 @@ class BookManagement {
             const imageInput = document.getElementById('book-image-input');
             if (imageInput.files[0]) {
                 formData.append('image', imageInput.files[0]);
+                showToast('Uploading book with cover image...', 'info');
+            } else {
+                showToast('Uploading book...', 'info');
             }
 
             const response = await fetch('/api/books', {
@@ -275,7 +438,7 @@ class BookManagement {
                 throw new Error(data.error || 'Failed to add book');
             }
 
-            showToast('Book added successfully!', 'success');
+            showToast('✓ Book added successfully!', 'success');
             this.closeModal('add-book-modal');
             
             // Refresh books list if on books section
@@ -289,6 +452,10 @@ class BookManagement {
         } catch (error) {
             console.error('Add book error:', error);
             showToast(error.message || 'Failed to add book', 'error');
+            
+            // Restore button state
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
         }
     }
 

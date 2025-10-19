@@ -41,13 +41,33 @@ class ApiClient {
                 err.endpoint = endpoint;
                 err.body = data;
 
-                // Notify listeners on auth errors so UI can prompt login
+                // Handle token expiration - clear auth and force re-login
                 if (response.status === 401 || response.status === 403) {
-                    try {
-                        window.dispatchEvent(new CustomEvent('auth:unauthorized', {
-                            detail: { status: response.status, endpoint }
-                        }));
-                    } catch (_) { /* noop for non-browser */ }
+                    // Check if it's a token expiration error
+                    const isTokenExpired = message.toLowerCase().includes('token') && 
+                                          (message.toLowerCase().includes('expired') || 
+                                           message.toLowerCase().includes('invalid'));
+                    
+                    if (isTokenExpired) {
+                        console.warn('🔒 Token expired, clearing authentication...');
+                        // Clear expired token
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                        
+                        // Dispatch event to notify auth manager
+                        try {
+                            window.dispatchEvent(new CustomEvent('auth:token-expired', {
+                                detail: { status: response.status, endpoint, message }
+                            }));
+                        } catch (_) { /* noop for non-browser */ }
+                    } else {
+                        // Generic unauthorized error
+                        try {
+                            window.dispatchEvent(new CustomEvent('auth:unauthorized', {
+                                detail: { status: response.status, endpoint }
+                            }));
+                        } catch (_) { /* noop for non-browser */ }
+                    }
                 }
 
                 throw err;

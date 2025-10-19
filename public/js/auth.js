@@ -23,9 +23,42 @@ class AuthManager {
         const user = localStorage.getItem('user');
 
         if (token && user) {
-            this.isAuthenticated = true;
-            this.currentUser = JSON.parse(user);
-            this.updateUIForAuthState(true);
+            // Validate token is not expired (JWT tokens have 3 parts)
+            try {
+                const tokenParts = token.split('.');
+                if (tokenParts.length === 3) {
+                    // Decode the payload (middle part)
+                    const payload = JSON.parse(atob(tokenParts[1]));
+                    const expirationTime = payload.exp * 1000; // Convert to milliseconds
+                    const currentTime = Date.now();
+                    
+                    // Check if token is expired
+                    if (currentTime >= expirationTime) {
+                        console.warn('🔒 Token expired on page load, clearing...');
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                        this.updateUIForAuthState(false);
+                        return;
+                    }
+                    
+                    // Token is valid
+                    this.isAuthenticated = true;
+                    this.currentUser = JSON.parse(user);
+                    this.updateUIForAuthState(true);
+                } else {
+                    // Invalid token format
+                    console.warn('⚠️ Invalid token format, clearing...');
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    this.updateUIForAuthState(false);
+                }
+            } catch (error) {
+                console.error('Error validating token:', error);
+                // If we can't validate, clear it to be safe
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                this.updateUIForAuthState(false);
+            }
         } else {
             this.updateUIForAuthState(false);
         }
@@ -107,6 +140,31 @@ class AuthManager {
     }
 
     setupAuthEvents() {
+        // Listen for token expiration and handle logout
+        window.addEventListener('auth:token-expired', (e) => {
+            console.warn('🔒 Session expired', e.detail);
+            
+            // Only show message if user was actually logged in
+            if (this.isAuthenticated) {
+                this.showToast('Your session has expired. Please login again.', 'warning');
+                
+                // Clear auth state
+                this.isAuthenticated = false;
+                this.currentUser = null;
+                this.updateUIForAuthState(false);
+                
+                // Redirect to home and show login modal
+                if (window.app) {
+                    window.app.navigateToSection('home');
+                }
+                
+                // Show login modal after a brief delay
+                setTimeout(() => {
+                    this.openModal('login-modal');
+                }, 500);
+            }
+        });
+
         // Listen for API auth errors (401/403) and prompt login
         window.addEventListener('auth:unauthorized', (e) => {
             console.warn('⚠️ Unauthorized API access', e.detail);
