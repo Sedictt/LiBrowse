@@ -132,9 +132,15 @@ function formatCondition(condition) {
     const conditions = {
         excellent: { text: 'Excellent', class: 'condition-excellent' },
         good: { text: 'Good', class: 'condition-good' },
-        fair: { text: 'Fair', class: 'condition-fair' }
+        fair: { text: 'Fair', class: 'condition-fair' },
+        poor: { text: 'Poor', class: 'condition-poor' },
+        // Handle old database values
+        new: { text: 'New', class: 'condition-excellent' },
+        used_good: { text: 'Good', class: 'condition-good' },
+        used_fair: { text: 'Fair', class: 'condition-fair' },
+        damaged: { text: 'Poor', class: 'condition-poor' }
     };
-    return conditions[condition] || { text: condition, class: '' };
+    return conditions[condition] || { text: condition || 'Unknown', class: '' };
 }
 
 // Copy to clipboard

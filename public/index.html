@@ -1429,130 +1429,6 @@
         </div>
     </div>
 
-    <!-- Book Details Modal -->
-    <div class="modal" id="book-details-modal">
-        <div class="modal-content modal-large">
-            <div class="modal-header">
-                <h3>Book Details</h3>
-                <button class="modal-close" data-modal="book-details-modal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="book-details-container">
-                    <div class="book-image-section">
-                        <div class="book-cover-large">
-                            <img id="book-details-image" src="" alt="Book Cover"
-                                onerror="this.src='https://placehold.co/600x400/000000/FFFFFF.png'">
-                        </div>
-                        <div class="book-actions-quick">
-                            <button id="book-details-borrow-btn" class="btn btn-primary btn-full">
-                                <i class="fas fa-handshake"></i>
-                                Request to Borrow
-                            </button>
-                            <button id="book-details-edit-btn" class="btn btn-outline btn-full" style="display: none;">
-                                <i class="fas fa-edit"></i>
-                                Edit Book
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="book-info-section">
-                        <div class="book-title-section">
-                            <h2 id="book-details-title">Book Title</h2>
-                            <p id="book-details-author" class="book-author">by Author Name</p>
-                            <div class="book-meta-tags">
-                                <span id="book-details-condition" class="meta-tag condition">Condition</span>
-                                <span id="book-details-availability" class="meta-tag availability">Available</span>
-                            </div>
-                        </div>
-
-                        <div class="book-details-grid">
-                            <div class="detail-item">
-                                <i class="fas fa-graduation-cap"></i>
-                                <div>
-                                    <label>Course Code</label>
-                                    <span id="book-details-course">Course Code</span>
-                                </div>
-                            </div>
-                            <div class="detail-item">
-                                <i class="fas fa-book-open"></i>
-                                <div>
-                                    <label>Subject</label>
-                                    <span id="book-details-subject">Subject</span>
-                                </div>
-                            </div>
-                            <div class="detail-item">
-                                <i class="fas fa-bookmark"></i>
-                                <div>
-                                    <label>Edition</label>
-                                    <span id="book-details-edition">Edition</span>
-                                </div>
-                            </div>
-                            <div class="detail-item">
-                                <i class="fas fa-building"></i>
-                                <div>
-                                    <label>Publisher</label>
-                                    <span id="book-details-publisher">Publisher</span>
-                                </div>
-                            </div>
-                            <div class="detail-item">
-                                <i class="fas fa-calendar"></i>
-                                <div>
-                                    <label>Publication Year</label>
-                                    <span id="book-details-year">Year</span>
-                                </div>
-                            </div>
-                            <div class="detail-item">
-                                <i class="fas fa-barcode"></i>
-                                <div>
-                                    <label>ISBN</label>
-                                    <span id="book-details-isbn">ISBN</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="credit-requirement-display">
-                            <div class="credit-info">
-                                <i class="fas fa-coins"></i>
-                                <div>
-                                    <label>Credit Requirement</label>
-                                    <span id="book-details-credits" class="credit-amount">100 Credits</span>
-                                </div>
-                            </div>
-                            <div id="book-details-credit-status" class="credit-status"></div>
-                        </div>
-
-                        <div class="book-description-section">
-                            <h4><i class="fas fa-align-left"></i> Description</h4>
-                            <p id="book-details-description">Book description will appear here...</p>
-                        </div>
-
-                        <div class="book-owner-section">
-                            <h4><i class="fas fa-user"></i> Owner Information</h4>
-                            <div class="owner-info">
-                                <div class="owner-details">
-                                    <span id="book-details-owner" class="owner-name">Owner Name</span>
-                                    <span id="book-details-owner-program" class="owner-program">Program</span>
-                                </div>
-                                <div class="owner-stats">
-                                    <div class="stat-item">
-                                        <span class="stat-value" id="book-details-owner-books">0</span>
-                                        <span class="stat-label">Books</span>
-                                    </div>
-                                    <div class="stat-item">
-                                        <span class="stat-value" id="book-details-owner-rating">5.0</span>
-                                        <span class="stat-label">Rating</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Borrow Request Modal -->
     <div class="modal" id="borrow-modal">
         <div class="modal-content modal-large">
@@ -1906,8 +1782,121 @@
                 </form>
             </div>
         </div>
-        <!-- Toast Notifications -->
+      </div>
+    </div>
+    <!-- Toast Notifications -->
         <div class="toast-container" id="toast-container"></div>
+
+        <!-- Book Details Modal -->
+        <div id="book-details-modal" class="modal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3 id="modal-book-title">Book Details</h3>
+                    <button class="modal-close" data-modal="book-details-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="book-details-content">
+                        <div class="book-details-image">
+                            <img id="modal-book-image" src="" alt="Book cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="book-image-fallback" style="display: none; width: 100%; height: 100%; background: var(--bg-secondary); align-items: center; justify-content: center; font-size: 4rem; color: var(--text-muted);">
+                                <i class="fas fa-book"></i>
+                            </div>
+                            <div class="book-status-badge" id="modal-book-status"></div>
+                        </div>
+                        <div class="book-details-info">
+                            <div class="book-details-section">
+                                <h4>Basic Information</h4>
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <label>Title</label>
+                                        <span id="modal-book-title-text"></span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Author</label>
+                                        <span id="modal-book-author"></span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>ISBN</label>
+                                        <span id="modal-book-isbn"></span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Publisher</label>
+                                        <span id="modal-book-publisher"></span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Publication Year</label>
+                                        <span id="modal-book-year"></span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Edition</label>
+                                        <span id="modal-book-edition"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="book-details-section">
+                                <h4>Course Information</h4>
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <label>Course Code</label>
+                                        <span id="modal-book-course-code"></span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Subject</label>
+                                        <span id="modal-book-subject"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="book-details-section">
+                                <h4>Book Condition & Requirements</h4>
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <label>Condition</label>
+                                        <span id="modal-book-condition"></span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Minimum Credits</label>
+                                        <span id="modal-book-credits"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="book-details-section">
+                                <h4>Owner Information</h4>
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <label>Owner</label>
+                                        <span id="modal-book-owner"></span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Program</label>
+                                        <span id="modal-book-owner-program"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="book-details-section" id="modal-book-description-section" style="display: none;">
+                                <h4>Description</h4>
+                                <p id="modal-book-description"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" onclick="app.closeModal('book-details-modal')">
+                        <i class="fas fa-times"></i>
+                        Close
+                    </button>
+                    <button class="btn btn-primary" id="modal-request-book" onclick="booksManager.requestBookFromModal()">
+                        <i class="fas fa-hand-paper"></i>
+                        Request Book
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- Scripts -->
         <script src="./js/utils.js"></script>

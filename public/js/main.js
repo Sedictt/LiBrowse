@@ -162,6 +162,13 @@ class App {
             });
         });
 
+        // Book details modal close on backdrop click
+        document.getElementById('book-details-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'book-details-modal') {
+                this.closeModal('book-details-modal');
+            }
+        });
+
         // Close modal on backdrop click
         const modals = document.querySelectorAll('.modal');
         modals.forEach(modal => {
@@ -230,8 +237,8 @@ class App {
     async loadSectionData(sectionName) {
         switch (sectionName) {
             case 'books':
-                if (booksManager) {
-                    await booksManager.loadBooks();
+                if (window.booksManager) {
+                    await window.booksManager.loadBooks();
                 }
                 break;
             case 'requests':
@@ -1012,7 +1019,7 @@ class App {
         } catch (error) {
             // Don't show error for stats if user is not authenticated
             if (error.status !== 401) {
-                console.error('Failed to load platform stats:', error);
+            console.error('Failed to load platform stats:', error);
             }
         }
     }
@@ -1101,7 +1108,17 @@ class App {
         const modal = document.getElementById(modalId);
         if (modal) {
             modal.classList.remove('active');
+            // Clear any inline styles that might have been set
+            modal.style.display = '';
+            modal.style.visibility = '';
+            modal.style.opacity = '';
+            modal.style.zIndex = '';
             document.body.style.overflow = '';
+        }
+        
+        // Special handling for book details modal
+        if (modalId === 'book-details-modal' && window.booksManager) {
+            window.booksManager.closeBookModal();
         }
     }
 
