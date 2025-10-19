@@ -11,6 +11,7 @@
     "setup": "node scripts/setup.js",
     "init": "node scripts/start.js",
     "db:setup": "mysql -u root -p plv_book_exchange < database/schema.sql",
+    "seed": "node scripts/seed-sample-books.js",
     "test": "jest"
   },
   "keywords": [

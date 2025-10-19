@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -15,6 +15,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="./css/style.css?v=2.3">
     <link rel="stylesheet" href="./css/new-landing.css?v=1.0">
+    <link rel="stylesheet" href="./css/bookManagement.css?v=1.0">
     <style>
         /* Fallback styles to ensure basic functionality */
         body {
@@ -108,7 +109,7 @@
                     <span>Home</span>
                 </a>
                 <a href="#books" class="nav-link" data-section="books">
-                    <i class="fas fa-book"></i>
+                    <i class="fas fa-book-open"></i>
                     <span>Books</span>
                 </a>
                 <a href="#requests" class="nav-link" data-section="requests">
@@ -383,7 +384,7 @@
         </section>
 
         <!-- Books Section (Hidden for now) -->
-        <section id="books-section" class="section" style="display: none;">
+        <section id="books-section" class="section">
             <div class="container">
                 <div class="section-header">
                     <h2 class="section-title">Available Books</h2>
@@ -1917,6 +1918,7 @@
         <script src="./js/books.js"></script>
         <script src="./js/requests.js"></script>
         <script src="./js/monitoring.js"></script>
+        <script src="./js/bookManagement.js"></script>
 
         <!-- Profile Tab Switching Script -->
         <script>
@@ -1940,6 +1942,11 @@
                         const tabContent = document.getElementById(`${tabName}-content`);
                         if (tabContent) {
                             tabContent.style.display = 'block';
+                        }
+
+                        // Load books when Books tab is clicked
+                        if (tabName === 'books' && typeof bookManagement !== 'undefined') {
+                            bookManagement.loadMyBooks();
                         }
                     });
                 });

@@ -231,7 +231,7 @@ class App {
         switch (sectionName) {
             case 'books':
                 if (booksManager) {
-                    await booksManager.loadBooks(true);
+                    await booksManager.loadBooks();
                 }
                 break;
             case 'requests':
@@ -1010,7 +1010,10 @@ class App {
             const stats = await api.getPlatformStats();
             this.updateStatsDisplay(stats);
         } catch (error) {
-            console.error('Failed to load platform stats:', error);
+            // Don't show error for stats if user is not authenticated
+            if (error.status !== 401) {
+                console.error('Failed to load platform stats:', error);
+            }
         }
     }
 
@@ -1087,6 +1090,11 @@ class App {
                 }, 500);
             }, 1000);
         }
+    }
+
+    loadCurrentSection() {
+        // Reload the current section data
+        this.loadSectionData(this.currentSection);
     }
 
     closeModal(modalId) {

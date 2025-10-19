@@ -118,7 +118,13 @@ function truncateText(text, maxLength = 100) {
 
 // Generate placeholder image URL
 function getPlaceholderImage(text = 'Book', size = 200) {
-    return `https://via.placeholder.com/${size}x${size}/4a5568/ffffff?text=${encodeURIComponent(text)}`;
+    // Use a more reliable placeholder service
+    const hash = text.split('').reduce((a, b) => {
+        a = ((a << 5) - a) + b.charCodeAt(0);
+        return a & a;
+    }, 0);
+    const seed = Math.abs(hash) % 1000;
+    return `https://picsum.photos/seed/${seed}/${size}/${size}`;
 }
 
 // Format book condition

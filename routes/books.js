@@ -103,9 +103,9 @@ router.get('/', [
         const [books] = await connection.execute(`
             SELECT 
                 b.*,
-                CONCAT(u.first_name, ' ', u.last_name) as owner_name,
+                CONCAT(u.fname, ' ', u.lname) as owner_name,
                 u.email as owner_email,
-                u.program as owner_program
+                u.course as owner_program
             FROM books b
             JOIN users u ON b.owner_id = u.id
             ${whereClause}
@@ -201,9 +201,9 @@ router.get('/search', [
         const [books] = await connection.execute(`
             SELECT 
                 b.*,
-                CONCAT(u.first_name, ' ', u.last_name) as owner_name,
+                CONCAT(u.fname, ' ', u.lname) as owner_name,
                 u.email as owner_email,
-                u.program as owner_program
+                u.course as owner_program
             FROM books b
             JOIN users u ON b.owner_id = u.id
             ${whereClause}
@@ -254,6 +254,41 @@ router.get('/search', [
     }
 });
 
+// Get user's own books (must be before /:id route)
+router.get('/my-books', authenticateToken, async (req, res) => {
+    try {
+        const connection = await getConnection();
+
+        const [books] = await connection.execute(`
+            SELECT 
+                b.*,
+                CONCAT(u.fname, ' ', u.lname) as owner_name,
+                u.email as owner_email,
+                u.course as owner_program
+            FROM books b
+            JOIN users u ON b.owner_id = u.id
+            WHERE b.owner_id = ?
+            ORDER BY b.created_at DESC
+        `, [req.user.id]);
+
+        connection.release();
+
+        res.json({
+            books: books.map(book => ({
+                ...book,
+                status: book.is_available ? 'available' : 'borrowed',
+                condition: book.condition_rating,
+                min_credit: book.minimum_credits,
+                image_url: book.cover_image ? `/uploads/books/${path.basename(book.cover_image)}` : null
+            }))
+        });
+
+    } catch (error) {
+        console.error('Get my books error:', error);
+        res.status(500).json({ error: 'Failed to fetch your books' });
+    }
+});
+
 // Get single book
 router.get('/:id', optionalAuth, async (req, res) => {
     try {
@@ -263,9 +298,9 @@ router.get('/:id', optionalAuth, async (req, res) => {
         const [books] = await connection.execute(`
             SELECT 
                 b.*,
-                CONCAT(u.first_name, ' ', u.last_name) as owner_name,
+                CONCAT(u.fname, ' ', u.lname) as owner_name,
                 u.email as owner_email,
-                u.program as owner_program,
+                u.course as owner_program,
                 u.id as owner_id
             FROM books b
             JOIN users u ON b.owner_id = u.id
@@ -289,18 +324,27 @@ router.get('/:id', optionalAuth, async (req, res) => {
     }
 });
 
-// Add new book
+// Add new book (with optional image upload)
 router.post('/', [
     authenticateToken,
+    upload.single('image'),
     body('title').trim().isLength({ min: 1 }).withMessage('Title is required'),
     body('author').trim().isLength({ min: 1 }).withMessage('Author is required'),
     body('course_code').trim().notEmpty().withMessage('Course code is required'),
     body('condition').isIn(['excellent', 'good', 'fair', 'poor']).withMessage('Invalid condition'),
-    body('minimum_credits').isInt({ min: 50, max: 500 }).withMessage('Minimum credits must be between 50-500')
+    body('minimum_credits').optional().isInt({ min: 50, max: 500 }).withMessage('Minimum credits must be between 50-500')
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
+            // Clean up uploaded file if validation fails
+            if (req.file) {
+                try {
+                    await fs.unlink(req.file.path);
+                } catch (unlinkError) {
+                    console.error('Failed to delete uploaded file:', unlinkError);
+                }
+            }
             return res.status(400).json({ 
                 error: 'Validation failed', 
                 details: errors.array() 
@@ -316,26 +360,40 @@ router.post('/', [
             subject,
             condition,
             minimum_credits = 100,
-            description
+            description,
+            publisher,
+            publication_year
         } = req.body;
 
         const connection = await getConnection();
 
         const [result] = await connection.execute(`
             INSERT INTO books (
-                title, author, isbn, course_code, subject, edition, 
-                condition_rating, description, owner_id, is_available, minimum_credits, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?, NOW())
+                title, author, isbn, course_code, subject, edition, publisher, publication_year,
+                condition_rating, description, owner_id, is_available, minimum_credits, 
+                cover_image, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?, NOW())
         `, [
-            title, author, isbn || null, course_code, (subject && subject.trim()) ? subject : 'General', edition || null,
-            condition, description || null, req.user.id, minimum_credits
+            title, 
+            author, 
+            isbn || null, 
+            course_code, 
+            (subject && subject.trim()) ? subject : 'General', 
+            edition || null,
+            publisher || null,
+            publication_year || null,
+            condition, 
+            description || null, 
+            req.user.id, 
+            minimum_credits,
+            req.file ? req.file.path : null
         ]);
 
         // Get the created book
         const [books] = await connection.execute(`
             SELECT 
                 b.*,
-                CONCAT(u.first_name, ' ', u.last_name) as owner_name
+                CONCAT(u.fname, ' ', u.lname) as owner_name
             FROM books b
             JOIN users u ON b.owner_id = u.id
             WHERE b.id = ?
@@ -343,13 +401,24 @@ router.post('/', [
 
         connection.release();
 
+        const book = books[0];
+        book.image_url = book.cover_image ? `/uploads/books/${path.basename(book.cover_image)}` : null;
+
         res.status(201).json({
             message: 'Book added successfully',
-            book: books[0]
+            book
         });
 
     } catch (error) {
         console.error('Add book error:', error);
+        // Clean up uploaded file on error
+        if (req.file) {
+            try {
+                await fs.unlink(req.file.path);
+            } catch (unlinkError) {
+                console.error('Failed to delete uploaded file:', unlinkError);
+            }
+        }
         res.status(500).json({ error: 'Failed to add book' });
     }
 });
@@ -414,7 +483,7 @@ router.put('/:id', [
         const [updatedBooks] = await connection.execute(`
             SELECT 
                 b.*,
-                CONCAT(u.first_name, ' ', u.last_name) as owner_name
+                CONCAT(u.fname, ' ', u.lname) as owner_name
             FROM books b
             JOIN users u ON b.owner_id = u.id
             WHERE b.id = ?
@@ -497,28 +566,16 @@ router.post('/:id/image', [
     }
 });
 
-// Update book
-router.put('/:id', [
-    authenticateToken,
-    body('title').optional().trim().isLength({ min: 1 }).withMessage('Title cannot be empty'),
-    body('author').optional().trim().isLength({ min: 1 }).withMessage('Author cannot be empty'),
-    body('subject').optional().isString(),
-    body('publisher').optional().isString(),
-    body('publication_year').optional().isInt({ min: 1500, max: 3000 }),
-    body('condition').optional().isIn(['excellent', 'good', 'fair', 'poor']).withMessage('Invalid condition'),
-    body('min_credit').optional().isInt({ min: 0 }).withMessage('Minimum credit must be a non-negative integer'),
-    body('is_available').optional().isBoolean()
-], async (req, res) => {
+// Toggle book availability
+router.patch('/:id/availability', authenticateToken, async (req, res) => {
     try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ 
-                error: 'Validation failed', 
-                details: errors.array() 
-            });
+        const bookId = req.params.id;
+        const { is_available } = req.body;
+
+        if (typeof is_available !== 'boolean') {
+            return res.status(400).json({ error: 'is_available must be a boolean' });
         }
 
-        const bookId = req.params.id;
         const connection = await getConnection();
 
         // Check if user owns the book
@@ -532,56 +589,22 @@ router.put('/:id', [
             return res.status(404).json({ error: 'Book not found or access denied' });
         }
 
-        // Build update query
-        const updateFields = [];
-        const updateValues = [];
-
-        const allowedFields = [
-            'title', 'author', 'isbn', 'edition', 'course_code', 'subject',
-            'publisher', 'publication_year', 'condition_rating', 'minimum_credits',
-            'description', 'is_available'
-        ];
-        
-        allowedFields.forEach(field => {
-            if (req.body[field] !== undefined) {
-                updateFields.push(`${field} = ?`);
-                updateValues.push(req.body[field]);
-            }
-        });
-
-        if (updateFields.length === 0) {
-            connection.release();
-            return res.status(400).json({ error: 'No fields to update' });
-        }
-
-        updateFields.push('updated_at = NOW()');
-        updateValues.push(bookId);
-
+        // Update availability
         await connection.execute(
-            `UPDATE books SET ${updateFields.join(', ')} WHERE id = ?`,
-            updateValues
+            'UPDATE books SET is_available = ?, updated_at = NOW() WHERE id = ?',
+            [is_available, bookId]
         );
 
-        // Get updated book
-        const [updatedBooks] = await connection.execute(`
-            SELECT 
-                b.*,
-                CONCAT(u.first_name, ' ', u.last_name) as owner_name
-            FROM books b
-            JOIN users u ON b.owner_id = u.id
-            WHERE b.id = ?
-        `, [bookId]);
-
-        await connection.end();
+        connection.release();
 
         res.json({
-            message: 'Book updated successfully',
-            book: updatedBooks[0]
+            message: 'Book availability updated successfully',
+            is_available
         });
 
     } catch (error) {
-        console.error('Update book error:', error);
-        res.status(500).json({ error: 'Failed to update book' });
+        console.error('Toggle availability error:', error);
+        res.status(500).json({ error: 'Failed to update availability' });
     }
 });
 
