@@ -1806,8 +1806,12 @@
                             <div class="book-status-badge" id="modal-book-status"></div>
                         </div>
                         <div class="book-details-info">
-                            <div class="book-details-section">
-                                <h4>Basic Information</h4>
+                            <div class="book-details-section collapsible">
+                                <h4 class="section-header" data-toggle="basic-info">
+                                    <span>Basic Information</span>
+                                    <i class="fas fa-chevron-down toggle-icon"></i>
+                                </h4>
+                                <div class="section-content" id="basic-info">
                                 <div class="info-grid">
                                     <div class="info-item">
                                         <label>Title</label>
@@ -1834,10 +1838,15 @@
                                         <span id="modal-book-edition"></span>
                                     </div>
                                 </div>
+                                </div>
                             </div>
 
-                            <div class="book-details-section">
-                                <h4>Course Information</h4>
+                            <div class="book-details-section collapsible collapsed">
+                                <h4 class="section-header" data-toggle="course-info">
+                                    <span>Course Information</span>
+                                    <i class="fas fa-chevron-down toggle-icon"></i>
+                                </h4>
+                                <div class="section-content" id="course-info">
                                 <div class="info-grid">
                                     <div class="info-item">
                                         <label>Course Code</label>
@@ -1848,10 +1857,15 @@
                                         <span id="modal-book-subject"></span>
                                     </div>
                                 </div>
+                                </div>
                             </div>
 
-                            <div class="book-details-section">
-                                <h4>Book Condition & Requirements</h4>
+                            <div class="book-details-section collapsible collapsed">
+                                <h4 class="section-header" data-toggle="condition-info">
+                                    <span>Book Condition & Requirements</span>
+                                    <i class="fas fa-chevron-down toggle-icon"></i>
+                                </h4>
+                                <div class="section-content" id="condition-info">
                                 <div class="info-grid">
                                     <div class="info-item">
                                         <label>Condition</label>
@@ -1862,10 +1876,15 @@
                                         <span id="modal-book-credits"></span>
                                     </div>
                                 </div>
+                                </div>
                             </div>
 
-                            <div class="book-details-section">
-                                <h4>Owner Information</h4>
+                            <div class="book-details-section collapsible collapsed">
+                                <h4 class="section-header" data-toggle="owner-info">
+                                    <span>Owner Information</span>
+                                    <i class="fas fa-chevron-down toggle-icon"></i>
+                                </h4>
+                                <div class="section-content" id="owner-info">
                                 <div class="info-grid">
                                     <div class="info-item">
                                         <label>Owner</label>
@@ -1876,11 +1895,17 @@
                                         <span id="modal-book-owner-program"></span>
                                     </div>
                                 </div>
+                                </div>
                             </div>
 
-                            <div class="book-details-section" id="modal-book-description-section" style="display: none;">
-                                <h4>Description</h4>
+                            <div class="book-details-section collapsible" id="modal-book-description-section" style="display: none;">
+                                <h4 class="section-header" data-toggle="description-info">
+                                    <span>Description</span>
+                                    <i class="fas fa-chevron-down toggle-icon"></i>
+                                </h4>
+                                <div class="section-content" id="description-info">
                                 <p id="modal-book-description"></p>
+                                </div>
                             </div>
                         </div>
                     </div>

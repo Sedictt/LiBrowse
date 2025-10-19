@@ -5308,13 +5308,52 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.book-details-section h4 {
+.book-details-section .section-header {
     color: var(--text-primary);
     font-size: 1rem;
     font-weight: 600;
-    margin-bottom: var(--spacing-md);
-    padding-bottom: var(--spacing-sm);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin: 0;
+    padding: 0;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    transition: var(--transition-fast);
+}
+
+.book-details-section .section-header:hover {
+    color: #667eea;
+}
+
+.book-details-section .section-header:hover .toggle-icon {
+    color: #667eea;
+    transform: scale(1.1);
+}
+
+.book-details-section .toggle-icon {
+    font-size: 0.85rem;
+    transition: transform var(--transition-smooth);
+    color: var(--text-muted);
+}
+
+.book-details-section.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.book-details-section .section-content {
+    max-height: 1000px;
+    overflow: hidden;
+    transition: max-height var(--transition-smooth), opacity var(--transition-smooth), margin-top var(--transition-smooth);
+    opacity: 1;
+    margin-top: var(--spacing-md);
+}
+
+.book-details-section.collapsed .section-content {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
 }
 
 .info-grid {

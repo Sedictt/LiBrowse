@@ -394,6 +394,22 @@ class BooksManager {
                 this.loadMoreBooks();
             });
         }
+
+        // Collapsible sections in modal
+        this.setupCollapsibleSections();
+    }
+
+    setupCollapsibleSections() {
+        // Use event delegation for collapsible sections
+        document.addEventListener('click', (e) => {
+            const header = e.target.closest('.section-header');
+            if (header && header.hasAttribute('data-toggle')) {
+                const section = header.closest('.book-details-section');
+                if (section) {
+                    section.classList.toggle('collapsed');
+                }
+            }
+        });
     }
 
     applyFilters() {
