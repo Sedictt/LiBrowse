@@ -36,6 +36,12 @@ class BookManagement {
     }
 
     showAddBookModal() {
+        // Remove any existing add-book-modal first
+        const existingModal = document.getElementById('add-book-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
         const modal = this.createBookFormModal();
         document.body.appendChild(modal);
         modal.classList.add('active');
@@ -57,7 +63,7 @@ class BookManagement {
                     </button>
                 </div>
                 <div class="modal-body">
-                    <form id="${isEdit ? 'edit-book-form' : 'add-book-form'}" class="book-form">
+                    <form id="${isEdit ? 'edit-book-form' : 'add-book-form'}" class="book-form" novalidate>
                         <!-- Image Upload Section -->
                         <div class="form-section">
                             <h4>Book Cover Image</h4>
@@ -403,20 +409,102 @@ class BookManagement {
         showToast('Image removed', 'info');
     }
 
+clearFormErrors() {
+    const activeModal = document.querySelector('.modal.active');
+    const ids = ['title-error', 'author-error', 'course-code-error', 'condition-error', 'credits-error'];
+    ids.forEach(id => {
+        const el = activeModal ? activeModal.querySelector('#' + id) : document.getElementById(id);
+        if (el) el.textContent = '';
+    });
+}
+
+displayValidationErrors(details) {
+    if (!Array.isArray(details)) return;
+    const activeModal = document.querySelector('.modal.active');
+    const map = {
+        title: { errorId: 'title-error', fieldSel: '#book-title' },
+        author: { errorId: 'author-error', fieldSel: '#book-author' },
+        course_code: { errorId: 'course-code-error', fieldSel: '#book-course-code' },
+        condition: { errorId: 'condition-error', fieldSel: '#book-condition' },
+        minimum_credits: { errorId: 'credits-error', fieldSel: '#book-credits' }
+    };
+    let firstField = null;
+    details.forEach(err => {
+        const cfg = map[err.param];
+        if (!cfg) return;
+        const errEl = activeModal ? activeModal.querySelector('#' + cfg.errorId) : document.getElementById(cfg.errorId);
+        if (errEl) errEl.textContent = err.msg;
+        if (!firstField) {
+            const field = activeModal ? activeModal.querySelector(cfg.fieldSel) : document.querySelector(cfg.fieldSel);
+            if (field) firstField = field;
+        }
+    });
+    if (firstField && typeof firstField.focus === 'function') {
+        firstField.focus();
+    }
+}
+
     async addBook() {
-        const submitBtn = document.querySelector('#add-book-form button[type="submit"]');
-        const originalBtnText = submitBtn.innerHTML;
+        const activeModal = document.querySelector('.modal.active');
+        const submitBtn = activeModal ? activeModal.querySelector('#add-book-form button[type="submit"]') : document.querySelector('#add-book-form button[type="submit"]');
+        const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
         
         try {
             // Show loading state
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+            }
             
-            const form = document.getElementById('add-book-form');
+            const form = activeModal ? activeModal.querySelector('#add-book-form') : document.getElementById('add-book-form');
+            this.clearFormErrors();
             const formData = new FormData(form);
+            const titleInput = activeModal ? activeModal.querySelector('#book-title') : document.getElementById('book-title');
+            console.log('Submitting book. Title field value:', titleInput ? titleInput.value : '(not found)');
+            // Sanitize and normalize fields
+            const trimKeys = ['title', 'author', 'course_code', 'condition'];
+            trimKeys.forEach(k => {
+                const v = formData.get(k);
+                if (typeof v === 'string') formData.set(k, v.trim());
+            });
+            // Explicitly set critical fields from the active modal controls
+            const authorInput = activeModal ? activeModal.querySelector('#book-author') : document.getElementById('book-author');
+            const courseInput = activeModal ? activeModal.querySelector('#book-course-code') : document.getElementById('book-course-code');
+            const conditionSelect = activeModal ? activeModal.querySelector('#book-condition') : document.getElementById('book-condition');
+            if (titleInput) formData.set('title', titleInput.value.trim());
+            if (authorInput) formData.set('author', authorInput.value.trim());
+            if (courseInput) formData.set('course_code', courseInput.value.trim());
+            if (conditionSelect) formData.set('condition', (conditionSelect.value || '').trim());
+            const mcRaw = formData.get('minimum_credits');
+            let mc = parseInt(typeof mcRaw === 'string' ? mcRaw.trim() : mcRaw, 10);
+            if (Number.isNaN(mc)) mc = 100;
+            if (mc < 50) mc = 50;
+            if (mc > 500) mc = 500;
+            formData.set('minimum_credits', String(mc));
+
+            // Debug outgoing FormData (excluding image)
+            try {
+                const preview = [];
+                for (const [k, v] of formData.entries()) {
+                    if (k === 'image') continue;
+                    preview.push([k, typeof v === 'string' ? v : '[File]']);
+                }
+                console.log('FormData preview:', preview);
+            } catch (e) { /* ignore */ }
+
+            // Ensure user is authenticated
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showToast('Please login to add a book', 'error');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                }
+                return;
+            }
 
             // Add image if selected
-            const imageInput = document.getElementById('book-image-input');
+            const imageInput = activeModal ? activeModal.querySelector('#book-image-input') : document.getElementById('book-image-input');
             if (imageInput.files[0]) {
                 formData.append('image', imageInput.files[0]);
                 showToast('Uploading book with cover image...', 'info');
@@ -427,7 +515,7 @@ class BookManagement {
             const response = await fetch('/api/books', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${token}`
                 },
                 body: formData
             });
@@ -435,18 +523,38 @@ class BookManagement {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || 'Failed to add book');
+                if (data && Array.isArray(data.details)) {
+                    this.displayValidationErrors(data.details);
+                }
+                const firstDetailMsg = Array.isArray(data?.details) && data.details.length ? data.details[0].msg : null;
+                throw new Error(firstDetailMsg || data.error || 'Failed to add book');
             }
 
+            console.log('✅ Book added successfully, closing modal and refreshing lists...');
+            
+            // Reset form
+            if (form && typeof form.reset === 'function') {
+                form.reset();
+            }
+            
+            // Show success message BEFORE closing modal so user sees it
             showToast('✓ Book added successfully!', 'success');
-            this.closeModal('add-book-modal');
+            
+            // Close modal with slight delay to ensure toast is visible
+            setTimeout(() => {
+                this.closeModal('add-book-modal');
+            }, 100);
             
             // Refresh books list if on books section
             if (window.location.hash === '#books') {
-                booksManager.loadBooks();
+                console.log('Refreshing books section...');
+                if (typeof booksManager !== 'undefined' && booksManager.loadBooks) {
+                    booksManager.loadBooks();
+                }
             }
             
             // Refresh my books if on profile
+            console.log('Refreshing my books...');
             this.loadMyBooks();
 
         } catch (error) {
@@ -454,50 +562,10 @@ class BookManagement {
             showToast(error.message || 'Failed to add book', 'error');
             
             // Restore button state
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalBtnText;
-        }
-    }
-
-    async updateBook(bookId) {
-        try {
-            const form = document.getElementById('edit-book-form');
-            const formData = new FormData(form);
-
-            // Convert FormData to JSON for PUT request
-            const bookData = {};
-            formData.forEach((value, key) => {
-                bookData[key] = value;
-            });
-
-            const response = await fetch(`/api/books/${bookId}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(bookData)
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to update book');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
             }
-
-            // Handle image upload separately if changed
-            const imageInput = document.getElementById('book-image-input');
-            if (imageInput.files[0]) {
-                await this.uploadBookImage(bookId, imageInput.files[0]);
-            }
-
-            showToast('Book updated successfully!', 'success');
-            this.closeModal('edit-book-modal');
-            this.loadMyBooks();
-
-        } catch (error) {
-            console.error('Update book error:', error);
-            showToast(error.message || 'Failed to update book', 'error');
         }
     }
 
