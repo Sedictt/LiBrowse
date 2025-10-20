@@ -494,6 +494,13 @@ class App {
                 break;
             case 'books':
                 tabContent.innerHTML = this.getMyBooksTab();
+                // Trigger book loading after DOM is ready
+                setTimeout(() => {
+                    if (typeof bookManagement !== 'undefined' && bookManagement.loadMyBooks) {
+                        console.log('🔄 Triggering loadMyBooks from main.js');
+                        bookManagement.loadMyBooks();
+                    }
+                }, 100);
                 break;
             case 'reviews':
                 tabContent.innerHTML = this.getReviewsTab();
@@ -824,9 +831,11 @@ class App {
 
     getMyBooksTab() {
         return `
-            <div class="my-books-content">
-                <h3>My Books</h3>
-                <p>Loading your books...</p>
+            <div class="my-books-content" id="books-content">
+                <div class="loading-state">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <p>Loading your books...</p>
+                </div>
             </div>
         `;
     }

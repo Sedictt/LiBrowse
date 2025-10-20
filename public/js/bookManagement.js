@@ -22,8 +22,22 @@ class BookManagement {
         // Profile tab - My Books
         const booksTab = document.querySelector('[data-tab="books"]');
         if (booksTab) {
-            booksTab.addEventListener('click', () => this.loadMyBooks());
+            console.log('✅ Books tab found, attaching listener');
+            booksTab.addEventListener('click', () => {
+                console.log('🔘 Books tab clicked');
+                this.loadMyBooks();
+            });
+        } else {
+            console.warn('⚠️ Books tab not found in DOM');
         }
+        
+        // Also listen for tab changes via custom event or hash
+        document.addEventListener('profile-tab-changed', (e) => {
+            if (e.detail && e.detail.tab === 'books') {
+                console.log('📢 Profile tab changed to books via event');
+                this.loadMyBooks();
+            }
+        });
 
         // Ensure image preview works for both static and dynamic modals
         document.addEventListener('change', (e) => {
@@ -569,6 +583,123 @@ displayValidationErrors(details) {
         }
     }
 
+    async updateBook(bookId) {
+        const activeModal = document.querySelector('.modal.active');
+        const submitBtn = activeModal ? activeModal.querySelector('#edit-book-form button[type="submit"]') : document.querySelector('#edit-book-form button[type="submit"]');
+        const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+        
+        try {
+            // Show loading state
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+            }
+            
+            const form = activeModal ? activeModal.querySelector('#edit-book-form') : document.getElementById('edit-book-form');
+            this.clearFormErrors();
+            
+            // Get form data as JSON (not FormData since we're not uploading image here)
+            const titleInput = activeModal ? activeModal.querySelector('#book-title') : document.getElementById('book-title');
+            const authorInput = activeModal ? activeModal.querySelector('#book-author') : document.getElementById('book-author');
+            const isbnInput = activeModal ? activeModal.querySelector('#book-isbn') : document.getElementById('book-isbn');
+            const editionInput = activeModal ? activeModal.querySelector('#book-edition') : document.getElementById('book-edition');
+            const courseInput = activeModal ? activeModal.querySelector('#book-course-code') : document.getElementById('book-course-code');
+            const subjectSelect = activeModal ? activeModal.querySelector('#book-subject') : document.getElementById('book-subject');
+            const conditionSelect = activeModal ? activeModal.querySelector('#book-condition') : document.getElementById('book-condition');
+            const creditsInput = activeModal ? activeModal.querySelector('#book-credits') : document.getElementById('book-credits');
+            const descriptionInput = activeModal ? activeModal.querySelector('#book-description') : document.getElementById('book-description');
+            const publisherInput = activeModal ? activeModal.querySelector('#book-publisher') : document.getElementById('book-publisher');
+            const yearInput = activeModal ? activeModal.querySelector('#book-year') : document.getElementById('book-year');
+            
+            const bookData = {
+                title: titleInput ? titleInput.value.trim() : '',
+                author: authorInput ? authorInput.value.trim() : '',
+                isbn: isbnInput ? isbnInput.value.trim() : '',
+                edition: editionInput ? editionInput.value.trim() : '',
+                course_code: courseInput ? courseInput.value.trim() : '',
+                subject: subjectSelect ? subjectSelect.value : 'General',
+                condition: conditionSelect ? conditionSelect.value : 'good',
+                minimum_credits: creditsInput ? parseInt(creditsInput.value, 10) : 100,
+                description: descriptionInput ? descriptionInput.value.trim() : '',
+                publisher: publisherInput ? publisherInput.value.trim() : '',
+                publication_year: yearInput ? yearInput.value : null
+            };
+            
+            // Clamp minimum_credits
+            if (isNaN(bookData.minimum_credits)) bookData.minimum_credits = 100;
+            if (bookData.minimum_credits < 50) bookData.minimum_credits = 50;
+            if (bookData.minimum_credits > 500) bookData.minimum_credits = 500;
+            
+            console.log('Updating book:', bookId, bookData);
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showToast('Please login to update book', 'error');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                }
+                return;
+            }
+            
+            const response = await fetch(`/api/books/${bookId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bookData)
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                if (data && Array.isArray(data.details)) {
+                    this.displayValidationErrors(data.details);
+                }
+                const firstDetailMsg = Array.isArray(data?.details) && data.details.length ? data.details[0].msg : null;
+                throw new Error(firstDetailMsg || data.error || 'Failed to update book');
+            }
+            
+            console.log('✅ Book updated successfully');
+            
+            // Handle image upload separately if changed
+            const imageInput = activeModal ? activeModal.querySelector('#book-image-input') : document.getElementById('book-image-input');
+            if (imageInput && imageInput.files && imageInput.files[0]) {
+                console.log('Uploading new image...');
+                await this.uploadBookImage(bookId, imageInput.files[0]);
+            }
+            
+            // Show success message
+            showToast('✓ Book updated successfully!', 'success');
+            
+            // Close modal with slight delay
+            setTimeout(() => {
+                this.closeModal('edit-book-modal');
+            }, 100);
+            
+            // Refresh books list
+            if (window.location.hash === '#books') {
+                if (typeof booksManager !== 'undefined' && booksManager.loadBooks) {
+                    booksManager.loadBooks();
+                }
+            }
+            
+            // Refresh my books
+            this.loadMyBooks();
+            
+        } catch (error) {
+            console.error('Update book error:', error);
+            showToast(error.message || 'Failed to update book', 'error');
+            
+            // Restore button state
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
+        }
+    }
+
     async uploadBookImage(bookId, imageFile) {
         const formData = new FormData();
         formData.append('image', imageFile);
@@ -587,29 +718,47 @@ displayValidationErrors(details) {
     }
 
     async loadMyBooks() {
+        console.log('📚 Loading my books...');
         try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                console.warn('No token found, user not logged in');
+                showToast('Please login to view your books', 'error');
+                return;
+            }
+            
             const response = await fetch('/api/books/my-books', {
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${token}`
                 }
             });
 
+            console.log('Response status:', response.status);
+
             if (!response.ok) {
-                throw new Error('Failed to load books');
+                const errorData = await response.json().catch(() => ({}));
+                console.error('Failed to load books:', errorData);
+                throw new Error(errorData.error || 'Failed to load books');
             }
 
             const data = await response.json();
-            this.renderMyBooks(data.books);
+            console.log('Books loaded:', data.books ? data.books.length : 0, 'books');
+            this.renderMyBooks(data.books || []);
 
         } catch (error) {
             console.error('Load my books error:', error);
-            showToast('Failed to load your books', 'error');
+            showToast(error.message || 'Failed to load your books', 'error');
         }
     }
 
     renderMyBooks(books) {
+        console.log('📖 Rendering my books:', books);
         const container = document.getElementById('books-content');
-        if (!container) return;
+        if (!container) {
+            console.error('❌ books-content container not found!');
+            return;
+        }
+        console.log('✅ Container found:', container);
 
         if (books.length === 0) {
             container.innerHTML = `
@@ -686,6 +835,12 @@ displayValidationErrors(details) {
 
     async editBook(bookId) {
         try {
+            // Remove any existing edit-book-modal first
+            const existingModal = document.getElementById('edit-book-modal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
             const response = await fetch(`/api/books/${bookId}`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
