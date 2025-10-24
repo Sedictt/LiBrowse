@@ -419,8 +419,56 @@
                             <option value="available">Available</option>
                             <option value="borrowed">Borrowed</option>
                         </select>
+                        <select id="sort-filter" class="filter-select">
+                            <option value="">Sort By...</option>
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="titleasc">Title (A-Z)</option>
+                            <option value="titledesc">Title (Z-A)</option>
+                            <option value="creditslow">Credits (Low to High)</option>
+                            <option value="creditshigh">Credits (High to Low)</option>
+                        </select>
                     </div>
                 </div>
+
+                <!-- Saved Searches Panel -->
+                <div class="saved-searches-panel">
+                    <div class="saved-searches-header">
+                        <h3><i class="fas fa-bookmark"></i> Saved Searches</h3>
+                        <button class="btn btn-sm btn-primary" id="save-search-btn" title="Save current search">
+                            <i class="fas fa-save"></i> Save Current Search
+                        </button>
+                    </div>
+                    <div class="saved-searches-list" id="saved-searches-list">
+                        <!-- Saved searches will be loaded here dynamically -->
+                        <p class="empty-state">No saved searches yet</p>
+                    </div>
+                </div>
+
+                <!-- Recently Viewed Books -->
+                <div class="recently-viewed-section" id="recently-viewed-section" style="display: none;">
+                    <div class="section-header-small">
+                        <h3><i class="fas fa-history"></i> Recently Viewed</h3>
+                        <a href="#" class="view-all-link" id="view-all-recent">View All</a>
+                    </div>
+                    <div class="recently-viewed-books" id="recently-viewed-books">
+                        <!-- Recently viewed books will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Personalized Recommendations -->
+                <div class="recommendations-section" id="recommendations-section" style="display: none;">
+                    <div class="section-header-small">
+                        <h3><i class="fas fa-magic"></i> Recommended for You</h3>
+                        <button class="btn btn-sm btn-outline" id="refresh-recommendations">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="recommended-books" id="recommended-books">
+                        <!-- Recommendations will be loaded here -->
+                    </div>
+                </div>
+
 
                 <!-- Books Grid -->
                 <div class="books-grid" id="books-grid">
@@ -1066,42 +1114,42 @@
     </script>
 
     <script>
-    // Handle registration form submission
-    const registerForm = document.getElementById("register-form");
+        // Handle registration form submission
+        const registerForm = document.getElementById("register-form");
 
-    registerForm.addEventListener("submit", function (e) {
-        e.preventDefault(); // Prevents form from refreshing the page
+        registerForm.addEventListener("submit", function (e) {
+            e.preventDefault(); // Prevents form from refreshing the page
 
-        // OPTIONAL: Add validation or backend request here using fetch()
+            // OPTIONAL: Add validation or backend request here using fetch()
 
-        // Simulate success (replace this with actual API callback)
-        showSuccessMessage("Your account has been successfully registered!");
-        
-        // Reset form after submission
-        registerForm.reset();
-    });
+            // Simulate success (replace this with actual API callback)
+            showSuccessMessage("Your account has been successfully registered!");
 
-    function showSuccessMessage(message) {
-        // Create message container
-        const successMsg = document.createElement("div");
-        successMsg.textContent = message;
-        successMsg.className = "success-message";
-        
-        // Style the message
-        successMsg.style.backgroundColor = "#d1fae5";
-        successMsg.style.color = "#065f46";
-        successMsg.style.padding = "12px";
-        successMsg.style.textAlign = "center";
-        successMsg.style.marginTop = "15px";
-        successMsg.style.borderRadius = "6px";
-        successMsg.style.border = "1px solid #10b981";
-        
-        // Insert below the form
-        registerForm.parentNode.insertBefore(successMsg, registerForm.nextSibling);
+            // Reset form after submission
+            registerForm.reset();
+        });
 
-        // Remove message after 4 seconds
-        setTimeout(() => successMsg.remove(), 4000);
-    }
+        function showSuccessMessage(message) {
+            // Create message container
+            const successMsg = document.createElement("div");
+            successMsg.textContent = message;
+            successMsg.className = "success-message";
+
+            // Style the message
+            successMsg.style.backgroundColor = "#d1fae5";
+            successMsg.style.color = "#065f46";
+            successMsg.style.padding = "12px";
+            successMsg.style.textAlign = "center";
+            successMsg.style.marginTop = "15px";
+            successMsg.style.borderRadius = "6px";
+            successMsg.style.border = "1px solid #10b981";
+
+            // Insert below the form
+            registerForm.parentNode.insertBefore(successMsg, registerForm.nextSibling);
+
+            // Remove message after 4 seconds
+            setTimeout(() => successMsg.remove(), 4000);
+        }
     </script>
 
 
@@ -1782,36 +1830,38 @@
                 </form>
             </div>
         </div>
-      </div>
+    </div>
     </div>
     <!-- Toast Notifications -->
-        <div class="toast-container" id="toast-container"></div>
+    <div class="toast-container" id="toast-container"></div>
 
-        <!-- Book Details Modal -->
-        <div id="book-details-modal" class="modal">
-            <div class="modal-content modal-large">
-                <div class="modal-header">
-                    <h3 id="modal-book-title">Book Details</h3>
-                    <button class="modal-close" data-modal="book-details-modal">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="book-details-content">
-                        <div class="book-details-image">
-                            <img id="modal-book-image" src="" alt="Book cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                            <div class="book-image-fallback" style="display: none; width: 100%; height: 100%; background: var(--bg-secondary); align-items: center; justify-content: center; font-size: 4rem; color: var(--text-muted);">
-                                <i class="fas fa-book"></i>
-                            </div>
-                            <div class="book-status-badge" id="modal-book-status"></div>
+    <!-- Book Details Modal -->
+    <div id="book-details-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="modal-book-title">Book Details</h3>
+                <button class="modal-close" data-modal="book-details-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="book-details-content">
+                    <div class="book-details-image">
+                        <img id="modal-book-image" src="" alt="Book cover"
+                            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="book-image-fallback"
+                            style="display: none; width: 100%; height: 100%; background: var(--bg-secondary); align-items: center; justify-content: center; font-size: 4rem; color: var(--text-muted);">
+                            <i class="fas fa-book"></i>
                         </div>
-                        <div class="book-details-info">
-                            <div class="book-details-section collapsible">
-                                <h4 class="section-header" data-toggle="basic-info">
-                                    <span>Basic Information</span>
-                                    <i class="fas fa-chevron-down toggle-icon"></i>
-                                </h4>
-                                <div class="section-content" id="basic-info">
+                        <div class="book-status-badge" id="modal-book-status"></div>
+                    </div>
+                    <div class="book-details-info">
+                        <div class="book-details-section collapsible">
+                            <h4 class="section-header" data-toggle="basic-info">
+                                <span>Basic Information</span>
+                                <i class="fas fa-chevron-down toggle-icon"></i>
+                            </h4>
+                            <div class="section-content" id="basic-info">
                                 <div class="info-grid">
                                     <div class="info-item">
                                         <label>Title</label>
@@ -1838,15 +1888,15 @@
                                         <span id="modal-book-edition"></span>
                                     </div>
                                 </div>
-                                </div>
                             </div>
+                        </div>
 
-                            <div class="book-details-section collapsible collapsed">
-                                <h4 class="section-header" data-toggle="course-info">
-                                    <span>Course Information</span>
-                                    <i class="fas fa-chevron-down toggle-icon"></i>
-                                </h4>
-                                <div class="section-content" id="course-info">
+                        <div class="book-details-section collapsible collapsed">
+                            <h4 class="section-header" data-toggle="course-info">
+                                <span>Course Information</span>
+                                <i class="fas fa-chevron-down toggle-icon"></i>
+                            </h4>
+                            <div class="section-content" id="course-info">
                                 <div class="info-grid">
                                     <div class="info-item">
                                         <label>Course Code</label>
@@ -1857,15 +1907,15 @@
                                         <span id="modal-book-subject"></span>
                                     </div>
                                 </div>
-                                </div>
                             </div>
+                        </div>
 
-                            <div class="book-details-section collapsible collapsed">
-                                <h4 class="section-header" data-toggle="condition-info">
-                                    <span>Book Condition & Requirements</span>
-                                    <i class="fas fa-chevron-down toggle-icon"></i>
-                                </h4>
-                                <div class="section-content" id="condition-info">
+                        <div class="book-details-section collapsible collapsed">
+                            <h4 class="section-header" data-toggle="condition-info">
+                                <span>Book Condition & Requirements</span>
+                                <i class="fas fa-chevron-down toggle-icon"></i>
+                            </h4>
+                            <div class="section-content" id="condition-info">
                                 <div class="info-grid">
                                     <div class="info-item">
                                         <label>Condition</label>
@@ -1876,15 +1926,15 @@
                                         <span id="modal-book-credits"></span>
                                     </div>
                                 </div>
-                                </div>
                             </div>
+                        </div>
 
-                            <div class="book-details-section collapsible collapsed">
-                                <h4 class="section-header" data-toggle="owner-info">
-                                    <span>Owner Information</span>
-                                    <i class="fas fa-chevron-down toggle-icon"></i>
-                                </h4>
-                                <div class="section-content" id="owner-info">
+                        <div class="book-details-section collapsible collapsed">
+                            <h4 class="section-header" data-toggle="owner-info">
+                                <span>Owner Information</span>
+                                <i class="fas fa-chevron-down toggle-icon"></i>
+                            </h4>
+                            <div class="section-content" id="owner-info">
                                 <div class="info-grid">
                                     <div class="info-item">
                                         <label>Owner</label>
@@ -1895,104 +1945,113 @@
                                         <span id="modal-book-owner-program"></span>
                                     </div>
                                 </div>
-                                </div>
                             </div>
+                        </div>
 
-                            <div class="book-details-section collapsible" id="modal-book-description-section" style="display: none;">
-                                <h4 class="section-header" data-toggle="description-info">
-                                    <span>Description</span>
-                                    <i class="fas fa-chevron-down toggle-icon"></i>
-                                </h4>
-                                <div class="section-content" id="description-info">
+                        <div class="book-details-section collapsible" id="modal-book-description-section"
+                            style="display: none;">
+                            <h4 class="section-header" data-toggle="description-info">
+                                <span>Description</span>
+                                <i class="fas fa-chevron-down toggle-icon"></i>
+                            </h4>
+                            <div class="section-content" id="description-info">
                                 <p id="modal-book-description"></p>
-                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button class="btn btn-outline" onclick="app.closeModal('book-details-modal')">
-                        <i class="fas fa-times"></i>
-                        Close
-                    </button>
-                    <button class="btn btn-primary" id="modal-request-book" onclick="booksManager.requestBookFromModal()">
-                        <i class="fas fa-hand-paper"></i>
-                        Request Book
-                    </button>
+
+                <!-- Similar Books Section -->
+                <div class="similar-books-section" id="similar-books-section" style="display: none;">
+                    <h4><i class="fas fa-book-reader"></i> Similar Books You Might Like</h4>
+                    <div class="similar-books-grid" id="similar-books-grid">
+                        <!-- Similar books will be loaded here -->
+                    </div>
                 </div>
             </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="app.closeModal('book-details-modal')">
+                    <i class="fas fa-times"></i>
+                    Close
+                </button>
+                <button class="btn btn-primary" id="modal-request-book" onclick="booksManager.requestBookFromModal()">
+                    <i class="fas fa-hand-paper"></i>
+                    Request Book
+                </button>
+            </div>
         </div>
+    </div>
 
-        <!-- Scripts -->
-        <script src="./js/utils.js"></script>
-        <script src="./js/api.js"></script>
-        <script src="./js/captcha.js"></script>
-        <script src="./js/auth.js"></script>
-        <script src="./js/main.js"></script>
-        <script src="./js/books.js"></script>
-        <script src="./js/requests.js"></script>
-        <script src="./js/monitoring.js"></script>
-        <script src="./js/bookManagement.js"></script>
+    <!-- Scripts -->
+    <script src="./js/utils.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/captcha.js"></script>
+    <script src="./js/auth.js"></script>
+    <script src="./js/main.js"></script>
+    <script src="./js/books.js"></script>
+    <script src="./js/requests.js"></script>
+    <script src="./js/monitoring.js"></script>
+    <script src="./js/bookManagement.js"></script>
 
-        <!-- Profile Tab Switching Script -->
-        <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                // Setup profile tab switching
-                const profileTabBtns = document.querySelectorAll('.profile-tabs .tab-btn');
-                profileTabBtns.forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        // Remove active from all buttons
-                        profileTabBtns.forEach(b => b.classList.remove('active'));
-                        // Add active to clicked button
-                        btn.classList.add('active');
+    <!-- Profile Tab Switching Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Setup profile tab switching
+            const profileTabBtns = document.querySelectorAll('.profile-tabs .tab-btn');
+            profileTabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Remove active from all buttons
+                    profileTabBtns.forEach(b => b.classList.remove('active'));
+                    // Add active to clicked button
+                    btn.classList.add('active');
 
-                        // Hide all tab contents
-                        document.querySelectorAll('.profile-tab-content .tab-content').forEach(content => {
-                            content.style.display = 'none';
-                        });
-
-                        // Show selected tab content
-                        const tabName = btn.getAttribute('data-tab');
-                        const tabContent = document.getElementById(`${tabName}-content`);
-                        if (tabContent) {
-                            tabContent.style.display = 'block';
-                        }
-
-                        // Load books when Books tab is clicked
-                        if (tabName === 'books' && typeof bookManagement !== 'undefined') {
-                            bookManagement.loadMyBooks();
-                        }
+                    // Hide all tab contents
+                    document.querySelectorAll('.profile-tab-content .tab-content').forEach(content => {
+                        content.style.display = 'none';
                     });
+
+                    // Show selected tab content
+                    const tabName = btn.getAttribute('data-tab');
+                    const tabContent = document.getElementById(`${tabName}-content`);
+                    if (tabContent) {
+                        tabContent.style.display = 'block';
+                    }
+
+                    // Load books when Books tab is clicked
+                    if (tabName === 'books' && typeof bookManagement !== 'undefined') {
+                        bookManagement.loadMyBooks();
+                    }
                 });
             });
-        </script>
+        });
+    </script>
 
-        <script>
-            // Close mobile menu when modal opens
-            document.addEventListener('DOMContentLoaded', () => {
-                const modals = document.querySelectorAll('.modal');
-                const navToggle = document.getElementById('nav-toggle');
-                const navMenu = document.getElementById('nav-menu');
+    <script>
+        // Close mobile menu when modal opens
+        document.addEventListener('DOMContentLoaded', () => {
+            const modals = document.querySelectorAll('.modal');
+            const navToggle = document.getElementById('nav-toggle');
+            const navMenu = document.getElementById('nav-menu');
 
-                modals.forEach(modal => {
-                    const observer = new MutationObserver((mutations) => {
-                        mutations.forEach((mutation) => {
-                            if (mutation.attributeName === 'class') {
-                                if (modal.classList.contains('active') || modal.classList.contains('show')) {
-                                    if (navToggle && navMenu) {
-                                        navToggle.classList.remove('active');
-                                        navMenu.classList.remove('active');
-                                        document.body.classList.remove('menu-open');
-                                    }
+            modals.forEach(modal => {
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.attributeName === 'class') {
+                            if (modal.classList.contains('active') || modal.classList.contains('show')) {
+                                if (navToggle && navMenu) {
+                                    navToggle.classList.remove('active');
+                                    navMenu.classList.remove('active');
+                                    document.body.classList.remove('menu-open');
                                 }
                             }
-                        });
+                        }
                     });
-
-                    observer.observe(modal, { attributes: true });
                 });
+
+                observer.observe(modal, { attributes: true });
             });
-        </script>
+        });
+    </script>
 
 </body>
 

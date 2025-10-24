@@ -44,16 +44,16 @@ class ApiClient {
                 // Handle token expiration - clear auth and force re-login
                 if (response.status === 401 || response.status === 403) {
                     // Check if it's a token expiration error
-                    const isTokenExpired = message.toLowerCase().includes('token') && 
-                                          (message.toLowerCase().includes('expired') || 
-                                           message.toLowerCase().includes('invalid'));
-                    
+                    const isTokenExpired = message.toLowerCase().includes('token') &&
+                        (message.toLowerCase().includes('expired') ||
+                            message.toLowerCase().includes('invalid'));
+
                     if (isTokenExpired) {
                         console.warn('🔒 Token expired, clearing authentication...');
                         // Clear expired token
                         localStorage.removeItem('token');
                         localStorage.removeItem('user');
-                        
+
                         // Dispatch event to notify auth manager
                         try {
                             window.dispatchEvent(new CustomEvent('auth:token-expired', {
@@ -276,6 +276,101 @@ class ApiClient {
         return this.request('/auth/reset-password', {
             method: 'POST',
             body: JSON.stringify({ email, token, newPassword })
+        });
+    }
+
+    // --- Advanced book search ---
+    async searchBooks(filters = {}) {
+        const query = new URLSearchParams(filters).toString();
+        return this.request(`/books/search?${query}`, { method: "GET" });
+    }
+
+    async getBookSuggestions(query) {
+        if (!query || query.trim().length < 2) return { suggestions: [] };
+        const encodedQuery = encodeURIComponent(query);
+        return this.request(`/books/autocomplete?q=${encodedQuery}`, { method: "GET" });
+    }
+
+
+    // --- Save user’s search locally ---
+    saveSearch(filters) {
+        const searches = JSON.parse(localStorage.getItem("savedSearches") || "[]");
+        searches.unshift(filters);
+        localStorage.setItem("savedSearches", JSON.stringify(searches.slice(0, 5)));
+    }
+
+    getSavedSearches() {
+        return JSON.parse(localStorage.getItem("savedSearches") || "[]");
+    }
+
+    // ========================================
+    // SAVED SEARCHES API METHODS
+    // ========================================
+
+    async getSavedSearches() {
+        return this.request('/books/saved-searches', {
+            method: 'GET'
+        });
+    }
+
+    async saveSearch(searchName, searchCriteria) {
+        return this.request('/books/saved-searches', {
+            method: 'POST',
+            body: JSON.stringify({
+                search_name: searchName,
+                search_criteria: searchCriteria
+            })
+        });
+    }
+
+    async updateSavedSearch(searchId) {
+        return this.request(`/books/saved-searches/${searchId}`, {
+            method: 'PUT'
+        });
+    }
+
+    async deleteSavedSearch(searchId) {
+        return this.request(`/books/saved-searches/${searchId}`, {
+            method: 'DELETE'
+        });
+    }
+
+    // ========================================
+    // RECENTLY VIEWED API METHODS
+    // ========================================
+
+    async trackBookView(bookId) {
+        return this.request(`/books/${bookId}/view`, {
+            method: 'POST'
+        });
+    }
+
+    async getRecentlyViewed(limit = 10) {
+        return this.request(`/books/recently-viewed?limit=${limit}`, {
+            method: 'GET'
+        });
+    }
+
+    // ========================================
+    // RECOMMENDATIONS API METHODS
+    // ========================================
+
+    async getRecommendations(limit = 8) {
+        return this.request(`/books/recommendations?limit=${limit}`, {
+            method: 'GET'
+        });
+    }
+
+    async getSimilarBooks(bookId) {
+        return this.request(`/books/${bookId}/similar`, {
+            method: 'GET'
+        });
+    }
+
+    // Track book view for recently viewed
+    async trackBookView(bookId) {
+        return this.request(`/books/${bookId}/view`, {
+            method: 'POST'
         });
     }
 

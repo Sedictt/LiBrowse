@@ -26,11 +26,11 @@ class BooksManager {
 
     async loadBooks(filters = {}, reset = true) {
         if (this.isLoading) return;
-        
+
         try {
             this.isLoading = true;
             this.filters = { ...this.filters, ...filters };
-            
+
             if (reset) {
                 this.currentPage = 1;
                 this.books = [];
@@ -43,19 +43,19 @@ class BooksManager {
             };
 
             const response = await api.getBooks(queryParams);
-            
+
             if (reset) {
-            this.books = response.books || [];
+                this.books = response.books || [];
             } else {
                 this.books = [...this.books, ...(response.books || [])];
             }
-            
+
             this.totalBooks = response.pagination?.total || 0;
             this.hasMore = response.pagination?.hasMore || false;
-            
+
             this.renderBooks();
             this.updateLoadMoreButton();
-            
+
         } catch (error) {
             console.error('Failed to load books:', error);
             showToast('Failed to load books', 'error');
@@ -66,7 +66,7 @@ class BooksManager {
 
     async loadMoreBooks() {
         if (!this.hasMore || this.isLoading) return;
-        
+
         this.currentPage++;
         await this.loadBooks({}, false);
     }
@@ -83,7 +83,7 @@ class BooksManager {
             this.totalBooks = response.pagination?.total || 0;
             this.hasMore = response.pagination?.hasMore || false;
             this.currentPage = 1;
-            
+
             this.renderBooks();
             this.updateLoadMoreButton();
         } catch (error) {
@@ -116,7 +116,7 @@ class BooksManager {
         const isAvailable = book.is_available === 1 || book.is_available === true;
         const status = isAvailable ? 'available' : 'borrowed';
         const statusText = isAvailable ? 'Available' : 'Borrowed';
-        
+
         return `
             <div class="book-card" data-book-id="${book.id}">
                 <div class="book-image">
@@ -172,61 +172,62 @@ class BooksManager {
     }
 
     async viewBook(bookId) {
-        console.log('=== VIEW BOOK CALLED ===');
-        console.log('Book ID:', bookId);
-        console.log('Current books array:', this.books);
-        console.log('booksManager instance:', this);
-        
+        console.log('VIEW BOOK CALLED');
+
         try {
-            // First try to find the book in the current books array
+            // Find book in current array or fetch from API
             let book = this.books.find(b => b.id == bookId);
-            console.log('Found book in array:', book);
-            
+
             if (!book) {
-                console.log('Book not found in array, fetching from API...');
-                // If not found, fetch from API
                 const response = await api.getBook(bookId);
-                console.log('API response for book:', response);
-                
-                // The API returns { book: bookData }, so we need to extract the book object
                 book = response.book || response;
-                console.log('Extracted book data:', book);
-            } else {
-                console.log('Using book from current array:', book);
             }
-            
-            console.log('About to show modal with book:', book);
+
+            // 🎯 ADD THIS: Track the view in backend
+            if (authManager && authManager.isAuthenticated) {
+                try {
+                    await api.trackBookView(bookId);
+                    console.log('✅ Book view tracked:', bookId);
+                } catch (error) {
+                    console.warn('Failed to track book view:', error);
+                    // Don't block modal if tracking fails
+                }
+            }
+
+            // Show the modal
             this.showBookModal(book);
+
         } catch (error) {
             console.error('Failed to load book details:', error);
             showToast('Failed to load book details', 'error');
         }
     }
 
+
     showBookModal(book) {
         console.log('=== SHOW BOOK MODAL ===');
         console.log('Book received:', book);
-        
+
         // Store current book for modal actions
         this.currentModalBook = book;
-        
+
         // Update modal content
         console.log('About to populate modal...');
         this.populateBookModal(book);
         console.log('Modal populated');
-        
+
         // Show modal
         const modal = document.getElementById('book-details-modal');
         console.log('Modal element:', modal);
         console.log('Modal classes before:', modal?.className);
-        
+
         // Ensure loading overlay doesn't cover the modal
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
             loadingScreen.classList.add('hidden');
             loadingScreen.style.display = 'none';
         }
-        
+
         if (modal) {
             // Force visibility with inline styles to override any CSS issues
             modal.style.display = 'flex';
@@ -235,7 +236,7 @@ class BooksManager {
             modal.style.zIndex = '9999';
             modal.classList.add('active');
             document.body.style.overflow = 'hidden';
-            
+
             console.log('Modal classes after:', modal.className);
             console.log('Modal computed styles:', {
                 display: getComputedStyle(modal).display,
@@ -254,14 +255,14 @@ class BooksManager {
         console.log('Book data received:', book);
         console.log('Book title:', book.title);
         console.log('Book author:', book.author);
-        
+
         // Check if modal elements exist
         const titleElement = document.getElementById('modal-book-title');
         const titleTextElement = document.getElementById('modal-book-title-text');
-        
+
         console.log('Title element found:', !!titleElement);
         console.log('Title text element found:', !!titleTextElement);
-        
+
         if (!titleElement) {
             console.error('modal-book-title element not found!');
             return;
@@ -270,7 +271,7 @@ class BooksManager {
             console.error('modal-book-title-text element not found!');
             return;
         }
-        
+
         // Test with simple values first
         console.log('Setting title to:', book.title);
         titleElement.textContent = book.title || 'TEST TITLE';
@@ -334,13 +335,13 @@ class BooksManager {
 
     async requestBookFromModal() {
         if (!this.currentModalBook) return;
-        
+
         if (!authManager.requireAuth()) return;
 
         try {
             await api.post('/transactions', { book_id: this.currentModalBook.id });
             showToast('Request sent successfully!', 'success');
-            
+
             // Close modal
             this.closeBookModal();
         } catch (error) {
@@ -370,20 +371,18 @@ class BooksManager {
             const debouncedSearch = debounce((query) => {
                 this.searchBooks(query);
             }, 500);
-            
+
             searchInput.addEventListener('input', (e) => {
                 debouncedSearch(e.target.value);
             });
         }
 
         // Filter functionality
-        const filterSelects = ['program-filter', 'condition-filter', 'availability-filter'];
+        const filterSelects = ['program-filter', 'condition-filter', 'availability-filter', 'sort-filter']; // ADD sort-filter
         filterSelects.forEach(filterId => {
             const filter = document.getElementById(filterId);
             if (filter) {
-                filter.addEventListener('change', () => {
-                    this.applyFilters();
-                });
+                filter.addEventListener('change', () => this.applyFilters());
             }
         });
 
@@ -414,17 +413,26 @@ class BooksManager {
 
     applyFilters() {
         const filters = {};
-        
+
         const programFilter = document.getElementById('program-filter');
         const conditionFilter = document.getElementById('condition-filter');
         const availabilityFilter = document.getElementById('availability-filter');
-        
+        const sortFilter = document.getElementById('sort-filter'); // ADD THIS
+
         if (programFilter?.value) filters.program = programFilter.value;
         if (conditionFilter?.value) filters.condition = conditionFilter.value;
         if (availabilityFilter?.value) filters.availability = availabilityFilter.value;
-        
+        if (sortFilter?.value) filters.sort = sortFilter.value; // ADD THIS
+
+        // Show loading state
+        const booksGrid = document.getElementById('books-grid');
+        if (booksGrid) {
+            booksGrid.innerHTML = '<div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading books...</div>';
+        }
+
         this.loadBooks(filters);
     }
+
 
     updateLoadMoreButton() {
         const loadMoreBtn = document.getElementById('load-more-books');
@@ -433,7 +441,7 @@ class BooksManager {
         if (this.hasMore && this.books.length > 0) {
             loadMoreBtn.style.display = 'block';
             loadMoreBtn.disabled = this.isLoading;
-            loadMoreBtn.innerHTML = this.isLoading 
+            loadMoreBtn.innerHTML = this.isLoading
                 ? '<i class="fas fa-spinner fa-spin"></i> Loading...'
                 : '<i class="fas fa-chevron-down"></i> Load More Books';
         } else {
@@ -450,12 +458,12 @@ class BooksManager {
         try {
             this.isLoading = true;
             this.updateLoadMoreButton();
-            
+
             const response = await api.get(`/books/search?q=${encodeURIComponent(query)}`);
             this.books = response.books || [];
             this.totalBooks = response.pagination?.total || 0;
             this.hasMore = response.pagination?.hasMore || false;
-            
+
             this.renderBooks();
             this.updateLoadMoreButton();
         } catch (error) {
@@ -472,14 +480,14 @@ class BooksManager {
         try {
             this.isLoading = true;
             this.updateLoadMoreButton();
-            
+
             const currentPage = Math.floor(this.books.length / 12) + 1;
             const response = await api.get(`/books?page=${currentPage}&limit=12`);
-            
+
             this.books = [...this.books, ...(response.books || [])];
             this.totalBooks = response.pagination?.total || 0;
             this.hasMore = response.pagination?.hasMore || false;
-            
+
             this.renderBooks();
             this.updateLoadMoreButton();
         } catch (error) {
@@ -501,19 +509,158 @@ class BooksManager {
             console.error('Test modal failed:', error);
         }
     }
+
+    // ========================================
+    // ADD TO BooksManager CLASS
+    // ========================================
+
+    // Track book view when opening detail modal
+    async viewBookDetails(bookId) {
+        try {
+            // Track the view
+            if (authManager.isAuthenticated) {
+                await api.trackBookView(bookId);
+                // Refresh recently viewed list
+                await this.loadRecentlyViewed();
+            }
+
+            // Load book details
+            const response = await api.getBook(bookId);
+            const book = response.book;
+
+            // Load similar books for recommendations
+            const similarResponse = await api.getSimilarBooks(bookId);
+            const similarBooks = similarResponse.recommendations || [];
+
+            // Show detail modal with book info
+            this.showBookDetailModal(book, similarBooks);
+        } catch (error) {
+            console.error('Failed to load book details:', error);
+            showToast('Failed to load book details', 'error');
+        }
+    }
+
+    async loadRecentlyViewed() {
+        if (!authManager || !authManager.isAuthenticated) return;
+
+        try {
+            const response = await api.getRecentlyViewed(10);
+            this.recentlyViewed = response.books || [];
+            this.renderRecentlyViewed();
+        } catch (error) {
+            console.error('Failed to load recently viewed:', error);
+        }
+    }
+
+    renderRecentlyViewed() {
+        const container = document.getElementById('recently-viewed-books');
+        if (!container) return;
+
+        if (this.recentlyViewed.length === 0) {
+            container.innerHTML = '<p class="empty-state">No recently viewed books</p>';
+            return;
+        }
+
+        container.innerHTML = this.recentlyViewed.map(book => `
+    <div class="book-card-mini" data-book-id="${book.id}">
+      <img src="${book.cover_image || '/images/default-book.png'}" alt="${book.title}">
+      <div class="book-mini-info">
+        <h5>${book.title}</h5>
+        <p>${book.author || 'Unknown Author'}</p>
+        <small>${this.formatTimeAgo(book.viewed_at)}</small>
+      </div>
+    </div>
+  `).join('');
+
+        // Add click handlers
+        container.querySelectorAll('.book-card-mini').forEach(card => {
+            card.addEventListener('click', () => {
+                const bookId = card.dataset.bookId;
+                this.viewBookDetails(bookId);
+            });
+        });
+    }
+
+    async loadRecommendations() {
+        if (!authManager.isAuthenticated) return;
+
+        try {
+            const response = await api.getRecommendations(8);
+            this.recommendations = response.books || [];
+            this.renderRecommendations();
+        } catch (error) {
+            console.error('Failed to load recommendations:', error);
+        }
+    }
+
+    renderRecommendations() {
+        const container = document.getElementById('recommended-books');
+        if (!container) return;
+
+        if (this.recommendations.length === 0) {
+            container.innerHTML = '<p class="empty-state">No recommendations available yet</p>';
+            return;
+        }
+
+        container.innerHTML = this.recommendations.map(book => this.createBookCard(book)).join('');
+
+        // Add click handlers
+        container.querySelectorAll('.book-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const bookId = card.dataset.bookId;
+                this.viewBookDetails(bookId);
+            });
+        });
+    }
+
+    showBookDetailModal(book, similarBooks = []) {
+        // Your existing book detail modal code here
+        // Add a section at the bottom for similar books:
+
+        const modalContent = `
+    <!-- Your existing book detail HTML -->
+    
+    ${similarBooks.length > 0 ? `
+      <div class="similar-books-section">
+        <h3>Similar Books You Might Like</h3>
+        <div class="similar-books-grid">
+          ${similarBooks.map(b => this.createBookCard(b)).join('')}
+        </div>
+      </div>
+    ` : ''}
+  `;
+
+        // Show the modal (your existing code)
+    }
+
+    formatTimeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString();
+    }
+
 }
 
 // Global test function for debugging
-window.testBookModal = async function() {
+window.testBookModal = async function () {
     console.log('Testing book modal...');
     try {
         const response = await fetch('/api/books/28');
         const data = await response.json();
         console.log('API response:', data);
-        
+
         const book = data.book;
         console.log('Book data:', book);
-        
+
         // Test modal population directly
         if (window.booksManager) {
             window.booksManager.showBookModal(book);
@@ -526,16 +673,16 @@ window.testBookModal = async function() {
 };
 
 // Simple test to populate modal with hardcoded data
-window.testModalSimple = function() {
+window.testModalSimple = function () {
     try {
         console.log('=== TEST MODAL SIMPLE START ===');
         console.log('Testing modal with simple data...');
-        
+
         // First check if modal exists at all
         const testModal = document.getElementById('book-details-modal');
         console.log('Modal element found:', testModal);
         console.log('Modal exists:', !!testModal);
-        
+
         if (testModal) {
             console.log('Modal HTML length:', testModal.outerHTML?.length);
             console.log('Modal HTML preview:', testModal.outerHTML?.substring(0, 200) + '...');
@@ -545,31 +692,31 @@ window.testModalSimple = function() {
     } catch (error) {
         console.error('Error in testModalSimple:', error);
     }
-    
+
     // Test if modal elements exist
     const titleElement = document.getElementById('modal-book-title');
     const titleTextElement = document.getElementById('modal-book-title-text');
     const authorElement = document.getElementById('modal-book-author');
-    
+
     console.log('Title element:', titleElement);
     console.log('Title text element:', titleTextElement);
     console.log('Author element:', authorElement);
-    
+
     if (titleElement) {
         titleElement.textContent = 'TEST BOOK TITLE';
         console.log('Set title to TEST BOOK TITLE');
     }
-    
+
     if (titleTextElement) {
         titleTextElement.textContent = 'TEST BOOK TITLE';
         console.log('Set title text to TEST BOOK TITLE');
     }
-    
+
     if (authorElement) {
         authorElement.textContent = 'TEST AUTHOR';
         console.log('Set author to TEST AUTHOR');
     }
-    
+
     // Show modal
     const showModal = document.getElementById('book-details-modal');
     if (showModal) {
@@ -580,7 +727,7 @@ window.testModalSimple = function() {
         showModal.style.zIndex = '9999';
         showModal.classList.add('active');
         document.body.style.overflow = 'hidden';
-        
+
         console.log('Modal forced visible with inline styles');
         console.log('Modal computed styles:', {
             display: getComputedStyle(showModal).display,
@@ -591,7 +738,7 @@ window.testModalSimple = function() {
     } else {
         console.error('Modal element not found!');
         console.log('Creating a simple test modal...');
-        
+
         // Create a simple test modal
         const newTestModal = document.createElement('div');
         newTestModal.id = 'test-modal';

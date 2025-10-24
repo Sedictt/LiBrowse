@@ -12,6 +12,9 @@ class App {
         this.handleInitialRoute();
         await this.loadPlatformStats();
         this.hideLoadingScreen();
+        if (authManager.isAuthenticated) {
+            this.showAuthenticatedFeatures();
+        }
     }
 
     setupEventListeners() {
@@ -49,13 +52,13 @@ class App {
         // Mobile auth buttons
         const mobileLoginBtn = document.getElementById('mobile-login-btn');
         const mobileRegisterBtn = document.getElementById('mobile-register-btn');
-        
+
         if (mobileLoginBtn) {
             mobileLoginBtn.addEventListener('click', () => {
                 authManager.openModal('login-modal');
             });
         }
-        
+
         if (mobileRegisterBtn) {
             mobileRegisterBtn.addEventListener('click', () => {
                 authManager.openModal('register-modal');
@@ -65,7 +68,7 @@ class App {
         // Mobile navigation toggle
         const navToggle = document.getElementById('nav-toggle');
         const navMenu = document.getElementById('nav-menu');
-        
+
         const closeMobileMenu = () => {
             if (navToggle && navMenu) {
                 navToggle.classList.remove('active');
@@ -73,13 +76,13 @@ class App {
                 document.body.classList.remove('menu-open');
             }
         };
-        
+
         if (navToggle && navMenu) {
             // Toggle menu when clicking hamburger
             navToggle.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const isOpen = navMenu.classList.contains('active');
-                
+
                 if (isOpen) {
                     closeMobileMenu();
                 } else {
@@ -88,7 +91,7 @@ class App {
                     document.body.classList.add('menu-open');
                 }
             });
-            
+
             // Close menu when clicking on a nav link
             const navLinks = navMenu.querySelectorAll('.nav-link');
             navLinks.forEach(link => {
@@ -96,7 +99,7 @@ class App {
                     closeMobileMenu();
                 });
             });
-            
+
             // Close menu when clicking overlay/backdrop
             navMenu.addEventListener('click', (e) => {
                 // If clicking the backdrop (::before pseudo-element area)
@@ -104,18 +107,18 @@ class App {
                     closeMobileMenu();
                 }
             });
-            
+
             // Close when clicking outside
             document.addEventListener('click', (e) => {
                 const isMenuOpen = navMenu.classList.contains('active');
                 const clickedInsideMenu = navMenu.contains(e.target);
                 const clickedToggle = navToggle.contains(e.target);
-                
+
                 if (isMenuOpen && !clickedInsideMenu && !clickedToggle) {
                     closeMobileMenu();
                 }
             });
-            
+
             // Close with Escape key
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && navMenu.classList.contains('active')) {
@@ -282,7 +285,7 @@ class App {
                     <p>Start by browsing books or adding your own!</p>
                 </div>
             `;
-            
+
             if (borrowingList) borrowingList.innerHTML = emptyMessage;
             if (lendingList) lendingList.innerHTML = emptyMessage;
             if (historyList) historyList.innerHTML = emptyMessage;
@@ -341,7 +344,7 @@ class App {
     getTransactionActions(transaction) {
         // Return appropriate action buttons based on transaction status and user role
         let actions = '';
-        
+
         if (transaction.type === 'lending' && transaction.status === 'pending') {
             actions += `
                 <button class="btn btn-primary btn-sm" onclick="app.approveTransaction(${transaction.id})">
@@ -352,7 +355,7 @@ class App {
                 </button>
             `;
         }
-        
+
         return actions;
     }
 
@@ -363,11 +366,11 @@ class App {
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 const tabName = btn.getAttribute('data-tab');
-                
+
                 // Update active tab button
                 tabBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                
+
                 // Update active tab content
                 tabContents.forEach(content => {
                     content.classList.remove('active');
@@ -449,17 +452,17 @@ class App {
 
     setupProfileTabs() {
         const tabBtns = document.querySelectorAll('.profile-tabs .tab-btn');
-        
+
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 // Remove active class from all tabs
                 tabBtns.forEach(b => b.classList.remove('active'));
                 // Add active class to clicked tab
                 btn.classList.add('active');
-                
+
                 // Get tab name from data attribute
                 const tabName = btn.getAttribute('data-tab');
-                
+
                 // Load tab content
                 this.loadProfileTabContent(tabName);
             });
@@ -594,10 +597,10 @@ class App {
                                     <h5>Email Verification</h5>
                                     <p>Quick and easy verification using your PLV email address</p>
                                     <div class="method-status">
-                                        ${emailVerified ? 
-                                            '<span class="status-badge verified"><i class="fas fa-check"></i> Completed</span>' :
-                                            '<span class="status-badge pending"><i class="fas fa-clock"></i> Pending</span>'
-                                        }
+                                        ${emailVerified ?
+                    '<span class="status-badge verified"><i class="fas fa-check"></i> Completed</span>' :
+                    '<span class="status-badge pending"><i class="fas fa-clock"></i> Pending</span>'
+                }
                                     </div>
                                 </div>
                                 <button class="method-btn ${emailVerified ? 'btn-outline' : 'btn-primary'}" 
@@ -640,17 +643,17 @@ class App {
                                 <div class="email-display">
                                     <i class="fas fa-envelope"></i>
                                     <span>${user.email}</span>
-                                    ${user.email && user.email.includes('@plv.edu.ph') ? 
-                                        '<span class="plv-badge"><i class="fas fa-university"></i> PLV Email</span>' : 
-                                        '<span class="warning-badge"><i class="fas fa-exclamation-triangle"></i> Non-PLV Email</span>'
-                                    }
+                                    ${user.email && user.email.includes('@plv.edu.ph') ?
+                    '<span class="plv-badge"><i class="fas fa-university"></i> PLV Email</span>' :
+                    '<span class="warning-badge"><i class="fas fa-exclamation-triangle"></i> Non-PLV Email</span>'
+                }
                                 </div>
                                 <p class="email-description">
                                     We'll send a verification code to your email address. 
-                                    ${user.email && user.email.includes('@plv.edu.ph') ? 
-                                        'PLV emails are automatically trusted for faster verification.' : 
-                                        'Please ensure you have access to this email address.'
-                                    }
+                                    ${user.email && user.email.includes('@plv.edu.ph') ?
+                    'PLV emails are automatically trusted for faster verification.' :
+                    'Please ensure you have access to this email address.'
+                }
                                 </p>
                             </div>
 
@@ -852,7 +855,7 @@ class App {
     getSettingsTab() {
         const user = authManager.getCurrentUser();
         const isVerified = user ? true : false; // Assume verified if logged in
-        
+
         return `
             <div class="settings-content">
                 <h3>Account Settings</h3>
@@ -865,10 +868,10 @@ class App {
                             <span>${isVerified ? 'Account Verified' : 'Account Not Verified'}</span>
                         </div>
                         <p class="status-description">
-                            ${isVerified 
-                                ? 'Your account has been successfully verified. You can re-verify using a different method if needed.'
-                                : 'Please verify your account to access all features and build trust with other users.'
-                            }
+                            ${isVerified
+                ? 'Your account has been successfully verified. You can re-verify using a different method if needed.'
+                : 'Please verify your account to access all features and build trust with other users.'
+            }
                         </p>
                     </div>
                     
@@ -1028,9 +1031,34 @@ class App {
         } catch (error) {
             // Don't show error for stats if user is not authenticated
             if (error.status !== 401) {
-            console.error('Failed to load platform stats:', error);
+                console.error('Failed to load platform stats:', error);
             }
         }
+    }
+
+    showAuthenticatedFeatures() {
+        const recentlyViewedSection = document.getElementById('recently-viewed-section');
+        const recommendationsSection = document.getElementById('recommendations-section');
+
+        if (recentlyViewedSection) recentlyViewedSection.style.display = 'block';
+        if (recommendationsSection) recommendationsSection.style.display = 'block';
+
+        // Load data
+        if (typeof savedSearchesManager !== 'undefined') {
+            savedSearchesManager.loadSavedSearches();
+        }
+        if (typeof booksManager !== 'undefined') {
+            booksManager.loadRecentlyViewed();
+            booksManager.loadRecommendations();
+        }
+    }
+
+    hideAuthenticatedFeatures() {
+        const recentlyViewedSection = document.getElementById('recently-viewed-section');
+        const recommendationsSection = document.getElementById('recommendations-section');
+
+        if (recentlyViewedSection) recentlyViewedSection.style.display = 'none';
+        if (recommendationsSection) recommendationsSection.style.display = 'none';
     }
 
     updateStatsDisplay(stats) {
@@ -1053,7 +1081,7 @@ class App {
         const animate = (currentTime) => {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            
+
             const current = start + (target - start) * this.easeOutQuart(progress);
             element.textContent = decimals > 0 ? current.toFixed(decimals) : Math.floor(current);
 
@@ -1124,7 +1152,7 @@ class App {
             modal.style.zIndex = '';
             document.body.style.overflow = '';
         }
-        
+
         // Special handling for book details modal
         if (modalId === 'book-details-modal' && window.booksManager) {
             window.booksManager.closeBookModal();
@@ -1166,17 +1194,17 @@ class App {
         // Method selection buttons
         const emailVerifyBtn = document.getElementById('email-verify-btn');
         const documentVerifyBtn = document.getElementById('document-verify-btn');
-        
+
         // Navigation buttons
         const backToMethodsBtn = document.getElementById('back-to-methods');
         const backToMethodsDocBtn = document.getElementById('back-to-methods-doc');
-        
+
         // Email verification elements
         const sendCodeBtn = document.getElementById('send-verification-code');
         const verifyCodeBtn = document.getElementById('verify-code-btn');
         const resendCodeBtn = document.getElementById('resend-code-btn');
         const verificationCodeInput = document.getElementById('verification-code');
-        
+
         // Document upload elements
         const frontUpload = document.getElementById('profile-front-upload');
         const frontFile = document.getElementById('profile-front-file');
@@ -1184,7 +1212,7 @@ class App {
         const backFile = document.getElementById('profile-back-file');
         const debugMode = document.getElementById('profile-debug-mode');
         const form = document.getElementById('profile-verification-form');
-        
+
         // Re-verify and change method buttons
         const reVerifyBtn = document.getElementById('re-verify-btn');
         const changeMethodBtn = document.getElementById('change-method-btn');
@@ -1193,7 +1221,7 @@ class App {
         if (emailVerifyBtn) {
             emailVerifyBtn.addEventListener('click', () => this.showEmailVerification());
         }
-        
+
         if (documentVerifyBtn) {
             documentVerifyBtn.addEventListener('click', () => this.showDocumentVerification());
         }
@@ -1202,7 +1230,7 @@ class App {
         if (backToMethodsBtn) {
             backToMethodsBtn.addEventListener('click', () => this.showVerificationMethods());
         }
-        
+
         if (backToMethodsDocBtn) {
             backToMethodsDocBtn.addEventListener('click', () => this.showVerificationMethods());
         }
@@ -1211,26 +1239,26 @@ class App {
         if (sendCodeBtn) {
             sendCodeBtn.addEventListener('click', () => this.sendVerificationCode());
         }
-        
+
         if (verifyCodeBtn) {
             verifyCodeBtn.addEventListener('click', () => this.verifyEmailCode());
         }
-        
+
         if (resendCodeBtn) {
             resendCodeBtn.addEventListener('click', () => this.resendVerificationCode());
         }
-        
+
         if (verificationCodeInput) {
             verificationCodeInput.addEventListener('input', (e) => {
                 // Auto-format and validate code input
                 e.target.value = e.target.value.replace(/\D/g, '').substring(0, 6);
-                
+
                 // Auto-verify when 6 digits are entered
                 if (e.target.value.length === 6) {
                     this.verifyEmailCode();
                 }
             });
-            
+
             verificationCodeInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     this.verifyEmailCode();
@@ -1261,7 +1289,7 @@ class App {
         if (reVerifyBtn) {
             reVerifyBtn.addEventListener('click', () => this.handleReVerification());
         }
-        
+
         if (changeMethodBtn) {
             changeMethodBtn.addEventListener('click', () => this.showVerificationMethods());
         }
@@ -1320,10 +1348,10 @@ class App {
         this.profileSelectedFiles[side] = null;
         const previewContainer = document.getElementById(`profile-${side}-preview`);
         const fileInput = document.getElementById(`profile-${side}-file`);
-        
+
         if (previewContainer) previewContainer.innerHTML = '';
         if (fileInput) fileInput.value = '';
-        
+
         this.updateProfileUploadButton();
     }
 
@@ -1340,7 +1368,7 @@ class App {
         if (debugOutput) {
             debugOutput.style.display = enabled ? 'block' : 'none';
         }
-        
+
         if (enabled) {
             this.profileDebugLog('🔬 Debug mode enabled - OCR processing details will be shown');
         }
@@ -1348,7 +1376,7 @@ class App {
 
     profileDebugLog(message) {
         if (!this.profileDebugMode) return;
-        
+
         const debugLog = document.getElementById('profile-debug-log');
         if (debugLog) {
             const timestamp = new Date().toLocaleTimeString();
@@ -1359,18 +1387,18 @@ class App {
 
     async handleProfileVerificationUpload(event) {
         event.preventDefault();
-        
+
         if (!this.profileSelectedFiles.front) {
             showToast('Please select at least the front side of your ID', 'error');
             return;
         }
 
         this.setProfileUploadingState(true);
-        
+
         try {
             const formData = new FormData();
             formData.append('frontId', this.profileSelectedFiles.front);
-            
+
             if (this.profileSelectedFiles.back) {
                 formData.append('backId', this.profileSelectedFiles.back);
             }
@@ -1435,7 +1463,7 @@ class App {
 
     displayProfileDebugInfo(result) {
         this.profileDebugLog('🎨 === OCR PROCESSING RESULTS ===');
-        
+
         // Show preprocessing results if available
         if (result.preprocessingResults) {
             this.profileDebugLog('🎨 Image Preprocessing Methods Tried:');
@@ -1473,7 +1501,7 @@ class App {
         // Show verification decision
         const autoApproved = result.autoApproved;
         this.profileDebugLog(`🎯 Verification Decision: ${autoApproved ? '✅ AUTO-APPROVED' : '⏳ REQUIRES REVIEW'}`);
-        
+
         this.profileDebugLog('🎨 === END OCR RESULTS ===\n');
     }
 
@@ -1483,8 +1511,8 @@ class App {
 
         if (uploadBtn) {
             uploadBtn.disabled = isUploading;
-            uploadBtn.innerHTML = isUploading ? 
-                '<i class="fas fa-spinner fa-spin"></i> Processing Documents...' : 
+            uploadBtn.innerHTML = isUploading ?
+                '<i class="fas fa-spinner fa-spin"></i> Processing Documents...' :
                 '<i class="fas fa-upload"></i> Upload Documents for Verification';
         }
 
@@ -1495,17 +1523,17 @@ class App {
 
     clearProfileUploadForm() {
         this.profileSelectedFiles = { front: null, back: null };
-        
+
         const frontFile = document.getElementById('profile-front-file');
         const backFile = document.getElementById('profile-back-file');
         const frontPreview = document.getElementById('profile-front-preview');
         const backPreview = document.getElementById('profile-back-preview');
-        
+
         if (frontFile) frontFile.value = '';
         if (backFile) backFile.value = '';
         if (frontPreview) frontPreview.innerHTML = '';
         if (backPreview) backPreview.innerHTML = '';
-        
+
         this.updateProfileUploadButton();
     }
 
@@ -1518,7 +1546,7 @@ class App {
     showEmailVerification() {
         const methodsSection = document.querySelector('.verification-methods');
         const emailSection = document.getElementById('email-verification-section');
-        
+
         if (methodsSection) methodsSection.style.display = 'none';
         if (emailSection) emailSection.style.display = 'block';
     }
@@ -1526,7 +1554,7 @@ class App {
     showDocumentVerification() {
         const methodsSection = document.querySelector('.verification-methods');
         const documentSection = document.getElementById('document-verification-section');
-        
+
         if (methodsSection) methodsSection.style.display = 'none';
         if (documentSection) documentSection.style.display = 'block';
     }
@@ -1541,128 +1569,128 @@ class App {
         if (documentSection) documentSection.style.display = 'none';
     }
 
-        async sendVerificationCode() {
-            const sendBtn = document.getElementById('send-verification-code');
-            const originalText = sendBtn.innerHTML;
-            
-            try {
-                sendBtn.disabled = true;
-                sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    async sendVerificationCode() {
+        const sendBtn = document.getElementById('send-verification-code');
+        const originalText = sendBtn.innerHTML;
 
-                const user = authManager.getCurrentUser();
-                if (!user || !user.email) {
-                    throw new Error('No email found for verification');
-                }
+        try {
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
 
-                await api.sendOTP(user.email);
-
-                // Show code input step
-                document.getElementById('send-code-step').style.display = 'none';
-                document.getElementById('verify-code-step').style.display = 'block';
-                
-                // Start resend timer
-                this.startResendTimer();
-                
-                showToast('Verification code sent to your email!', 'success');
-            
-            } catch (error) {
-                console.error('Send verification code error:', error);
-                showToast(`Error: ${error.message}`, 'error');
-            } finally {
-                sendBtn.disabled = false;
-                sendBtn.innerHTML = originalText;
+            const user = authManager.getCurrentUser();
+            if (!user || !user.email) {
+                throw new Error('No email found for verification');
             }
+
+            await api.sendOTP(user.email);
+
+            // Show code input step
+            document.getElementById('send-code-step').style.display = 'none';
+            document.getElementById('verify-code-step').style.display = 'block';
+
+            // Start resend timer
+            this.startResendTimer();
+
+            showToast('Verification code sent to your email!', 'success');
+
+        } catch (error) {
+            console.error('Send verification code error:', error);
+            showToast(`Error: ${error.message}`, 'error');
+        } finally {
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = originalText;
+        }
+    }
+
+    async verifyEmailCode() {
+        const codeInput = document.getElementById('verification-code');
+        const verifyBtn = document.getElementById('verify-code-btn');
+        const code = codeInput.value.trim();
+
+        if (code.length !== 6) {
+            showToast('Please enter a 6-digit verification code', 'error');
+            return;
         }
 
-        async verifyEmailCode() {
-            const codeInput = document.getElementById('verification-code');
-            const verifyBtn = document.getElementById('verify-code-btn');
-            const code = codeInput.value.trim();
-            
-            if (code.length !== 6) {
-                showToast('Please enter a 6-digit verification code', 'error');
-                return;
+        const originalText = verifyBtn.innerHTML;
+
+        try {
+            verifyBtn.disabled = true;
+            verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+
+            const user = authManager.getCurrentUser();
+            if (!user || !user.email) {
+                throw new Error('No email found for verification');
             }
 
-            const originalText = verifyBtn.innerHTML;
-            
-            try {
-                verifyBtn.disabled = true;
-                verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+            await api.verifyOTP(user.email, code);
 
-                const user = authManager.getCurrentUser();
-                if (!user || !user.email) {
-                    throw new Error('No email found for verification');
-                }
+            // Show success step
+            document.getElementById('verify-code-step').style.display = 'none';
+            document.getElementById('email-success-step').style.display = 'block';
 
-                await api.verifyOTP(user.email, code);
+            // Update user data
+            authManager.currentUser.email_verified = true;
+            authManager.currentUser.is_verified = true;
+            authManager.currentUser.verification_method = 'email';
 
-                // Show success step
-                document.getElementById('verify-code-step').style.display = 'none';
-                document.getElementById('email-success-step').style.display = 'block';
-                
-                // Update user data
-                authManager.currentUser.email_verified = true;
-                authManager.currentUser.is_verified = true;
-                authManager.currentUser.verification_method = 'email';
-                
-                showToast('Email verified successfully!', 'success');
-                
-                // Reload verification tab after 2 seconds
-                setTimeout(() => {
-                    this.loadProfileTabContent('verification');
-                }, 2000);
+            showToast('Email verified successfully!', 'success');
 
-            } catch (error) {
-                console.error('Verify email code error:', error);
-                showToast(`Error: ${error.message}`, 'error');
-            } finally {
-                verifyBtn.disabled = false;
-                verifyBtn.innerHTML = originalText;
-            }
+            // Reload verification tab after 2 seconds
+            setTimeout(() => {
+                this.loadProfileTabContent('verification');
+            }, 2000);
+
+        } catch (error) {
+            console.error('Verify email code error:', error);
+            showToast(`Error: ${error.message}`, 'error');
+        } finally {
+            verifyBtn.disabled = false;
+            verifyBtn.innerHTML = originalText;
         }
+    }
 
-        async resendVerificationCode() {
-            const resendBtn = document.getElementById('resend-code-btn');
-            const originalText = resendBtn.innerHTML;
-            
-            try {
-                resendBtn.disabled = true;
-                resendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    async resendVerificationCode() {
+        const resendBtn = document.getElementById('resend-code-btn');
+        const originalText = resendBtn.innerHTML;
 
-                const user = authManager.getCurrentUser();
-                if (!user || !user.email) {
-                    throw new Error('No email found for verification');
-                }
+        try {
+            resendBtn.disabled = true;
+            resendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
 
-                await api.sendOTP(user.email);
-
-                // Restart resend timer
-                this.startResendTimer();
-                showToast('New verification code sent!', 'success');
-
-            } catch (error) {
-                console.error('Resend verification code error:', error);
-                showToast(`Error: ${error.message}`, 'error');
-            } finally {
-                resendBtn.innerHTML = originalText;
+            const user = authManager.getCurrentUser();
+            if (!user || !user.email) {
+                throw new Error('No email found for verification');
             }
-        }
 
-        startResendTimer() {
-            const resendBtn = document.getElementById('resend-code-btn');
-            const timerSpan = document.getElementById('resend-timer');
-            let seconds = 60;
+            await api.sendOTP(user.email);
+
+            // Restart resend timer
+            this.startResendTimer();
+            showToast('New verification code sent!', 'success');
+
+        } catch (error) {
+            console.error('Resend verification code error:', error);
+            showToast(`Error: ${error.message}`, 'error');
+        } finally {
+            resendBtn.innerHTML = originalText;
+        }
+    }
+
+    startResendTimer() {
+        const resendBtn = document.getElementById('resend-code-btn');
+        const timerSpan = document.getElementById('resend-timer');
+        let seconds = 60;
         if (this.resendTimer) {
             clearInterval(this.resendTimer);
         }
-        
+
         resendBtn.disabled = true;
-        
+
         this.resendTimer = setInterval(() => {
             seconds--;
             if (timerSpan) timerSpan.textContent = seconds;
-            
+
             if (seconds <= 0) {
                 clearInterval(this.resendTimer);
                 resendBtn.disabled = false;
@@ -1778,10 +1806,10 @@ class App {
 
     async handleEditProfileSubmit(event) {
         event.preventDefault();
-        
+
         const saveBtn = document.getElementById('save-profile-btn');
         const originalText = saveBtn.innerHTML;
-        
+
         try {
             // Show loading state
             saveBtn.disabled = true;
@@ -1816,13 +1844,13 @@ class App {
             if (result.success) {
                 // Update current user data
                 authManager.currentUser = { ...authManager.currentUser, ...formData };
-                
+
                 // Close modal
                 document.getElementById('edit-profile-modal').remove();
-                
+
                 // Refresh profile display
                 this.loadProfile();
-                
+
                 showToast('Profile updated successfully!', 'success');
             } else {
                 throw new Error(result.message || 'Failed to update profile');
@@ -1837,9 +1865,645 @@ class App {
             saveBtn.innerHTML = originalText;
         }
     }
+
+
+}
+// ============================
+// ADVANCED BOOK SEARCH & FILTER SYSTEM
+// ============================
+
+document.addEventListener("DOMContentLoaded", () => {
+    const searchInput = document.getElementById("book-search");
+    const programFilter = document.getElementById("program-filter");
+    const conditionFilter = document.getElementById("condition-filter");
+    const availabilityFilter = document.getElementById("availability-filter");
+    const sortFilter = document.getElementById("sort-filter");
+    sortFilter.addEventListener("change", performSearch);
+    const booksGrid = document.getElementById("books-grid");
+
+    // === AUTOCOMPLETE (robust, debug-friendly) ===
+    let autocompleteBox = null;
+    let debounceTimer = null;
+    let lastQuery = '';
+    let activeRequestId = 0;
+
+    function ensureAutocompleteBox() {
+        if (!autocompleteBox) {
+            autocompleteBox = document.createElement('div');
+            autocompleteBox.className = 'autocomplete-list';
+            // append after the input inside the container
+            if (searchInput && searchInput.parentNode) {
+                searchInput.parentNode.appendChild(autocompleteBox);
+            } else {
+                document.body.appendChild(autocompleteBox);
+            }
+        }
+        autocompleteBox.innerHTML = '';
+        return autocompleteBox;
+    }
+
+    async function handleAutocomplete() {
+        const q = searchInput.value.trim();
+        lastQuery = q;
+
+        // hide on short query
+        if (q.length < 2) {
+            if (autocompleteBox) autocompleteBox.innerHTML = '';
+            return;
+        }
+
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+            const thisRequestId = ++activeRequestId;
+            try {
+                // call backend - try multiple shapes defensively
+                let resp = null;
+                try {
+                    // Prefer api.getBookSuggestions if available
+                    if (typeof api.getBookSuggestions === 'function') {
+                        resp = await api.getBookSuggestions({ q }); // some clients use object param
+                    } else if (typeof api.searchBooks === 'function') {
+                        // fallback to searchBooks
+                        resp = await api.searchBooks({ query: q, limit: 10 });
+                    } else if (typeof api.getBooks === 'function') {
+                        resp = await api.getBooks({ query: q, limit: 10 });
+                    } else {
+                        throw new Error('No API method available for suggestions');
+                    }
+                } catch (fetchErr) {
+                    // try alternate call signature: api.getBookSuggestions(q)
+                    if (typeof api.getBookSuggestions === 'function') {
+                        try { resp = await api.getBookSuggestions(q); } catch (_) { /* swallow */ }
+                    }
+                }
+
+                // For debugging: log the raw response
+                console.log('AUTOCOMPLETE - raw response for "', q, '":', resp);
+
+                // If another request started after this one, discard these results
+                if (thisRequestId !== activeRequestId) {
+                    console.log('AUTOCOMPLETE - stale response discarded');
+                    return;
+                }
+
+                // Normalize response -> suggestions array of objects
+                let suggestions = [];
+
+                if (!resp) {
+                    suggestions = [];
+                } else if (Array.isArray(resp)) {
+                    // backend directly returned array
+                    suggestions = resp;
+                } else if (Array.isArray(resp.suggestions)) {
+                    suggestions = resp.suggestions;
+                } else if (Array.isArray(resp.results)) {
+                    suggestions = resp.results;
+                } else if (Array.isArray(resp.books)) {
+                    // searchBooks returns {books: [...]}
+                    suggestions = resp.books.map(b => ({
+                        title: b.title,
+                        author: b.author,
+                        course_code: b.course_code || b.course || b.owner_program
+                    }));
+                } else {
+                    // try to find any iterable array inside object
+                    const arr = Object.values(resp).find(v => Array.isArray(v));
+                    suggestions = arr || [];
+                }
+
+                // Normalize element shape to ensure title/author/course_code exist
+                suggestions = suggestions.map(item => {
+                    if (typeof item === 'string') {
+                        return { title: item, author: 'Unknown', course_code: 'N/A' };
+                    } else {
+                        return {
+                            title: item.title || item.name || item.book_title || item.title_text || 'Untitled',
+                            author: item.author || item.author_name || item.book_author || 'Unknown',
+                            course_code: item.course_code || item.course || item.owner_program || 'N/A',
+                            raw: item
+                        };
+                    }
+                });
+
+                ensureAutocompleteBox();
+
+                if (!suggestions.length) {
+                    autocompleteBox.innerHTML = `<div class="autocomplete-item">No suggestions found</div>`;
+                    return;
+                }
+
+                // Render items
+                autocompleteBox.innerHTML = suggestions.map((s, idx) => `
+                <div class="autocomplete-item" 
+                     data-idx="${idx}" 
+                     data-title="${(s.title || '').replace(/"/g, '&quot;')}" 
+                     data-author="${(s.author || '').replace(/"/g, '&quot;')}"
+                     data-course="${(s.course_code || '').replace(/"/g, '&quot;')}">
+                    <strong>${s.title || 'Untitled'}</strong><br>
+                    <small>by ${s.author || 'Unknown'} (${s.course_code || 'N/A'})</small>
+                </div>
+            `).join('');
+
+                // Attach click listeners (clear previous first)
+                autocompleteBox.querySelectorAll('.autocomplete-item').forEach(item => {
+                    item.removeEventListener('click', onAutocompleteClick); // safe remove
+                    item.addEventListener('click', onAutocompleteClick);
+                });
+
+            } catch (err) {
+                console.error('Autocomplete fetch/render error:', err);
+                ensureAutocompleteBox();
+                autocompleteBox.innerHTML = `<div class="autocomplete-item">Error loading suggestions</div>`;
+            }
+        }, 240); // debounce
+    }
+
+    function onAutocompleteClick(e) {
+        const item = e.currentTarget;
+        const title = item.getAttribute('data-title') || '';
+        // set search value then perform search
+        searchInput.value = title;
+        if (autocompleteBox) autocompleteBox.innerHTML = '';
+        performSearch();
+    }
+
+
+    // Perform book search
+    async function performSearch() {
+        const filters = {
+            query: searchInput.value.trim(),
+            program: programFilter.value,
+            condition: conditionFilter.value,
+            availability: availabilityFilter.value,
+            sort: sortFilter ? sortFilter.value : ''
+        };
+
+
+        try {
+            const data = await api.searchBooks(filters);
+            renderBooks(data.books);
+            api.saveSearch(filters);
+        } catch (error) {
+            console.error("Search failed:", error);
+        }
+    }
+
+    // Render search results in books grid
+    function renderBooks(books) {
+        booksGrid.innerHTML = "";
+
+        if (!books || !books.length) {
+            booksGrid.innerHTML = "<p>No books found matching your search.</p>";
+            return;
+        }
+
+        books.forEach(book => {
+            const title = book.title ?? "Untitled";
+            const author = book.author ?? "Unknown";
+            const program = book.owner_program ?? book.program ?? "N/A";
+            const condition = book.condition_rating ?? "N/A";
+            const status = book.status ?? (book.is_available ? "Available" : "Borrowed");
+
+            const card = document.createElement("div");
+            card.className = "book-card";
+            card.innerHTML = `
+            <img src="${book.image_url || '/images/default-book.png'}" alt="${title}">
+            <h4>${title}</h4>
+            <p><strong>Author:</strong> ${author}</p>
+            <p><strong>Program:</strong> ${program}</p>
+            <p><strong>Condition:</strong> ${condition}</p>
+            <p><strong>Status:</strong> ${status}</p>
+        `;
+            card.addEventListener("click", () => openBookDetails(book.id));
+            booksGrid.appendChild(card);
+        });
+    }
+
+
+    // Open detailed view of a single book
+    async function openBookDetails(bookId) {
+        try {
+            const data = await api.getBook(bookId);
+            const book = data.book;
+
+            showBookDetailModal({
+                title: book.title ?? "Untitled",
+                author: book.author ?? "Unknown",
+                isbn: book.isbn ?? "N/A",
+                subject: book.subject ?? "N/A",
+                minimum_credits: book.minimum_credits ?? "N/A",
+                status: book.status ?? (book.is_available ? "Available" : "Borrowed"),
+                description: book.description ?? "No description available.",
+                image_url: book.image_url ?? "/images/default-book.png"
+            });
+
+            saveRecentlyViewed(book);
+        } catch (error) {
+            console.error("Failed to open book details:", error);
+        }
+    }
+
+
+    // Save recently viewed books
+    function saveRecentlyViewed(book) {
+        const viewed = JSON.parse(localStorage.getItem("recentlyViewed") || "[]");
+        const exists = viewed.find(b => b.id === book.id);
+        if (!exists) {
+            viewed.unshift({
+                id: book.id,
+                title: book.title,
+                author: book.author,
+                image_url: book.image_url
+            });
+        }
+        localStorage.setItem("recentlyViewed", JSON.stringify(viewed.slice(0, 6)));
+    }
+
+    function renderRecentlyViewed() {
+        const container = document.getElementById("recently-viewed-list");
+        if (!container) return;
+
+        const viewed = JSON.parse(localStorage.getItem("recentlyViewed") || "[]");
+        container.innerHTML = viewed.length
+            ? viewed.map(b => `
+            <div class="recent-item" onclick="api.getBook(${b.id}).then(r => showBookDetailModal(r.book))">
+                <img src="${b.image_url || '/images/default-book.png'}" alt="${b.title}">
+                <p>${b.title}</p>
+            </div>
+          `).join("")
+            : "<p>No recently viewed books.</p>";
+    }
+
+    function renderSavedSearches() {
+        const container = document.getElementById("saved-searches-list");
+        if (!container) return;
+
+        const searches = api.getSavedSearches();
+        container.innerHTML = searches.length
+            ? searches.map((f, i) => `
+            <button class="saved-search-item" data-index="${i}">
+                ${f.query || 'Untitled Search'}
+            </button>
+          `).join("")
+            : "<p>No saved searches yet.</p>";
+
+        container.querySelectorAll(".saved-search-item").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const idx = btn.dataset.index;
+                const filters = api.getSavedSearches()[idx];
+                Object.assign(searchInput, { value: filters.query || '' });
+                programFilter.value = filters.program || '';
+                conditionFilter.value = filters.condition || '';
+                availabilityFilter.value = filters.availability || '';
+                performSearch();
+            });
+        });
+    }
+
+    function renderRecommendations() {
+        const recContainer = document.getElementById("recommended-books");
+        if (!recContainer) return;
+
+        const viewed = JSON.parse(localStorage.getItem("recentlyViewed") || "[]");
+        if (viewed.length === 0) {
+            recContainer.innerHTML = "<p>No recommendations yet.</p>";
+            return;
+        }
+
+        const recs = viewed.slice(0, 3);
+        recContainer.innerHTML = recs.map(b => `
+    <div class="rec-card" onclick="api.getBook(${b.id}).then(r => showBookDetailModal(r.book))">
+      <img src="${b.image_url || '/images/default-book.png'}" alt="${b.title}">
+      <p>${b.title}</p>
+    </div>
+  `).join("");
+    }
+
+    // ========================================
+    // SAVED SEARCHES FUNCTIONALITY
+    // ========================================
+
+    class SavedSearchesManager {
+        constructor() {
+            this.savedSearches = [];
+            this.init();
+        }
+
+        init() {
+            this.setupEventListeners();
+        }
+
+        setupEventListeners() {
+            // Save current search button
+            const saveSearchBtn = document.getElementById('save-search-btn');
+            if (saveSearchBtn) {
+                saveSearchBtn.addEventListener('click', () => this.showSaveSearchModal());
+            }
+
+            // Saved searches dropdown/list
+            const savedSearchesList = document.getElementById('saved-searches-list');
+            if (savedSearchesList) {
+                savedSearchesList.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('apply-search')) {
+                        const searchId = e.target.dataset.searchId;
+                        this.applySavedSearch(searchId);
+                    } else if (e.target.classList.contains('delete-search')) {
+                        const searchId = e.target.dataset.searchId;
+                        this.deleteSavedSearch(searchId);
+                    }
+                });
+            }
+        }
+
+        async loadSavedSearches() {
+            if (!authManager.isAuthenticated) return;
+
+            try {
+                const response = await api.getSavedSearches();
+                this.savedSearches = response.searches || [];
+                this.renderSavedSearches();
+            } catch (error) {
+                console.error('Failed to load saved searches:', error);
+            }
+        }
+
+        renderSavedSearches() {
+            const container = document.getElementById('saved-searches-list');
+            if (!container) return;
+
+            if (this.savedSearches.length === 0) {
+                container.innerHTML = '<p class="empty-state">No saved searches yet</p>';
+                return;
+            }
+
+            container.innerHTML = this.savedSearches.map(search => `
+      <div class="saved-search-item" data-search-id="${search.id}">
+        <div class="search-info">
+          <h4>${search.search_name}</h4>
+          <small>Last used: ${this.formatDate(search.last_used || search.created_at)}</small>
+        </div>
+        <div class="search-actions">
+          <button class="btn-icon apply-search" data-search-id="${search.id}" title="Apply this search">
+            <i class="fas fa-search"></i>
+          </button>
+          <button class="btn-icon delete-search" data-search-id="${search.id}" title="Delete">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    `).join('');
+        }
+
+        showSaveSearchModal() {
+            // Get current search filters from BooksManager
+            const currentFilters = booksManager.filters;
+
+            if (Object.keys(currentFilters).length === 0) {
+                showToast('Please apply some filters before saving', 'warning');
+                return;
+            }
+
+            const searchName = prompt('Enter a name for this search:');
+            if (!searchName) return;
+
+            this.saveCurrentSearch(searchName, currentFilters);
+        }
+
+        async saveCurrentSearch(name, criteria) {
+            try {
+                await api.saveSearch(name, criteria);
+                showToast('Search saved successfully!', 'success');
+                await this.loadSavedSearches();
+            } catch (error) {
+                console.error('Failed to save search:', error);
+                showToast('Failed to save search', 'error');
+            }
+        }
+
+        async applySavedSearch(searchId) {
+            const search = this.savedSearches.find(s => s.id == searchId);
+            if (!search) return;
+
+            try {
+                // Update last_used timestamp
+                await api.updateSavedSearch(searchId);
+
+                // Apply the filters to BooksManager
+                booksManager.filters = { ...search.search_criteria };
+                await booksManager.loadBooks(search.search_criteria, true);
+
+                // Update UI filters to reflect the applied search
+                this.updateFilterUI(search.search_criteria);
+
+                showToast(`Applied search: ${search.search_name}`, 'success');
+            } catch (error) {
+                console.error('Failed to apply saved search:', error);
+                showToast('Failed to apply search', 'error');
+            }
+        }
+
+        async deleteSavedSearch(searchId) {
+            if (!confirm('Are you sure you want to delete this saved search?')) return;
+
+            try {
+                await api.deleteSavedSearch(searchId);
+                showToast('Search deleted successfully', 'success');
+                await this.loadSavedSearches();
+            } catch (error) {
+                console.error('Failed to delete search:', error);
+                showToast('Failed to delete search', 'error');
+            }
+        }
+
+        updateFilterUI(filters) {
+            // Update filter dropdowns/inputs to reflect the saved search
+            if (filters.subject) {
+                const subjectFilter = document.getElementById('subject-filter');
+                if (subjectFilter) subjectFilter.value = filters.subject;
+            }
+            if (filters.program) {
+                const programFilter = document.getElementById('program-filter');
+                if (programFilter) programFilter.value = filters.program;
+            }
+            if (filters.condition) {
+                const conditionFilter = document.getElementById('condition-filter');
+                if (conditionFilter) conditionFilter.value = filters.condition;
+            }
+            if (filters.availability !== undefined) {
+                const availFilter = document.getElementById('availability-filter');
+                if (availFilter) availFilter.value = filters.availability;
+            }
+            // Add more filter mappings as needed
+        }
+
+        formatDate(dateString) {
+            if (!dateString) return 'Never';
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+            if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+            if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+            return date.toLocaleDateString();
+        }
+    }
+
+    // ========================================
+    // INITIALIZE SAVED SEARCHES MANAGER
+    // ========================================
+    let savedSearchesManager = null;
+
+    // Initialize when DOM is ready
+    function initSavedSearches() {
+        try {
+            if (typeof SavedSearchesManager !== 'undefined') {
+                savedSearchesManager = new SavedSearchesManager();
+                console.log('✅ SavedSearchesManager initialized:', savedSearchesManager);
+
+                // Load saved searches if user is authenticated
+                if (authManager && authManager.isAuthenticated) {
+                    setTimeout(() => {
+                        savedSearchesManager.loadSavedSearches();
+                    }, 1000);
+                }
+            } else {
+                console.error('❌ SavedSearchesManager class not found');
+            }
+        } catch (error) {
+            console.error('❌ Failed to initialize SavedSearchesManager:', error);
+        }
+    }
+
+    // Initialize on DOM ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSavedSearches);
+    } else {
+        initSavedSearches();
+    }
+
+    // Listen for login events
+    document.addEventListener('login-success', () => {
+        if (savedSearchesManager) {
+            savedSearchesManager.loadSavedSearches();
+        }
+    });
+
+
+
+    // Display a modal for book details
+    function showBookDetailModal(book) {
+        const modal = document.createElement("div");
+        modal.className = "modal active";
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>${book.title}</h3>
+                    <button class="modal-close" onclick="this.closest('.modal').remove()">×</button>
+                </div>
+                <div class="modal-body">
+                    <img src="${book.image_url || '/images/default-book.png'}" alt="${book.title}">
+                    <p><strong>Author:</strong> ${book.author}</p>
+                    <p><strong>ISBN:</strong> ${book.isbn || 'N/A'}</p>
+                    <p><strong>Subject:</strong> ${book.subject || 'N/A'}</p>
+                    <p><strong>Credits Required:</strong> ${book.minimum_credits || 'N/A'}</p>
+                    <p><strong>Availability:</strong> ${book.status}</p>
+                    <p><strong>Description:</strong> ${book.description || 'No description available.'}</p>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    // ======================
+    // EVENT LISTENERS
+    // ======================
+    searchInput.addEventListener("input", handleAutocomplete);
+    programFilter.addEventListener("change", performSearch);
+    conditionFilter.addEventListener("change", performSearch);
+    availabilityFilter.addEventListener("change", performSearch);
+
+    // Enter key triggers search
+    searchInput.addEventListener("keypress", e => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            performSearch();
+        }
+    });
+});
+
+// ========================================
+// INITIALIZE SAVED SEARCHES MANAGER
+// ========================================
+let savedSearchesManager;
+
+// Wait for DOM to be ready
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize SavedSearchesManager
+    if (typeof SavedSearchesManager !== 'undefined') {
+        savedSearchesManager = new SavedSearchesManager();
+        console.log('✅ SavedSearchesManager initialized');
+
+        // Load saved searches if user is logged in
+        if (authManager && authManager.isAuthenticated) {
+            setTimeout(() => {
+                savedSearchesManager.loadSavedSearches();
+            }, 500); // Small delay to ensure everything is loaded
+        }
+    }
+});
+
+// Listen for login events
+document.addEventListener('login-success', () => {
+    if (savedSearchesManager) {
+        savedSearchesManager.loadSavedSearches();
+    }
+});
+
+
+if (authManager.isAuthenticated && savedSearchesManager) {
+    savedSearchesManager.loadSavedSearches();
 }
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new App();
 });
+
+// Initialize features when user logs in
+document.addEventListener('user-logged-in', async () => {
+    await savedSearchesManager.loadSavedSearches();
+    await booksManager.loadRecentlyViewed();
+    await booksManager.loadRecommendations();
+});
+
+// Load on page load if already authenticated
+if (authManager.isAuthenticated) {
+    savedSearchesManager.loadSavedSearches();
+    booksManager.loadRecentlyViewed();
+    booksManager.loadRecommendations();
+}
+
+// ========================================
+// LISTEN FOR LOGIN/LOGOUT EVENTS
+// (Add this at the very end of main.js)
+// ========================================
+
+// Listen for successful login
+document.addEventListener('login-success', () => {
+    if (window.app) {
+        window.app.showAuthenticatedFeatures();
+    }
+});
+
+// Listen for logout
+document.addEventListener('logout', () => {
+    if (window.app) {
+        window.app.hideAuthenticatedFeatures();
+    }
+});
+

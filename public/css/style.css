@@ -5423,3 +5423,279 @@ body {
         gap: var(--spacing-sm);
     }
 }
+
+/* ========================================
+   AUTOCOMPLETE DROPDOWN STYLING (FIXED)
+   ======================================== */
+
+/* Search bar container positioning */
+.search-bar {
+  flex: 1;
+  position: relative;
+  min-width: 300px;
+  z-index: 100; /* Ensure search bar is above other elements */
+}
+
+/* Autocomplete container */
+.autocomplete-container {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  z-index: 10000; /* Much higher than books grid */
+  margin-top: 4px;
+}
+
+/* Autocomplete list */
+.autocomplete-list {
+  background: var(--bg-secondary);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+  max-height: 400px;
+  overflow-y: auto;
+  animation: fadeInUp 0.2s ease-out;
+}
+
+/* Autocomplete items */
+.autocomplete-item {
+  padding: var(--spacing-md);
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.autocomplete-item:last-child {
+  border-bottom: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.autocomplete-item:first-child {
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.autocomplete-item:hover {
+  background: rgba(102, 126, 234, 0.1);
+  border-left: 3px solid var(--primary);
+  padding-left: calc(var(--spacing-md) - 3px);
+}
+
+/* Book title in autocomplete */
+.autocomplete-item strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.95rem;
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* Author/ISBN in autocomplete */
+.autocomplete-item small {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  display: block;
+}
+
+/* Loading state */
+.autocomplete-loading {
+  padding: var(--spacing-lg);
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* No results */
+.autocomplete-empty {
+  padding: var(--spacing-lg);
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Ensure books grid stays below */
+.books-grid {
+  position: relative;
+  z-index: 1;
+}
+
+/* Ensure saved searches panel doesn't overlap */
+.saved-searches-panel {
+  position: relative;
+  z-index: 50; /* Below autocomplete, above books */
+  margin-bottom: 2rem;
+}
+
+
+/* ========================================
+   SAVED SEARCHES PANEL POSITIONING FIX
+   ======================================== */
+
+.saved-searches-panel {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 10; /* Lower than autocomplete */
+}
+
+.saved-searches-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+/* Move search filters section */
+.search-filters {
+  position: relative;
+  z-index: 100; /* Higher than saved searches, but lower than autocomplete */
+  margin-bottom: var(--spacing-xl);
+}
+
+
+/* ========================================
+   RECENTLY VIEWED & RECOMMENDATIONS
+   ======================================== */
+.recently-viewed-section,
+.recommendations-section {
+  margin-bottom: 2rem;
+}
+
+.section-header-small {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.section-header-small h3 {
+  font-size: 1.2rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.view-all-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.3s ease;
+}
+
+.view-all-link:hover {
+  color: var(--primary-light);
+}
+
+.recently-viewed-books,
+.recommended-books {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+/* Horizontal scroll for mobile */
+@media (max-width: 768px) {
+  .recently-viewed-books,
+  .recommended-books {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .book-card-mini {
+    flex: 0 0 140px;
+    scroll-snap-align: start;
+  }
+}
+
+.book-card-mini {
+  background: var(--bg-card);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.book-card-mini:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  border-color: var(--primary);
+}
+
+.book-card-mini img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+}
+
+.book-mini-info {
+  padding: 0.75rem;
+}
+
+.book-mini-info h5 {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.book-mini-info p {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.book-mini-info small {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ========================================
+   SIMILAR BOOKS IN MODAL
+   ======================================== */
+.similar-books-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.similar-books-section h4 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.similar-books-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
