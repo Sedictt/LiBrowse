@@ -456,19 +456,6 @@
                     </div>
                 </div>
 
-                <!-- Personalized Recommendations -->
-                <div class="recommendations-section" id="recommendations-section" style="display: none;">
-                    <div class="section-header-small">
-                        <h3><i class="fas fa-magic"></i> Recommended for You</h3>
-                        <button class="btn btn-sm btn-outline" id="refresh-recommendations">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
-                    </div>
-                    <div class="recommended-books" id="recommended-books">
-                        <!-- Recommendations will be loaded here -->
-                    </div>
-                </div>
-
 
                 <!-- Books Grid -->
                 <div class="books-grid" id="books-grid">
@@ -2014,20 +2001,31 @@
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="expected-return-date">Expected Return Date</label>
-                            <input type="date" id="expected-return-date" required />
-                            <small id="err-expected-return-date" class="error-message"></small>
+                            <label for="borrow-start-date">Borrow Start Date</label>
+                            <input type="date" id="borrow-start-date" aria-describedby="err-borrow-start-date" required />
+                            <small id="err-borrow-start-date" class="error-message"></small>
                         </div>
                         <div class="form-group">
                             <label for="borrow-duration">Borrow Duration</label>
-                            <select id="borrow-duration">
-                                <option value="">Select duration (optional)</option>
+                            <select id="borrow-duration" required aria-describedby="err-borrow-duration">
+                                <option value="">Select duration</option>
                                 <option value="1w">1 week</option>
                                 <option value="2w">2 weeks</option>
                                 <option value="3w">3 weeks</option>
                                 <option value="1m">1 month</option>
-                                <option value="custom">Custom</option>
                             </select>
+                            <small id="err-borrow-duration" class="error-message"></small>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="expected-return-date">Expected Return Date</label>
+                            <input type="text" id="expected-return-date" disabled aria-describedby="erd-help erd-closure-note" />
+                            <small id="erd-help" class="help-text">Auto-calculated from Start Date and Duration.</small>
+                            <small id="erd-closure-note" class="muted" style="display: none;">Adjusted for closure.</small>
+                            <span id="erd-live" class="visually-hidden" role="status" aria-live="polite"></span>
+                            <small id="err-expected-return-date" class="error-message"></small>
                         </div>
                     </div>
 

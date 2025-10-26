@@ -123,7 +123,7 @@ router.get('/', [
 
         // Get books with owner information
         const [books] = await connection.execute(`
-            SELECT 
+            SELECT
                 b.*,
                 CONCAT(u.fname, ' ', u.lname) as owner_name,
                 u.email as owner_email,
@@ -188,16 +188,16 @@ router.get('/autocomplete', async (req, res) => {
 
         // FIXED: Now includes author and isbn in SELECT
         const [results] = await connection.execute(
-            `SELECT DISTINCT 
-         b.title, 
-         b.author, 
+            `SELECT DISTINCT
+         b.title,
+         b.author,
          b.isbn,
          b.course_code
        FROM books b
-       WHERE b.title LIKE ? 
-         OR b.author LIKE ? 
+       WHERE b.title LIKE ?
+         OR b.author LIKE ?
          OR b.isbn LIKE ?
-       ORDER BY b.title ASC 
+       ORDER BY b.title ASC
        LIMIT 10`,
             [search, search, search]
         );
@@ -273,7 +273,7 @@ router.get('/search', [
         else if (sort === 'credits_high') orderBy = 'b.minimum_credits DESC';
 
         const [books] = await connection.execute(`
-            SELECT 
+            SELECT
                 b.*, CONCAT(u.fname, ' ', u.lname) AS owner_name,
                 u.email AS owner_email, u.course AS owner_program
             FROM books b
@@ -411,34 +411,29 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
         );
 
         // Build recommendation query with relevance scoring
+        const subjects = preferredSubjects;
+        const subjectClause = subjects.length ? `b.subject IN (${subjects.map(() => '?').join(',')})` : 'FALSE';
+
         let query = `
-      SELECT b.*, 
+      SELECT b.*,
              CONCAT(u.fname, ' ', u.lname) as owner_name,
              u.email as owner_email,
              u.course as owner_program,
-             (CASE 
-               WHEN b.subject IN (?) THEN 3
+             (CASE
+               WHEN ${subjectClause} THEN 3
                WHEN b.course_code LIKE CONCAT(?, '%') THEN 2
                ELSE 1
              END) as relevance_score
       FROM books b
       INNER JOIN users u ON b.owner_id = u.id
-      WHERE b.is_available = 1 
+      WHERE b.is_available = 1
         AND b.owner_id != ?
         AND b.id NOT IN (
           SELECT book_id FROM recently_viewed WHERE user_id = ?
         )
     `;
 
-        const params = [];
-
-        if (preferredSubjects.length > 0) {
-            params.push(preferredSubjects);
-        } else {
-            params.push(['']);
-        }
-
-        params.push(userData?.course || '', req.user.id, req.user.id);
+        const params = [...subjects, (userData?.course || ''), req.user.id, req.user.id];
 
         query += ` ORDER BY relevance_score DESC, b.created_at DESC LIMIT ?`;
         params.push(limit);
@@ -446,7 +441,12 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
         const [recommendations] = await connection.execute(query, params);
         connection.release();
 
-        res.json({ books: recommendations });
+        res.json({
+            books: recommendations.map(book => ({
+                ...book,
+                image_url: book.cover_image ? `/uploads/books/${path.basename(book.cover_image)}` : null
+            }))
+        });
     } catch (error) {
         console.error('Failed to fetch recommendations:', error);
         res.status(500).json({ error: 'Failed to fetch recommendations' });
@@ -473,16 +473,16 @@ router.get('/:id/similar', optionalAuth, async (req, res) => {
 
         // Find similar books
         const [similar] = await connection.execute(
-            `SELECT b.*, 
+            `SELECT b.*,
               CONCAT(u.fname, ' ', u.lname) as owner_name,
               u.email as owner_email,
               u.course as owner_program
        FROM books b
        INNER JOIN users u ON b.owner_id = u.id
-       WHERE b.id != ? 
+       WHERE b.id != ?
          AND b.is_available = 1
          AND (b.subject = ? OR b.course_code = ?)
-       ORDER BY 
+       ORDER BY
          (CASE WHEN b.subject = ? THEN 2 ELSE 0 END) +
          (CASE WHEN b.course_code = ? THEN 1 ELSE 0 END) DESC,
          b.created_at DESC
@@ -491,7 +491,12 @@ router.get('/:id/similar', optionalAuth, async (req, res) => {
         );
 
         connection.release();
-        res.json({ recommendations: similar });
+        res.json({
+            recommendations: similar.map(book => ({
+                ...book,
+                image_url: book.cover_image ? `/uploads/books/${path.basename(book.cover_image)}` : null
+            }))
+        });
     } catch (error) {
         console.error('Failed to fetch similar books:', error);
         res.status(500).json({ error: 'Failed to fetch similar books' });
@@ -506,7 +511,7 @@ router.get('/my-books', authenticateToken, async (req, res) => {
         const connection = await getConnection();
 
         const [books] = await connection.execute(`
-            SELECT 
+            SELECT
                 b.*,
                 CONCAT(u.fname, ' ', u.lname) as owner_name,
                 u.email as owner_email,
@@ -544,9 +549,9 @@ router.get('/saved-searches', authenticateToken, async (req, res) => {
     try {
         const conn = await getConnection();
         const [searches] = await conn.execute(
-            `SELECT id, search_name, search_criteria, created_at, last_used 
-       FROM saved_searches 
-       WHERE user_id = ? 
+            `SELECT id, search_name, search_criteria, created_at, last_used
+       FROM saved_searches
+       WHERE user_id = ?
        ORDER BY last_used DESC, created_at DESC`,
             [req.user.id]
         );
@@ -646,7 +651,9 @@ router.get('/recently-viewed', authenticateToken, async (req, res) => {
 
         const [books] = await conn.execute(
             `SELECT b.*, rv.viewed_at,
-              CONCAT(u.fname, ' ', u.lname) as owner_name
+              CONCAT(u.fname, ' ', u.lname) as owner_name,
+              u.email as owner_email,
+              u.course as owner_program
        FROM recently_viewed rv
        INNER JOIN books b ON rv.book_id = b.id
        INNER JOIN users u ON b.owner_id = u.id
@@ -657,64 +664,19 @@ router.get('/recently-viewed', authenticateToken, async (req, res) => {
         );
 
         conn.release();
-        res.json({ books });
+        res.json({
+            books: books.map(book => ({
+                ...book,
+                image_url: book.cover_image ? `/uploads/books/${path.basename(book.cover_image)}` : null
+            }))
+        });
     } catch (error) {
         console.error('Failed to fetch recently viewed:', error);
         res.status(500).json({ error: 'Failed to fetch recently viewed' });
     }
 });
 
-// ========================================
-// RECOMMENDATIONS ROUTE (already exists, but fix if broken)
-// ========================================
 
-// GET /api/books/recommendations - Get personalized recommendations
-router.get('/recommendations', authenticateToken, async (req, res) => {
-    try {
-        const limit = parseInt(req.query.limit) || 8;
-        const conn = await getConnection();
-
-        // Get user's recently viewed subjects
-        const [activity] = await conn.execute(
-            `SELECT b.subject, COUNT(*) as count
-       FROM recently_viewed rv
-       INNER JOIN books b ON rv.book_id = b.id
-       WHERE rv.user_id = ?
-       GROUP BY b.subject
-       ORDER BY count DESC
-       LIMIT 3`,
-            [req.user.id]
-        );
-
-        const subjects = activity.map(a => a.subject).filter(Boolean);
-
-        let query = `
-      SELECT b.*, CONCAT(u.fname, ' ', u.lname) as owner_name
-      FROM books b
-      INNER JOIN users u ON b.owner_id = u.id
-      WHERE b.is_available = 1 
-        AND b.owner_id != ?
-    `;
-
-        const params = [req.user.id];
-
-        if (subjects.length > 0) {
-            query += ` AND b.subject IN (?)`;
-            params.push(subjects);
-        }
-
-        query += ` ORDER BY b.created_at DESC LIMIT ?`;
-        params.push(limit);
-
-        const [books] = await conn.execute(query, params);
-        conn.release();
-
-        res.json({ books });
-    } catch (error) {
-        console.error('Failed to fetch recommendations:', error);
-        res.status(500).json({ error: 'Failed to fetch recommendations' });
-    }
-});
 
 // Get single book
 router.get('/:id', optionalAuth, async (req, res) => {
@@ -723,7 +685,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
         const connection = await getConnection();
 
         const [books] = await connection.execute(`
-            SELECT 
+            SELECT
                 b.*,
                 CONCAT(u.fname, ' ', u.lname) as owner_name,
                 u.email as owner_email,
@@ -797,7 +759,7 @@ router.post('/', [
         const [result] = await connection.execute(`
             INSERT INTO books (
                 title, author, isbn, course_code, subject, edition, publisher, publication_year,
-                condition_rating, description, owner_id, is_available, minimum_credits, 
+                condition_rating, description, owner_id, is_available, minimum_credits,
                 cover_image, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?, NOW())
         `, [
@@ -818,7 +780,7 @@ router.post('/', [
 
         // Get the created book
         const [books] = await connection.execute(`
-            SELECT 
+            SELECT
                 b.*,
                 CONCAT(u.fname, ' ', u.lname) as owner_name
             FROM books b
@@ -896,8 +858,8 @@ router.put('/:id', [
 
         // Update book
         await connection.execute(`
-            UPDATE books SET 
-                title = ?, author = ?, isbn = ?, course_code = ?, subject = ?, 
+            UPDATE books SET
+                title = ?, author = ?, isbn = ?, course_code = ?, subject = ?,
                 edition = ?, condition_rating = ?, description = ?, minimum_credits = ?,
                 updated_at = NOW()
             WHERE id = ? AND owner_id = ?
@@ -908,7 +870,7 @@ router.put('/:id', [
 
         // Get updated book
         const [updatedBooks] = await connection.execute(`
-            SELECT 
+            SELECT
                 b.*,
                 CONCAT(u.fname, ' ', u.lname) as owner_name
             FROM books b

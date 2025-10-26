@@ -6,24 +6,63 @@ const { getConnection } = require('../config/database');
 
 const router = express.Router();
 
+// --- Date/Due date helpers ---
+function toYYYYMMDD(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function durationToDays(val) {
+    const map = { '1w':7, '2w':14, '3w':21, '1m':30, '1-week':7, '2-weeks':14, '3-weeks':21, '1-month':30 };
+    return map[val] || 0;
+}
+
+function addDaysYYYYMMDD(dateStr, days) {
+    if (!dateStr) return null;
+    const [yy, mm, dd] = dateStr.split('-').map(Number);
+    const base = new Date(yy, mm - 1, dd, 12);
+    base.setDate(base.getDate() + days);
+    return toYYYYMMDD(base);
+}
+
+function getLibraryConfigFromEnv() {
+    const closuresEnabled = String(process.env.LIB_CLOSURES_ENABLED || 'false').toLowerCase() === 'true';
+    const weeklyClosedDays = (process.env.LIB_WEEKLY_CLOSED_DAYS || '').split(',').map(s => s.trim()).filter(Boolean).map(n => parseInt(n, 10));
+    const holidays = (process.env.LIB_HOLIDAYS || '').split(',').map(s => s.trim()).filter(Boolean);
+    return { closuresEnabled, weeklyClosedDays, holidays };
+}
+
+function adjustDateForClosure(dateStr, cfg) {
+    if (!dateStr) return dateStr;
+    if (!cfg || !cfg.closuresEnabled) return dateStr;
+    const [yy, mm, dd] = dateStr.split('-').map(Number);
+    const d = new Date(yy, mm - 1, dd, 12);
+    const isClosed = (dt) => (cfg.weeklyClosedDays || []).includes(dt.getDay()) || (cfg.holidays || []).includes(toYYYYMMDD(dt));
+    while (isClosed(d)) { d.setDate(d.getDate() + 1); }
+    return toYYYYMMDD(d);
+}
+
+
 // Helper function to update user credits
 async function updateUserCredits(connection, userId, creditChange, reason, transactionId = null) {
     // Get current credits
     const [users] = await connection.execute('SELECT credits FROM users WHERE id = ?', [userId]);
     if (users.length === 0) return false;
-    
+
     const currentCredits = users[0].credits;
     const newCredits = Math.max(0, currentCredits + creditChange); // Prevent negative credits
-    
+
     // Update user credits
     await connection.execute('UPDATE users SET credits = ? WHERE id = ?', [newCredits, userId]);
-    
+
     // Log credit history
     await connection.execute(
         'INSERT INTO credit_history (user_id, transaction_id, credit_change, remark, old_balance, new_balance) VALUES (?, ?, ?, ?, ?, ?)',
         [userId, transactionId, creditChange, reason, currentCredits, newCredits]
     );
-    
+
     return true;
 }
 
@@ -39,9 +78,9 @@ async function createNotification(connection, userId, title, body, category, rel
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const connection = await getConnection();
-        
+
         const [transactions] = await connection.execute(`
-            SELECT 
+            SELECT
                 t.*,
                 b.title as book_title,
                 b.author as book_author,
@@ -59,9 +98,9 @@ router.get('/', authenticateToken, async (req, res) => {
             JOIN users borrower ON t.borrower_id = borrower.id
             JOIN users lender ON t.lender_id = lender.id
             WHERE t.borrower_id = ? OR t.lender_id = ?
-            ORDER BY t.date_req DESC
+            ORDER BY t.request_date DESC
         `, [req.user.id, req.user.id, req.user.id]);
-        
+
         connection.release();
         res.json(transactions);
     } catch (error) {
@@ -75,13 +114,14 @@ router.post('/request', [
     authenticateToken,
     body('book_id').isInt({ min: 1 }).withMessage('Valid book ID is required'),
     body('borrower_contact').trim().isLength({ min: 1 }).withMessage('Contact information is required'),
-    body('expected_return_date').isISO8601().withMessage('Valid return date is required'),
+
     body('request_message').trim().isLength({ min: 10 }).withMessage('Please provide a detailed reason for borrowing (minimum 10 characters)'),
+    body('borrow_start_date').isISO8601().withMessage('Valid start date is required'),
+    body('borrow_duration').isIn(['1w','2w','3w','1m','1-week','2-weeks','3-weeks','1-month']).withMessage('Valid borrow duration is required'),
     body('borrower_address').optional({ nullable: true }).trim().isLength({ max: 255 }).withMessage('Address must be less than 255 characters'),
     body('pickup_method').isIn(['pickup','meet','ship','meetup','delivery']).withMessage('Valid pickup method is required'),
     body('pickup_location').trim().isLength({ min: 1, max: 255 }).withMessage('Meeting location is required'),
-    body('preferred_pickup_time').optional({ nullable: true }).isISO8601().withMessage('Valid pickup time required if provided'),
-    body('borrow_duration').optional({ nullable: true }).isIn(['1w','2w','3w','1m','custom','1-week','2-weeks','3-weeks','1-month']).withMessage('Valid borrow duration required if provided')
+    body('preferred_pickup_time').optional({ nullable: true }).isISO8601().withMessage('Valid pickup time required if provided')
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -98,7 +138,7 @@ router.post('/request', [
             pickup_location,
             preferred_pickup_time,
             borrow_duration,
-            expected_return_date
+            borrow_start_date
         } = req.body;
 
         // Normalize optional values: undefined -> null
@@ -106,10 +146,11 @@ router.post('/request', [
         const borrower_address_norm = toNull(borrower_address);
         const preferred_pickup_time_norm = preferred_pickup_time ? new Date(preferred_pickup_time) : null;
 
-        // Map to DB enum values
-        const pickup_type = (pickup_method === 'meetup') ? 'meet' : (pickup_method === 'delivery' ? 'ship' : pickup_method);
+        // Normalize to new schema enums
+        const pickup_method_db = (pickup_method === 'meet') ? 'meetup' : (pickup_method === 'ship' ? 'delivery' : pickup_method);
         const borrower_duration_db = (function(val){
-            const map = { '1-week':'1w','2-weeks':'2w','3-weeks':'3w','1-month':'1m','1w':'1w','2w':'2w','3w':'3w','1m':'1m','custom':'custom' };
+            if (val == null) return null;
+            const map = { '1w':'1-week','2w':'2-weeks','3w':'3-weeks','1m':'1-month','1-week':'1-week','2-weeks':'2-weeks','3-weeks':'3-weeks','1-month':'1-month','custom':'custom' };
             return map[val] || null;
         })(borrow_duration);
 
@@ -142,7 +183,7 @@ router.post('/request', [
 
         if (borrowerCredits < book.minimum_credits) {
             connection.release();
-            return res.status(400).json({ 
+            return res.status(400).json({
                 error: `Insufficient credits. You have ${borrowerCredits} credits but need ${book.minimum_credits} credits to borrow this book.`,
                 required_credits: book.minimum_credits,
                 current_credits: borrowerCredits
@@ -151,43 +192,56 @@ router.post('/request', [
 
         // Step 4: Check if user has too many active borrows
         const [activeBorrows] = await connection.execute(`
-            SELECT COUNT(*) as count 
-            FROM transactions 
-            WHERE borrower_id = ? AND status IN ('waiting', 'approved', 'ongoing')
+            SELECT COUNT(*) as count
+            FROM transactions
+            WHERE borrower_id = ? AND status IN ('pending', 'approved', 'borrowed')
         `, [req.user.id]);
 
         const maxActiveBorrows = 3; // From settings table
         if (activeBorrows[0].count >= maxActiveBorrows) {
             connection.release();
-            return res.status(400).json({ 
-                error: `You have reached the maximum number of active borrow requests (${maxActiveBorrows})` 
+            return res.status(400).json({
+                error: `You have reached the maximum number of active borrow requests (${maxActiveBorrows})`
             });
         }
 
         // Step 5: Create borrow request
         // Build values with NULLs instead of undefined
+        // Compute expected return date from start date + duration (server is source of truth)
+        const libCfg = getLibraryConfigFromEnv();
+        const durationDays = durationToDays(borrow_duration);
+        if (!durationDays) {
+            connection.release();
+            return res.status(400).json({ error: 'Validation failed', details: [{ field: 'borrow_duration', message: 'Invalid duration' }] });
+        }
+        if (!borrow_start_date) {
+            connection.release();
+            return res.status(400).json({ error: 'Validation failed', details: [{ field: 'borrow_start_date', message: 'Start date is required' }] });
+        }
+        const expected_return_date = adjustDateForClosure(addDaysYYYYMMDD(borrow_start_date, durationDays), libCfg);
+
         const insertValues = [
             book_id, req.user.id, book.owner_id, request_message,
-            borrower_contact, borrower_address_norm, pickup_type, pickup_location,
+            borrower_contact, borrower_address_norm, pickup_method_db, pickup_location,
             expected_return_date
         ];
         console.assert(!insertValues.some(v => v === undefined), 'Undefined value in INSERT params', insertValues);
 
         const [result] = await connection.execute(`
             INSERT INTO transactions (
-                book_id, borrower_id, lender_id, status, req_msg,
-                bor_contact, bor_addr, pickup_type, pickup_spot,
-                date_expected, date_req
-            ) VALUES (?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, NOW())
+                book_id, borrower_id, lender_id, status, request_message,
+                borrower_contact, borrower_address, pickup_method, pickup_location,
+                expected_return_date, request_date
+            ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, NOW())
         `, insertValues);
 
-        // Update with additional fields if they exist
+        // Update with additional fields if they exist (new schema columns)
         if (preferred_pickup_time_norm !== null || borrower_duration_db !== null) {
             const updateValues = [preferred_pickup_time_norm, borrower_duration_db ?? null, result.insertId];
             console.assert(!updateValues.some(v => v === undefined), 'Undefined value in UPDATE params', updateValues);
             await connection.execute(`
                 UPDATE transactions
-                SET pref_pickup_time = ?, borrower_duration = ?
+                SET preferred_pickup_time = ?, borrow_duration = ?
                 WHERE id = ?
             `, updateValues);
         }
@@ -261,10 +315,10 @@ router.put('/:id/approve', [
 
         // Update transaction status to approved
         await connection.execute(`
-            UPDATE transactions 
-            SET status = 'approved', 
-                approved_date = NOW(), 
-                lender_notes = ?, 
+            UPDATE transactions
+            SET status = 'approved',
+                approved_date = NOW(),
+                lender_notes = ?,
                 pickup_location = COALESCE(?, pickup_location)
             WHERE id = ?
         `, [lender_notes, pickup_location, transactionId]);
@@ -274,7 +328,7 @@ router.put('/:id/approve', [
             INSERT INTO chats (transaction_id, created_at)
             VALUES (?, NOW())
         `, [transactionId]);
-        
+
         // Send system message to chat
         await connection.execute(`
             INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created_at)
@@ -343,7 +397,7 @@ router.put('/:id/reject', [
 
         // Update transaction status to rejected
         await connection.execute(`
-            UPDATE transactions 
+            UPDATE transactions
             SET status = 'rejected', rejection_reason = ?
             WHERE id = ?
         `, [rejection_reason, transactionId]);
@@ -420,9 +474,9 @@ router.put('/:id/return', [
 
         // Update transaction status
         await connection.execute(`
-            UPDATE transactions 
-            SET status = 'returned', 
-                actual_return_date = NOW(), 
+            UPDATE transactions
+            SET status = 'returned',
+                actual_return_date = NOW(),
                 return_condition = ?,
                 lender_notes = ?
             WHERE id = ?
@@ -500,7 +554,7 @@ router.put('/:id/cancel', [
 
         // Get transaction details
         const [transactions] = await connection.execute(`
-            SELECT t.*, b.title as book_title, 
+            SELECT t.*, b.title as book_title,
                    CONCAT(borrower.first_name, ' ', borrower.last_name) as borrower_name,
                    CONCAT(lender.first_name, ' ', lender.last_name) as lender_name
             FROM transactions t
@@ -527,8 +581,8 @@ router.put('/:id/cancel', [
         const cancellableStatuses = ['pending', 'approved'];
         if (!cancellableStatuses.includes(transaction.status)) {
             connection.release();
-            return res.status(400).json({ 
-                error: `Transaction cannot be cancelled. Current status: ${transaction.status}. Only pending or approved transactions can be cancelled.` 
+            return res.status(400).json({
+                error: `Transaction cannot be cancelled. Current status: ${transaction.status}. Only pending or approved transactions can be cancelled.`
             });
         }
 
@@ -540,8 +594,8 @@ router.put('/:id/cancel', [
 
         // Update transaction status to cancelled
         await connection.execute(`
-            UPDATE transactions 
-            SET status = 'cancelled', 
+            UPDATE transactions
+            SET status = 'cancelled',
                 rejection_reason = ?,
                 lender_notes = CONCAT(COALESCE(lender_notes, ''), '\\n[CANCELLED by ', ?, ']: ', ?)
             WHERE id = ?
@@ -553,7 +607,7 @@ router.put('/:id/cancel', [
         // Send notification to the other party
         const notificationTitle = `Transaction Cancelled`;
         const notificationMessage = `${isBorrower ? transaction.borrower_name : transaction.lender_name} has cancelled the transaction for "${transaction.book_title}". Reason: ${cancellation_reason}`;
-        
+
         await createNotification(
             connection,
             otherPartyId,
@@ -570,8 +624,8 @@ router.put('/:id/cancel', [
                 INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created_at)
                 VALUES (?, ?, ?, 'system', NOW())
             `, [
-                chats[0].id, 
-                req.user.id, 
+                chats[0].id,
+                req.user.id,
                 `🚫 Transaction cancelled by ${isBorrower ? 'borrower' : 'lender'}. Reason: ${cancellation_reason}`
             ]);
 
@@ -632,8 +686,8 @@ router.put('/:id/borrowed', [
 
         // Update transaction status to borrowed
         await connection.execute(`
-            UPDATE transactions 
-            SET status = 'borrowed', 
+            UPDATE transactions
+            SET status = 'borrowed',
                 borrowed_date = NOW(),
                 lender_notes = COALESCE(?, lender_notes)
             WHERE id = ?
@@ -656,8 +710,8 @@ router.put('/:id/borrowed', [
                 INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created_at)
                 VALUES (?, ?, ?, 'system', NOW())
             `, [
-                chats[0].id, 
-                req.user.id, 
+                chats[0].id,
+                req.user.id,
                 `📖 Book pickup confirmed! "${transaction.book_title}" is now borrowed. Please return by ${new Date(transaction.expected_return_date).toLocaleDateString()}.`
             ]);
         }

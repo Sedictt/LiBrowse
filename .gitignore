@@ -57,8 +57,7 @@ ehthumbs.db
 Thumbs.db
 
 # Uploads directory (if contains user-uploaded files)
-uploads/*
-!uploads/.gitkeep
+
 
 # Database files (if using local database)
 *.sqlite

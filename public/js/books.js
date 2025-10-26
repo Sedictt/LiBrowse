@@ -22,6 +22,8 @@ class BooksManager {
         this.totalBooks = 0;
         this.hasMore = false;
         this.isLoading = false;
+        // Lazy-loaded server config for loans/closures
+        this.libraryConfig = null;
     }
 
     async loadBooks(filters = {}, reset = true) {
@@ -117,6 +119,14 @@ class BooksManager {
         const status = isAvailable ? 'available' : 'borrowed';
         const statusText = isAvailable ? 'Available' : 'Borrowed';
 
+        // Check if user has enough credits (only if authenticated)
+        const currentUser = authManager?.getCurrentUser();
+        const userCredits = currentUser?.credits ?? 0;
+        const requiredCredits = book.minimum_credits || book.min_credit || 0;
+        const isAuthenticated = authManager?.isAuthenticated ?? false;
+        const hasEnoughCredits = !isAuthenticated || userCredits >= requiredCredits;
+        const canRequest = isAvailable && hasEnoughCredits;
+
         return `
             <div class="book-card" data-book-id="${book.id}">
                 <div class="book-image">
@@ -137,17 +147,23 @@ class BooksManager {
                         <i class="fas fa-user"></i>
                         <span>${escapeHtml(book.owner_name || 'Unknown')}</span>
                     </div>
-                    ${book.minimum_credits ? `
-                        <div class="credit-requirement">
+                    ${book.minimum_credits || book.min_credit ? `
+                        <div class="credit-requirement ${!hasEnoughCredits && isAuthenticated ? 'insufficient' : ''}">
                             <i class="fas fa-coins"></i>
-                            <span class="credit-amount">${book.minimum_credits}</span>
+                            <span class="credit-amount">${book.minimum_credits || book.min_credit}</span>
                             <span>credits required</span>
+                            ${!hasEnoughCredits && isAuthenticated ? `
+                                <small style="color: var(--danger); display: block; margin-top: 4px;">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Need ${requiredCredits - userCredits} more
+                                </small>
+                            ` : ''}
                         </div>
                     ` : ''}
                     <div class="book-actions">
-                        <button class="btn btn-primary btn-sm" onclick="booksManager.requestBook(${book.id})" ${!book.is_available ? 'disabled' : ''}>
+                        <button class="btn btn-primary btn-sm" onclick="booksManager.requestBook(${book.id})" ${!canRequest ? 'disabled' : ''}>
                             <i class="fas fa-hand-paper"></i>
-                            ${book.is_available ? 'Request' : 'Unavailable'}
+                            ${!isAvailable ? 'Unavailable' : !hasEnoughCredits && isAuthenticated ? 'Not Enough Credits' : 'Request'}
                         </button>
                         <button class="btn btn-outline btn-sm" onclick="booksManager.viewBook(${book.id})">
                             <i class="fas fa-eye"></i>
@@ -325,14 +341,25 @@ class BooksManager {
             descriptionSection.style.display = 'none';
         }
 
-        // Request button state
+        // Request button state - check both availability and credits
         const requestButton = document.getElementById('modal-request-book');
-        if (isAvailable) {
-            requestButton.disabled = false;
-            requestButton.innerHTML = '<i class="fas fa-hand-paper"></i> Request Book';
-        } else {
-            requestButton.disabled = true;
-            requestButton.innerHTML = '<i class="fas fa-ban"></i> Not Available';
+        if (requestButton) {
+            const currentUser = authManager?.getCurrentUser();
+            const userCredits = currentUser?.credits ?? 0;
+            const requiredCredits = book.minimum_credits || book.min_credit || 0;
+            const isUserAuthenticated = authManager?.isAuthenticated ?? false;
+            const hasEnoughCredits = !isUserAuthenticated || userCredits >= requiredCredits;
+
+            if (!isAvailable) {
+                requestButton.disabled = true;
+                requestButton.innerHTML = '<i class="fas fa-ban"></i> Not Available';
+            } else if (!hasEnoughCredits && isUserAuthenticated) {
+                requestButton.disabled = true;
+                requestButton.innerHTML = `<i class="fas fa-coins"></i> Insufficient Credits (Need ${requiredCredits - userCredits} more)`;
+            } else {
+                requestButton.disabled = false;
+                requestButton.innerHTML = '<i class="fas fa-hand-paper"></i> Request Book';
+            }
         }
     }
 
@@ -345,13 +372,27 @@ class BooksManager {
 
     // Open borrow request modal and prefill
     openBorrowRequestModal(book) {
+        // Check if user has enough credits before opening modal
+        const currentUser = authManager.getCurrentUser();
+        const userCredits = currentUser?.credits ?? 0;
+        const requiredCredits = book.minimum_credits || 0;
+
+        if (userCredits < requiredCredits) {
+            const deficit = requiredCredits - userCredits;
+            showToast(
+                `Insufficient credits! You have ${userCredits} credits but need ${requiredCredits} credits. You need ${deficit} more credits to request this book.`,
+                'error',
+                5000
+            );
+            return;
+        }
+
         const modal = document.getElementById('borrow-request-modal');
         if (!modal) {
             showToast('Borrow request form not found', 'error');
             return;
         }
         this.requestBookCtx = book;
-        // Scope all queries to this modal to avoid duplicate IDs elsewhere
         const q = (sel) => modal.querySelector(sel);
         const setVal = (id, val) => { const el = q(`#${id}`); if (el) el.value = val || ''; };
         const setErr = (id, msg) => { const el = q(`#err-${id}`); if (el) el.textContent = msg || ''; };
@@ -360,18 +401,109 @@ class BooksManager {
         if (bookIdInput) bookIdInput.value = book.id;
         setVal('pickup-method', 'meet');
         setVal('pickup-location', 'PLV Library');
-        setVal('expected-return-date', '');
         setVal('borrow-duration', '');
         setVal('preferred-pickup-time', '');
         setVal('request-contact', '');
         setVal('request-address', '');
         setVal('request-message', '');
+        setVal('expected-return-date', '—');
+
+        // Default start date = today (local) and min = today (configurable via backend)
+        const startInput = q('#borrow-start-date');
+        if (startInput) {
+            const today = new Date();
+            const todayStr = this.toYYYYMMDD(today);
+            startInput.value = todayStr;
+            startInput.min = todayStr;
+            startInput.onchange = () => this.updateExpectedReturnDate(modal);
+        }
+        const durSelect = q('#borrow-duration');
+        if (durSelect) {
+            durSelect.onchange = () => this.updateExpectedReturnDate(modal);
+        }
+
         // Clear inline errors
-        ['pickup-method','pickup-location','expected-return-date','request-contact','request-message']
+        ['pickup-method','pickup-location','borrow-start-date','borrow-duration','request-contact','request-message']
             .forEach(k => setErr(k, ''));
+
+        // Preload config (closures, limits) then recalc
+        this.loadLibraryConfigOnce().finally(() => this.updateExpectedReturnDate(modal));
+
         // Show modal
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
+    }
+
+    // Helper: format a Date to YYYY-MM-DD (local)
+    toYYYYMMDD(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    // Helper: map duration value to days
+    getDurationDays(val) {
+        const map = { '1w': 7, '2w': 14, '3w': 21, '1m': 30, '1-week': 7, '2-weeks': 14, '3-weeks': 21, '1-month': 30 };
+        return map[val] || 0;
+    }
+
+    async loadLibraryConfigOnce() {
+        if (this.libraryConfig) return;
+        try {
+            const res = await fetch('/api/config/library');
+            this.libraryConfig = await res.json();
+        } catch (e) {
+            // Fallback defaults
+            this.libraryConfig = { loans: { closuresEnabled: false, weeklyClosedDays: [], holidays: [], allowPastStartDateDays: 0 } };
+        }
+    }
+
+    // Recalculate and display Expected Return Date
+    updateExpectedReturnDate(modal) {
+        const q = (sel) => modal.querySelector(sel);
+        const startStr = q('#borrow-start-date')?.value;
+        const durationVal = q('#borrow-duration')?.value;
+        const erdInput = q('#expected-return-date');
+        const erdLive = q('#erd-live');
+        const closureNote = q('#erd-closure-note');
+
+        const showDash = () => {
+            if (erdInput) erdInput.value = '—';
+            if (closureNote) closureNote.style.display = 'none';
+            if (erdLive) erdLive.textContent = 'Expected return date not available';
+        };
+
+        if (!startStr || !durationVal) {
+            showDash();
+            return;
+        }
+
+        const days = this.getDurationDays(durationVal);
+        if (!days) { showDash(); return; }
+
+        // Compute due date = start + days (start date not counted)
+        const [yy, mm, dd] = startStr.split('-').map(Number);
+        const base = new Date(yy, mm - 1, dd, 12); // noon avoids DST edge cases
+        const due = new Date(base);
+        due.setDate(due.getDate() + days);
+
+        // Optional closure adjustment
+        let adjusted = false;
+        const cfg = this.libraryConfig?.loans || {};
+        if (cfg.closuresEnabled) {
+            const weeklyClosed = cfg.weeklyClosedDays || [];
+            const holidays = cfg.holidays || [];
+            const isClosed = (dt) => weeklyClosed.includes(dt.getDay()) || holidays.includes(this.toYYYYMMDD(dt));
+            while (isClosed(due)) { due.setDate(due.getDate() + 1); adjusted = true; }
+        }
+
+        const localized = this.toYYYYMMDD(due);
+        if (erdInput) erdInput.value = localized;
+        if (closureNote) closureNote.style.display = adjusted ? '' : 'none';
+        if (erdLive) erdLive.textContent = adjusted
+            ? `Expected return date updated to ${localized}. Adjusted for closure.`
+            : `Expected return date updated to ${localized}.`;
     }
 
     // Submit handler for borrow request form
@@ -386,10 +518,8 @@ class BooksManager {
         const bookId = Number(q('#request-book-id')?.value);
         const pickup_method = q('#pickup-method')?.value;
         const pickup_location = (q('#pickup-location')?.value || '').trim();
-        const expected_return_date = q('#expected-return-date')?.value;
-        // Optional fields: coerce empty -> null to avoid undefined reaching backend
-        const raw_borrow_duration = q('#borrow-duration')?.value;
-        const borrow_duration = raw_borrow_duration ? raw_borrow_duration : null;
+        const borrow_start_date = q('#borrow-start-date')?.value;
+        const borrow_duration = q('#borrow-duration')?.value || '';
         const raw_pickup_time = q('#preferred-pickup-time')?.value;
         const preferred_pickup_time = raw_pickup_time ? raw_pickup_time : null;
         const borrower_contact = (q('#request-contact')?.value || '').trim();
@@ -402,9 +532,20 @@ class BooksManager {
         const setErr = (k, m) => { const el = q(`#err-${k}`); if (el) el.textContent = m || ''; if (m) hasError = true; };
         setErr('pickup-method', !pickup_method ? 'Required' : '');
         setErr('pickup-location', !pickup_location ? 'Required' : '');
-        setErr('expected-return-date', !expected_return_date ? 'Required' : '');
         setErr('request-contact', !borrower_contact ? 'Required' : '');
         setErr('request-message', request_message.length < 10 ? 'Minimum 10 characters' : '');
+        setErr('borrow-duration', !borrow_duration ? 'Select a duration' : '');
+
+        // Start date validation: cannot be in the past (configurable)
+        const allowPast = this.libraryConfig?.loans?.allowPastStartDateDays ?? 0;
+        const minDate = new Date();
+        minDate.setDate(minDate.getDate() - (Number(allowPast) || 0));
+        const minStr = this.toYYYYMMDD(minDate);
+        if (!borrow_start_date) {
+            setErr('borrow-start-date', 'Required');
+        } else if (borrow_start_date < minStr) {
+            setErr('borrow-start-date', 'Start date cannot be in the past');
+        }
         if (hasError) return;
 
         const submitBtn = q('#borrow-request-submit');
@@ -421,10 +562,9 @@ class BooksManager {
                 borrower_contact,
                 pickup_method,
                 pickup_location,
-                expected_return_date,
-                // Always include optional keys with null when absent
                 borrower_address,
                 borrow_duration,
+                borrow_start_date,
                 preferred_pickup_time: preferred_pickup_time ? new Date(preferred_pickup_time).toISOString() : null
             };
 
@@ -446,18 +586,37 @@ class BooksManager {
             if (detailsModal) { detailsModal.classList.remove('active'); }
         } catch (err) {
             console.error('Borrow request failed:', err);
-            // Inline errors if provided by backend
+
+            // Handle validation errors with field-specific messages
             if (err?.status === 400 && err?.body?.details && Array.isArray(err.body.details)) {
                 err.body.details.forEach(d => {
-                    const el = q(`#err-${d.field}`);
-                    if (el) el.textContent = d.message || 'Invalid value';
+                    const key = d.field || d.path || d.param;
+                    const el = key ? q(`#err-${key}`) : null;
+                    if (el) el.textContent = d.message || d.msg || 'Invalid value';
                 });
                 showToast(err.message || 'Please correct the highlighted fields', 'error');
-            } else if (err?.status === 400) {
-                showToast(err.message || 'Validation error', 'error');
-            } else if (err?.status === 403) {
+            }
+            // Handle credit-related errors with detailed information
+            else if (err?.status === 400 && err?.body) {
+                const errorBody = err.body;
+
+                // Check if it's a credit-related error
+                if (errorBody.required_credits !== undefined && errorBody.current_credits !== undefined) {
+                    const deficit = errorBody.required_credits - errorBody.current_credits;
+                    showToast(
+                        `Insufficient credits! You have ${errorBody.current_credits} credits but need ${errorBody.required_credits} credits. You need ${deficit} more credits.`,
+                        'error',
+                        5000
+                    );
+                } else {
+                    // Generic 400 error
+                    showToast(err.message || errorBody.error || 'Validation error', 'error');
+                }
+            }
+            else if (err?.status === 403) {
                 showToast('Insufficient credits or request limit reached', 'error');
-            } else {
+            }
+            else {
                 showToast(err.message || 'Failed to send request', 'error');
             }
         } finally {
@@ -685,7 +844,7 @@ class BooksManager {
 
         container.innerHTML = this.recentlyViewed.map(book => `
     <div class="book-card-mini" data-book-id="${book.id}">
-      <img src="${book.cover_image || '/images/default-book.png'}" alt="${book.title}">
+      <img src="${book.image_url || book.cover_image || '/images/default-book.png'}" alt="${book.title}">
       <div class="book-mini-info">
         <h5>${book.title}</h5>
         <p>${book.author || 'Unknown Author'}</p>
@@ -696,38 +855,6 @@ class BooksManager {
 
         // Add click handlers
         container.querySelectorAll('.book-card-mini').forEach(card => {
-            card.addEventListener('click', () => {
-                const bookId = card.dataset.bookId;
-                this.viewBookDetails(bookId);
-            });
-        });
-    }
-
-    async loadRecommendations() {
-        if (!authManager.isAuthenticated) return;
-
-        try {
-            const response = await api.getRecommendations(8);
-            this.recommendations = response.books || [];
-            this.renderRecommendations();
-        } catch (error) {
-            console.error('Failed to load recommendations:', error);
-        }
-    }
-
-    renderRecommendations() {
-        const container = document.getElementById('recommended-books');
-        if (!container) return;
-
-        if (this.recommendations.length === 0) {
-            container.innerHTML = '<p class="empty-state">No recommendations available yet</p>';
-            return;
-        }
-
-        container.innerHTML = this.recommendations.map(book => this.createBookCard(book)).join('');
-
-        // Add click handlers
-        container.querySelectorAll('.book-card').forEach(card => {
             card.addEventListener('click', () => {
                 const bookId = card.dataset.bookId;
                 this.viewBookDetails(bookId);

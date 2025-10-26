@@ -1038,10 +1038,8 @@ class App {
 
     showAuthenticatedFeatures() {
         const recentlyViewedSection = document.getElementById('recently-viewed-section');
-        const recommendationsSection = document.getElementById('recommendations-section');
 
         if (recentlyViewedSection) recentlyViewedSection.style.display = 'block';
-        if (recommendationsSection) recommendationsSection.style.display = 'block';
 
         // Load data
         if (typeof savedSearchesManager !== 'undefined') {
@@ -1049,16 +1047,13 @@ class App {
         }
         if (typeof booksManager !== 'undefined') {
             booksManager.loadRecentlyViewed();
-            booksManager.loadRecommendations();
         }
     }
 
     hideAuthenticatedFeatures() {
         const recentlyViewedSection = document.getElementById('recently-viewed-section');
-        const recommendationsSection = document.getElementById('recommendations-section');
 
         if (recentlyViewedSection) recentlyViewedSection.style.display = 'none';
-        if (recommendationsSection) recommendationsSection.style.display = 'none';
     }
 
     updateStatsDisplay(stats) {
@@ -2478,14 +2473,12 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('user-logged-in', async () => {
     await savedSearchesManager.loadSavedSearches();
     await booksManager.loadRecentlyViewed();
-    await booksManager.loadRecommendations();
 });
 
 // Load on page load if already authenticated
 if (authManager.isAuthenticated) {
     savedSearchesManager.loadSavedSearches();
     booksManager.loadRecentlyViewed();
-    booksManager.loadRecommendations();
 }
 
 // ========================================
