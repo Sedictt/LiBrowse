@@ -161,13 +161,16 @@ class BooksManager {
 
     async requestBook(bookId) {
         if (!authManager.requireAuth()) return;
-
         try {
-            await api.post('/transactions', { book_id: bookId });
-            showToast('Request sent successfully!', 'success');
+            let book = this.books.find(b => b.id == bookId);
+            if (!book) {
+                const resp = await api.getBook(bookId);
+                book = resp.book || resp;
+            }
+            this.openBorrowRequestModal(book);
         } catch (error) {
-            console.error('Failed to request book:', error);
-            showToast(error.message || 'Failed to send request', 'error');
+            console.error('Failed to open request form:', error);
+            showToast('Failed to open request form', 'error');
         }
     }
 
@@ -334,19 +337,131 @@ class BooksManager {
     }
 
     async requestBookFromModal() {
+        if (!authManager.requireAuth()) return;
         if (!this.currentModalBook) return;
+        this.openBorrowRequestModal(this.currentModalBook);
+    }
 
+
+    // Open borrow request modal and prefill
+    openBorrowRequestModal(book) {
+        const modal = document.getElementById('borrow-request-modal');
+        if (!modal) {
+            showToast('Borrow request form not found', 'error');
+            return;
+        }
+        this.requestBookCtx = book;
+        // Scope all queries to this modal to avoid duplicate IDs elsewhere
+        const q = (sel) => modal.querySelector(sel);
+        const setVal = (id, val) => { const el = q(`#${id}`); if (el) el.value = val || ''; };
+        const setErr = (id, msg) => { const el = q(`#err-${id}`); if (el) el.textContent = msg || ''; };
+
+        const bookIdInput = q('#request-book-id');
+        if (bookIdInput) bookIdInput.value = book.id;
+        setVal('pickup-method', 'meet');
+        setVal('pickup-location', 'PLV Library');
+        setVal('expected-return-date', '');
+        setVal('borrow-duration', '');
+        setVal('preferred-pickup-time', '');
+        setVal('request-contact', '');
+        setVal('request-address', '');
+        setVal('request-message', '');
+        // Clear inline errors
+        ['pickup-method','pickup-location','expected-return-date','request-contact','request-message']
+            .forEach(k => setErr(k, ''));
+        // Show modal
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    // Submit handler for borrow request form
+    async handleBorrowRequestSubmit(e) {
+        e.preventDefault();
         if (!authManager.requireAuth()) return;
 
+        const modal = document.getElementById('borrow-request-modal');
+        if (!modal) return;
+        const q = (sel) => modal.querySelector(sel);
+
+        const bookId = Number(q('#request-book-id')?.value);
+        const pickup_method = q('#pickup-method')?.value;
+        const pickup_location = (q('#pickup-location')?.value || '').trim();
+        const expected_return_date = q('#expected-return-date')?.value;
+        // Optional fields: coerce empty -> null to avoid undefined reaching backend
+        const raw_borrow_duration = q('#borrow-duration')?.value;
+        const borrow_duration = raw_borrow_duration ? raw_borrow_duration : null;
+        const raw_pickup_time = q('#preferred-pickup-time')?.value;
+        const preferred_pickup_time = raw_pickup_time ? raw_pickup_time : null;
+        const borrower_contact = (q('#request-contact')?.value || '').trim();
+        const addr = (q('#request-address')?.value || '').trim();
+        const borrower_address = addr ? addr : null;
+        const request_message = (q('#request-message')?.value || '').trim();
+
+        // Basic inline validation (scoped to the modal)
+        let hasError = false;
+        const setErr = (k, m) => { const el = q(`#err-${k}`); if (el) el.textContent = m || ''; if (m) hasError = true; };
+        setErr('pickup-method', !pickup_method ? 'Required' : '');
+        setErr('pickup-location', !pickup_location ? 'Required' : '');
+        setErr('expected-return-date', !expected_return_date ? 'Required' : '');
+        setErr('request-contact', !borrower_contact ? 'Required' : '');
+        setErr('request-message', request_message.length < 10 ? 'Minimum 10 characters' : '');
+        if (hasError) return;
+
+        const submitBtn = q('#borrow-request-submit');
+        const prevHtml = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        }
+
         try {
-            await api.post('/transactions', { book_id: this.currentModalBook.id });
+            const payload = {
+                book_id: bookId,
+                request_message,
+                borrower_contact,
+                pickup_method,
+                pickup_location,
+                expected_return_date,
+                // Always include optional keys with null when absent
+                borrower_address,
+                borrow_duration,
+                preferred_pickup_time: preferred_pickup_time ? new Date(preferred_pickup_time).toISOString() : null
+            };
+
+            await api.createBorrowRequest(payload);
             showToast('Request sent successfully!', 'success');
 
-            // Close modal
-            this.closeBookModal();
-        } catch (error) {
-            console.error('Failed to request book:', error);
-            showToast(error.message || 'Failed to send request', 'error');
+            // Update UI: mark book unavailable/requested
+            if (this.books && this.books.length) {
+                const idx = this.books.findIndex(b => b.id == bookId);
+                if (idx >= 0) {
+                    this.books[idx].is_available = 0;
+                    this.renderBooks();
+                }
+            }
+
+            // Close modals
+            if (modal) { modal.classList.remove('active'); }
+            const detailsModal = document.getElementById('book-details-modal');
+            if (detailsModal) { detailsModal.classList.remove('active'); }
+        } catch (err) {
+            console.error('Borrow request failed:', err);
+            // Inline errors if provided by backend
+            if (err?.status === 400 && err?.body?.details && Array.isArray(err.body.details)) {
+                err.body.details.forEach(d => {
+                    const el = q(`#err-${d.field}`);
+                    if (el) el.textContent = d.message || 'Invalid value';
+                });
+                showToast(err.message || 'Please correct the highlighted fields', 'error');
+            } else if (err?.status === 400) {
+                showToast(err.message || 'Validation error', 'error');
+            } else if (err?.status === 403) {
+                showToast('Insufficient credits or request limit reached', 'error');
+            } else {
+                showToast(err.message || 'Failed to send request', 'error');
+            }
+        } finally {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = prevHtml; }
         }
     }
 
@@ -392,6 +507,13 @@ class BooksManager {
             loadMoreBtn.addEventListener('click', () => {
                 this.loadMoreBooks();
             });
+        }
+
+
+        // Borrow request form submit
+        const borrowForm = document.getElementById('borrow-request-form');
+        if (borrowForm) {
+            borrowForm.addEventListener('submit', (e) => this.handleBorrowRequestSubmit(e));
         }
 
         // Collapsible sections in modal
@@ -619,7 +741,7 @@ class BooksManager {
 
         const modalContent = `
     <!-- Your existing book detail HTML -->
-    
+
     ${similarBooks.length > 0 ? `
       <div class="similar-books-section">
         <h3>Similar Books You Might Like</h3>

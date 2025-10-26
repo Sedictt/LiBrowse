@@ -194,6 +194,14 @@ class ApiClient {
     }
 
     // Transactions endpoints
+    // Borrow request endpoint (aligned to backend contract)
+    async createBorrowRequest(payload) {
+        return this.request('/transactions/request', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+    }
+
     async getTransactions(filters = {}) {
         const queryString = new URLSearchParams(filters).toString();
         return this.request(`/transactions${queryString ? '?' + queryString : ''}`);

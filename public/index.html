@@ -1982,6 +1982,92 @@
         </div>
     </div>
 
+
+    <!-- Borrow Request Modal -->
+    <div id="borrow-request-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Borrow Request</h3>
+                <button class="modal-close" onclick="document.getElementById('borrow-request-modal').classList.remove('active')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="borrow-request-form">
+                    <input type="hidden" id="request-book-id" />
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="pickup-method">Pickup Method</label>
+                            <select id="pickup-method" required>
+                                <option value="pickup">Pickup</option>
+                                <option value="meet">Meet</option>
+                                <option value="ship">Delivery</option>
+                            </select>
+                            <small id="err-pickup-method" class="error-message"></small>
+                        </div>
+                        <div class="form-group">
+                            <label for="pickup-location">Pickup/Meet Location</label>
+                            <input type="text" id="pickup-location" placeholder="e.g., PLV Library entrance" required />
+                            <small id="err-pickup-location" class="error-message"></small>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="expected-return-date">Expected Return Date</label>
+                            <input type="date" id="expected-return-date" required />
+                            <small id="err-expected-return-date" class="error-message"></small>
+                        </div>
+                        <div class="form-group">
+                            <label for="borrow-duration">Borrow Duration</label>
+                            <select id="borrow-duration">
+                                <option value="">Select duration (optional)</option>
+                                <option value="1w">1 week</option>
+                                <option value="2w">2 weeks</option>
+                                <option value="3w">3 weeks</option>
+                                <option value="1m">1 month</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="preferred-pickup-time">Preferred Pickup Time</label>
+                            <input type="datetime-local" id="preferred-pickup-time" />
+                        </div>
+                        <div class="form-group">
+                            <label for="request-contact">Your Contact</label>
+                            <input type="text" id="request-contact" placeholder="e.g., 0917..., FB: name" required />
+                            <small id="err-request-contact" class="error-message"></small>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="request-address">Your Address (optional)</label>
+                            <input type="text" id="request-address" placeholder="Optional address" />
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="request-message">Message to owner</label>
+                        <textarea id="request-message" rows="3" placeholder="Reason and any helpful details (min 10 chars)" required></textarea>
+                        <small id="err-request-message" class="error-message"></small>
+                    </div>
+
+                    <div class="modal-footer" style="justify-content: flex-end; gap: 8px;">
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('borrow-request-modal').classList.remove('active')">Cancel</button>
+                        <button id="borrow-request-submit" type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i>
+                            Send Request
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="./js/utils.js"></script>
     <script src="./js/api.js"></script>

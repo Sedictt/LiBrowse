@@ -20,7 +20,7 @@ async function updateUserCredits(connection, userId, creditChange, reason, trans
     
     // Log credit history
     await connection.execute(
-        'INSERT INTO credit_history (user_id, transaction_id, credit_change, reason, previous_credits, new_credits) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO credit_history (user_id, transaction_id, credit_change, remark, old_balance, new_balance) VALUES (?, ?, ?, ?, ?, ?)',
         [userId, transactionId, creditChange, reason, currentCredits, newCredits]
     );
     
@@ -28,10 +28,10 @@ async function updateUserCredits(connection, userId, creditChange, reason, trans
 }
 
 // Helper function to send notification
-async function createNotification(connection, userId, title, message, type, relatedId = null) {
+async function createNotification(connection, userId, title, body, category, relatedId = null) {
     await connection.execute(
-        'INSERT INTO notifications (user_id, title, message, type, related_id) VALUES (?, ?, ?, ?, ?)',
-        [userId, title, message, type, relatedId]
+        'INSERT INTO notifications (user_id, title, body, category, related_id) VALUES (?, ?, ?, ?, ?)',
+        [userId, title, body, category, relatedId]
     );
 }
 
@@ -47,8 +47,8 @@ router.get('/', authenticateToken, async (req, res) => {
                 b.author as book_author,
                 b.cover_image as book_cover,
                 CASE WHEN t.borrower_id = ? THEN 'borrowing' ELSE 'lending' END AS type,
-                CONCAT(borrower.first_name, ' ', borrower.last_name) AS borrower_name,
-                CONCAT(lender.first_name, ' ', lender.last_name) AS lender_name,
+                CONCAT(borrower.fname, ' ', borrower.lname) AS borrower_name,
+                CONCAT(lender.fname, ' ', lender.lname) AS lender_name,
                 borrower.email as borrower_email,
                 lender.email as lender_email,
                 -- Check if feedback has been given (simplified approach)
@@ -59,7 +59,7 @@ router.get('/', authenticateToken, async (req, res) => {
             JOIN users borrower ON t.borrower_id = borrower.id
             JOIN users lender ON t.lender_id = lender.id
             WHERE t.borrower_id = ? OR t.lender_id = ?
-            ORDER BY t.created_at DESC
+            ORDER BY t.date_req DESC
         `, [req.user.id, req.user.id, req.user.id]);
         
         connection.release();
@@ -77,11 +77,11 @@ router.post('/request', [
     body('borrower_contact').trim().isLength({ min: 1 }).withMessage('Contact information is required'),
     body('expected_return_date').isISO8601().withMessage('Valid return date is required'),
     body('request_message').trim().isLength({ min: 10 }).withMessage('Please provide a detailed reason for borrowing (minimum 10 characters)'),
-    body('borrower_address').optional().trim().isLength({ max: 255 }).withMessage('Address must be less than 255 characters'),
-    body('pickup_method').isIn(['pickup', 'meetup', 'delivery']).withMessage('Valid pickup method is required'),
+    body('borrower_address').optional({ nullable: true }).trim().isLength({ max: 255 }).withMessage('Address must be less than 255 characters'),
+    body('pickup_method').isIn(['pickup','meet','ship','meetup','delivery']).withMessage('Valid pickup method is required'),
     body('pickup_location').trim().isLength({ min: 1, max: 255 }).withMessage('Meeting location is required'),
-    body('preferred_pickup_time').optional().isISO8601().withMessage('Valid pickup time required if provided'),
-    body('borrow_duration').optional().isIn(['1-week', '2-weeks', '3-weeks', '1-month', 'custom']).withMessage('Valid borrow duration required if provided')
+    body('preferred_pickup_time').optional({ nullable: true }).isISO8601().withMessage('Valid pickup time required if provided'),
+    body('borrow_duration').optional({ nullable: true }).isIn(['1w','2w','3w','1m','custom','1-week','2-weeks','3-weeks','1-month']).withMessage('Valid borrow duration required if provided')
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -101,13 +101,25 @@ router.post('/request', [
             expected_return_date
         } = req.body;
 
+        // Normalize optional values: undefined -> null
+        const toNull = (v) => (v === undefined ? null : v);
+        const borrower_address_norm = toNull(borrower_address);
+        const preferred_pickup_time_norm = preferred_pickup_time ? new Date(preferred_pickup_time) : null;
+
+        // Map to DB enum values
+        const pickup_type = (pickup_method === 'meetup') ? 'meet' : (pickup_method === 'delivery' ? 'ship' : pickup_method);
+        const borrower_duration_db = (function(val){
+            const map = { '1-week':'1w','2-weeks':'2w','3-weeks':'3w','1-month':'1m','1w':'1w','2w':'2w','3w':'3w','1m':'1m','custom':'custom' };
+            return map[val] || null;
+        })(borrow_duration);
+
         const connection = await getConnection();
-        
+
         // Step 1: Check if book exists and is available
         const [books] = await connection.execute(`
-            SELECT b.*, u.credits as owner_credits, CONCAT(u.first_name, ' ', u.last_name) as owner_name
-            FROM books b 
-            JOIN users u ON b.owner_id = u.id 
+            SELECT b.*, CONCAT(u.fname, ' ', u.lname) as owner_name
+            FROM books b
+            JOIN users u ON b.owner_id = u.id
             WHERE b.id = ? AND b.is_available = TRUE
         `, [book_id]);
 
@@ -141,7 +153,7 @@ router.post('/request', [
         const [activeBorrows] = await connection.execute(`
             SELECT COUNT(*) as count 
             FROM transactions 
-            WHERE borrower_id = ? AND status IN ('pending', 'approved', 'borrowed')
+            WHERE borrower_id = ? AND status IN ('waiting', 'approved', 'ongoing')
         `, [req.user.id]);
 
         const maxActiveBorrows = 3; // From settings table
@@ -153,33 +165,41 @@ router.post('/request', [
         }
 
         // Step 5: Create borrow request
+        // Build values with NULLs instead of undefined
+        const insertValues = [
+            book_id, req.user.id, book.owner_id, request_message,
+            borrower_contact, borrower_address_norm, pickup_type, pickup_location,
+            expected_return_date
+        ];
+        console.assert(!insertValues.some(v => v === undefined), 'Undefined value in INSERT params', insertValues);
+
         const [result] = await connection.execute(`
             INSERT INTO transactions (
-                book_id, borrower_id, lender_id, status, request_message,
-                borrower_contact, borrower_address, pickup_method, pickup_location,
-                expected_return_date, request_date
-            ) VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, NOW())
-        `, [
-            book_id, req.user.id, book.owner_id, request_message,
-            borrower_contact, borrower_address, pickup_method, pickup_location,
-            expected_return_date
-        ]);
+                book_id, borrower_id, lender_id, status, req_msg,
+                bor_contact, bor_addr, pickup_type, pickup_spot,
+                date_expected, date_req
+            ) VALUES (?, ?, ?, 'waiting', ?, ?, ?, ?, ?, ?, NOW())
+        `, insertValues);
 
         // Update with additional fields if they exist
-        if (preferred_pickup_time || borrow_duration) {
+        if (preferred_pickup_time_norm !== null || borrower_duration_db !== null) {
+            const updateValues = [preferred_pickup_time_norm, borrower_duration_db ?? null, result.insertId];
+            console.assert(!updateValues.some(v => v === undefined), 'Undefined value in UPDATE params', updateValues);
             await connection.execute(`
-                UPDATE transactions 
-                SET preferred_pickup_time = ?, borrow_duration = ?
+                UPDATE transactions
+                SET pref_pickup_time = ?, borrower_duration = ?
                 WHERE id = ?
-            `, [preferred_pickup_time || null, borrow_duration || null, result.insertId]);
+            `, updateValues);
         }
 
         // Step 6: Send notification to lender
+        const [borrowerRows] = await connection.execute('SELECT fname, lname FROM users WHERE id = ?', [req.user.id]);
+        const borrowerFullName = borrowerRows.length ? `${borrowerRows[0].fname} ${borrowerRows[0].lname}` : 'A borrower';
         await createNotification(
             connection,
             book.owner_id,
             'New Borrow Request',
-            `${req.user.first_name} ${req.user.last_name} wants to borrow "${book.title}"`,
+            `${borrowerFullName} wants to borrow "${book.title}"`,
             'transaction',
             result.insertId
         );
