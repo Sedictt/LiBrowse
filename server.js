@@ -16,6 +16,27 @@ const { testConnection } = require('./config/database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Initialize HTTP server for Socket.IO
+const http = require('http');
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const socketIO = require('socket.io');
+const io = socketIO(server, {
+    cors: {
+        origin: process.env.NODE_ENV === 'production' ? 'your-domain.com' : '*',
+        methods: ['GET', 'POST'],
+        credentials: true
+    }
+});
+
+// Initialize chat socket handlers
+const chatHandler = require('./socket/chatHandler');
+chatHandler(io);
+
+// Make io available to routes
+app.set('socketio', io);
+
 // =======================
 // Security Middleware
 // =======================
@@ -73,7 +94,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/books', require('./routes/books'));
 app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/feedback', require('./routes/feedback'));
-app.use('/api/chats', require('./routes/chats'));
+app.use('/api/chats', require('./routes/chats-new')); // Updated to use new chat system
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/verification', require('./routes/verification'));
 app.use('/api/verification', require('./routes/emailVerification'));
@@ -130,9 +151,10 @@ const startServer = async () => {
             process.exit(1);
         }
 
-        app.listen(PORT, () => {
+        server.listen(PORT, () => {
             console.log(`🚀 LiBrowse Server running on port ${PORT}`);
             console.log(`📚 Access at: http://localhost:${PORT}`);
+            console.log(`📡 Socket.IO enabled for real-time chat`);
             console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
         });
     } catch (err) {

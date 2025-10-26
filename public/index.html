@@ -10,12 +10,14 @@
     <meta name="keywords"
         content="LiBrowse, PLV, book exchange, student books, academic books, university, lending, book sharing">
     <meta name="author" content="LiBrowse Team">
+    <link rel="icon" type="image/png" href="./assets/LibrowseLogo.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="./css/style.css?v=2.3">
     <link rel="stylesheet" href="./css/new-landing.css?v=1.0">
     <link rel="stylesheet" href="./css/bookManagement.css?v=1.0">
+    <link rel="stylesheet" href="./css/chat-modal.css?v=1.0">
     <style>
         /* Fallback styles to ensure basic functionality */
         body {
@@ -1586,46 +1588,64 @@
         </div>
     </div>
 
-    <!-- Chat Modal -->
-    <div class="modal" id="chat-modal">
-        <div class="modal-content modal-chat">
-            <div class="modal-header">
-                <div class="chat-header-info">
-                    <h3 id="chat-title">Chat with User</h3>
-                    <p id="chat-book-info">About: Book Title</p>
+    <!-- Chat Modal - Rebuilt from scratch -->
+    <div class="modal" id="chat-modal" role="dialog" aria-modal="true">
+        <div class="chat-modal-backdrop"></div>
+        <div class="chat-modal-container">
+            <!-- Chat Header -->
+            <div class="chat-modal-header">
+                <div class="chat-user-info">
+                    <h2 id="chat-title" class="chat-user-name">Chat with User</h2>
+                    <p id="chat-book-info" class="chat-book-title">About: Book Title</p>
                 </div>
-                <div class="chat-actions">
-                    <button class="btn btn-outline btn-sm" id="report-chat-btn">
+                <div class="chat-header-buttons">
+                    <button type="button" class="chat-btn-icon" id="report-chat-btn" title="Report user">
                         <i class="fas fa-flag"></i>
-                        Report
                     </button>
-                    <button class="btn btn-error btn-sm" id="cancel-transaction-btn">
-                        <i class="fas fa-ban"></i>
-                        Cancel Transaction
+                    <button type="button" class="chat-btn-icon" id="cancel-transaction-btn" title="Cancel transaction">
+                        <i class="fas fa-times-circle"></i>
                     </button>
-                    <button class="modal-close" data-modal="chat-modal">
+                    <button type="button" class="chat-btn-close" data-modal="chat-modal" title="Close">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
-            <div class="modal-body">
-                <div class="chat-container">
-                    <div class="chat-messages" id="chat-messages">
-                        <!-- Messages will be loaded here -->
-                    </div>
-                    <div class="chat-input-container">
-                        <form id="chat-form">
-                            <input type="hidden" id="chat-id" name="chat_id">
-                            <div class="chat-input-wrapper">
-                                <input type="text" id="chat-message-input" name="message"
-                                    placeholder="Type your message..." required>
-                                <button type="submit" class="btn btn-primary btn-sm">
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+
+            <!-- Info Banner -->
+            <div class="chat-info-banner">
+                <i class="fas fa-info-circle"></i>
+                <span id="chat-banner-text">Chat created for "test book" transaction. Discuss pickup details and terms.</span>
+            </div>
+
+            <!-- Messages Area -->
+            <div class="chat-messages-area">
+                <button id="load-more-messages" class="chat-load-more" style="display: none;">
+                    <i class="fas fa-chevron-up"></i> Load Earlier Messages
+                </button>
+                <div id="chat-messages" class="chat-messages" role="log"></div>
+                <div id="typing-indicator" class="chat-typing" style="display: none;">
+                    <span></span><span></span><span></span>
                 </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="chat-input-section">
+                <form id="chat-form">
+                    <input type="hidden" id="chat-id">
+                    <div class="chat-input-box">
+                        <textarea id="chat-message-input" class="chat-textarea" placeholder="Type a message..." maxlength="1000" rows="1"></textarea>
+                        <div class="chat-input-controls">
+                            <button type="button" class="chat-btn-icon" id="attach-file-btn" title="Attach file">
+                                <i class="fas fa-paperclip"></i>
+                            </button>
+                            <button type="submit" class="chat-btn-send">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chat-char-count"><span id="character-count">0</span> / 1000</div>
+                    <input type="file" id="file-input" style="display: none;" accept="image/*">
+                </form>
             </div>
         </div>
     </div>
@@ -2101,6 +2121,13 @@
     <script src="./js/requests.js"></script>
     <script src="./js/monitoring.js"></script>
     <script src="./js/bookManagement.js"></script>
+
+    <!-- Socket.IO Client -->
+    <script src="/socket.io/socket.io.js"></script>
+
+    <!-- Chat System Scripts -->
+    <script src="./js/socket-client.js"></script>
+    <script src="./js/chat.js"></script>
 
     <!-- Profile Tab Switching Script -->
     <script>

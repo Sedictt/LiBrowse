@@ -707,28 +707,64 @@ class RequestManager {
     }
 
     createChatCard(chat) {
+        // Get initials for avatar
+        const initials = chat.other_user_name
+            .split(' ')
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .substring(0, 2);
+
+        // Format time (e.g., "2:30 PM" or "Yesterday")
+        const timeFormatted = chat.last_message_time ? this.formatTimeAgo(chat.last_message_time) : '';
+
         return `
             <div class="chat-card" data-chat-id="${chat.id}" onclick="requestManager.openChatById(${chat.id})">
+                <div class="chat-avatar">${initials}</div>
                 <div class="chat-header">
-                    <div class="chat-info">
+                    <div class="chat-content">
                         <h4>${this.escapeHtml(chat.other_user_name)}</h4>
-                        <p>About: ${this.escapeHtml(chat.book_title)}</p>
+                        <p class="chat-last-message">${this.escapeHtml(chat.last_message) || 'No messages yet'}</p>
                     </div>
-                    ${chat.unread_count > 0 ? `<div class="unread-badge">${chat.unread_count}</div>` : ''}
-                </div>
-                <div class="chat-preview">
-                    <p>${this.escapeHtml(chat.last_message) || 'No messages yet'}</p>
-                    <small>${chat.last_message_time ? this.formatDate(chat.last_message_time) : ''}</small>
+                    <div class="chat-meta">
+                        ${timeFormatted ? `<span class="chat-time">${timeFormatted}</span>` : ''}
+                        ${chat.unread_count > 0 ? `<div class="unread-badge">${chat.unread_count}</div>` : ''}
+                    </div>
                 </div>
             </div>
         `;
     }
 
-    // Chat modal methods (placeholder - implement when chat modal is added)
+    formatTimeAgo(dateString) {
+        if (!dateString) return '';
+        
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m`;
+        if (diffHours < 24) return `${diffHours}h`;
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays}d`;
+        
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+
+
+    // Chat modal methods - integrated with ChatManager
     openChatModal(chat) {
         console.log('Opening chat modal for:', chat);
-        this.showToast('Chat functionality will be implemented in the chat modal', 'info');
-        // TODO: Implement chat modal opening
+
+        if (window.chatManager) {
+            window.chatManager.openChat(chat.id);
+        } else {
+            console.error('ChatManager not initialized');
+            this.showToast('Chat system not ready. Please refresh the page.', 'error');
+        }
     }
 
     handleSendMessage(e) {
