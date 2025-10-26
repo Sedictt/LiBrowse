@@ -202,15 +202,17 @@ class App {
             return;
         }
 
-        // Hide all sections
+        // Hide all sections (remove active and ensure inline display none)
         document.querySelectorAll('.section').forEach(section => {
             section.classList.remove('active');
+            section.style.display = 'none';
         });
 
-        // Show target section
+        // Show target section (add active and ensure inline display block)
         const targetSection = document.getElementById(`${sectionName}-section`);
         if (targetSection) {
             targetSection.classList.add('active');
+            targetSection.style.display = 'block';
             this.currentSection = sectionName;
         }
 

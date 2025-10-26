@@ -6,6 +6,15 @@ const { getConnection } = require('../config/database');
 
 const router = express.Router();
 
+// Test endpoint to verify route is working
+router.get('/test', authenticateToken, (req, res) => {
+    res.json({
+        message: 'Transactions route is working',
+        user: req.user.id,
+        timestamp: new Date().toISOString()
+    });
+});
+
 // --- Date/Due date helpers ---
 function toYYYYMMDD(date) {
     const y = date.getFullYear();
@@ -90,9 +99,16 @@ router.get('/', authenticateToken, async (req, res) => {
                 CONCAT(lender.fname, ' ', lender.lname) AS lender_name,
                 borrower.email as borrower_email,
                 lender.email as lender_email,
+                borrower.is_verified as borrower_verified,
+                borrower.credits as borrower_credits,
+                lender.is_verified as lender_verified,
+                lender.credits as lender_credits,
+                -- Borrower reputation badges
+                COALESCE((SELECT AVG(rating) FROM feedback WHERE reviewee_id = borrower.id), 0) as borrower_rating,
+                COALESCE((SELECT COUNT(*) FROM transactions t2 WHERE t2.borrower_id = borrower.id AND t2.status IN ('done', 'ongoing')), 0) as borrower_completed_transactions,
                 -- Check if feedback has been given (simplified approach)
-                (SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = t.borrower_id) as borrower_feedback_given,
-                (SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = t.lender_id) as lender_feedback_given
+                COALESCE((SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = t.borrower_id), 0) as borrower_feedback_given,
+                COALESCE((SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = t.lender_id), 0) as lender_feedback_given
             FROM transactions t
             JOIN books b ON t.book_id = b.id
             JOIN users borrower ON t.borrower_id = borrower.id
@@ -105,7 +121,9 @@ router.get('/', authenticateToken, async (req, res) => {
         res.json(transactions);
     } catch (error) {
         console.error('Get transactions error:', error);
-        res.status(500).json({ error: 'Failed to load transactions' });
+        console.error('Error details:', error.message);
+        console.error('Stack trace:', error.stack);
+        res.status(500).json({ error: 'Failed to load transactions', details: error.message });
     }
 });
 
@@ -294,7 +312,7 @@ router.put('/:id/approve', [
 
         // Get transaction details
         const [transactions] = await connection.execute(`
-            SELECT t.*, b.title as book_title, CONCAT(u.first_name, ' ', u.last_name) as borrower_name
+            SELECT t.*, b.title as book_title, CONCAT(u.fname, ' ', u.lname) as borrower_name
             FROM transactions t
             JOIN books b ON t.book_id = b.id
             JOIN users u ON t.borrower_id = u.id
@@ -325,14 +343,14 @@ router.put('/:id/approve', [
 
         // Create chat for approved transaction
         const [chatResult] = await connection.execute(`
-            INSERT INTO chats (transaction_id, created_at)
+            INSERT INTO chats (transaction_id, created)
             VALUES (?, NOW())
         `, [transactionId]);
 
         // Send system message to chat
         await connection.execute(`
-            INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created_at)
-            VALUES (?, ?, ?, 'system', NOW())
+            INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created)
+            VALUES (?, ?, ?, 'sys', NOW())
         `, [chatResult.insertId, req.user.id, `Chat created for "${transaction.book_title}" transaction. You can now discuss pickup details and terms.`]);
 
         // Send notification to borrower
@@ -376,7 +394,7 @@ router.put('/:id/reject', [
 
         // Get transaction details
         const [transactions] = await connection.execute(`
-            SELECT t.*, b.title as book_title, CONCAT(u.first_name, ' ', u.last_name) as borrower_name
+            SELECT t.*, b.title as book_title, CONCAT(u.fname, ' ', u.lname) as borrower_name
             FROM transactions t
             JOIN books b ON t.book_id = b.id
             JOIN users u ON t.borrower_id = u.id
@@ -665,7 +683,7 @@ router.put('/:id/borrowed', [
 
         // Get transaction details
         const [transactions] = await connection.execute(`
-            SELECT t.*, b.title as book_title, CONCAT(u.first_name, ' ', u.last_name) as borrower_name
+            SELECT t.*, b.title as book_title, CONCAT(u.fname, ' ', u.lname) as borrower_name
             FROM transactions t
             JOIN books b ON t.book_id = b.id
             JOIN users u ON t.borrower_id = u.id
@@ -687,9 +705,9 @@ router.put('/:id/borrowed', [
         // Update transaction status to borrowed
         await connection.execute(`
             UPDATE transactions
-            SET status = 'borrowed',
-                borrowed_date = NOW(),
-                lender_notes = COALESCE(?, lender_notes)
+            SET status = 'ongoing',
+                date_borrowed = NOW(),
+                lender_note = COALESCE(?, lender_note)
             WHERE id = ?
         `, [lender_notes, transactionId]);
 
@@ -698,7 +716,7 @@ router.put('/:id/borrowed', [
             connection,
             transaction.borrower_id,
             'Book Pickup Confirmed',
-            `The lender has confirmed that you picked up "${transaction.book_title}". Please return it by ${new Date(transaction.expected_return_date).toLocaleDateString()}.`,
+            `The lender has confirmed that you picked up "${transaction.book_title}". Please return it by ${new Date(transaction.date_expected).toLocaleDateString()}.`,
             'transaction',
             transactionId
         );
@@ -707,12 +725,12 @@ router.put('/:id/borrowed', [
         const [chats] = await connection.execute('SELECT id FROM chats WHERE transaction_id = ?', [transactionId]);
         if (chats.length > 0) {
             await connection.execute(`
-                INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created_at)
-                VALUES (?, ?, ?, 'system', NOW())
+                INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created)
+                VALUES (?, ?, ?, 'sys', NOW())
             `, [
                 chats[0].id,
                 req.user.id,
-                `📖 Book pickup confirmed! "${transaction.book_title}" is now borrowed. Please return by ${new Date(transaction.expected_return_date).toLocaleDateString()}.`
+                `📖 Book pickup confirmed! "${transaction.book_title}" is now borrowed. Please return by ${new Date(transaction.date_expected).toLocaleDateString()}.`
             ]);
         }
 
@@ -721,12 +739,191 @@ router.put('/:id/borrowed', [
         res.json({
             message: 'Book pickup confirmed successfully',
             borrower_name: transaction.borrower_name,
-            expected_return_date: transaction.expected_return_date
+            expected_return_date: transaction.date_expected
         });
 
     } catch (error) {
         console.error('Mark as borrowed error:', error);
         res.status(500).json({ error: 'Failed to mark book as borrowed' });
+    }
+});
+
+// POST /api/transactions/bulk-approve - Bulk approve requests
+router.post('/bulk-approve', [
+    authenticateToken,
+    body('transaction_ids').isArray({ min: 1 }).withMessage('At least one transaction ID is required'),
+    body('transaction_ids.*').isInt({ min: 1 }).withMessage('Valid transaction IDs are required')
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ error: 'Validation failed', details: errors.array() });
+        }
+
+        const { transaction_ids } = req.body;
+        const connection = await getConnection();
+
+        const results = {
+            approved: [],
+            failed: []
+        };
+
+        for (const transactionId of transaction_ids) {
+            try {
+                // Get transaction details
+                const [transactions] = await connection.execute(`
+                    SELECT t.*, b.title as book_title, CONCAT(u.fname, ' ', u.lname) as borrower_name
+                    FROM transactions t
+                    JOIN books b ON t.book_id = b.id
+                    JOIN users u ON t.borrower_id = u.id
+                    WHERE t.id = ? AND t.lender_id = ?
+                `, [transactionId, req.user.id]);
+
+                if (transactions.length === 0) {
+                    results.failed.push({ id: transactionId, reason: 'Not found or not authorized' });
+                    continue;
+                }
+
+                const transaction = transactions[0];
+
+                if (transaction.status !== 'pending') {
+                    results.failed.push({ id: transactionId, reason: `Status is ${transaction.status}, not pending` });
+                    continue;
+                }
+
+                // Update transaction status to approved
+                await connection.execute(`
+                    UPDATE transactions
+                    SET status = 'approved',
+                        approved_date = NOW()
+                    WHERE id = ?
+                `, [transactionId]);
+
+                // Create chat for approved transaction
+                const [chatResult] = await connection.execute(`
+                    INSERT INTO chats (transaction_id, created)
+                    VALUES (?, NOW())
+                `, [transactionId]);
+
+                // Send system message to chat
+                await connection.execute(`
+                    INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created)
+                    VALUES (?, ?, ?, 'sys', NOW())
+                `, [chatResult.insertId, req.user.id, `Chat created for "${transaction.book_title}" transaction. You can now discuss pickup details and terms.`]);
+
+                // Send notification to borrower
+                await createNotification(
+                    connection,
+                    transaction.borrower_id,
+                    'Request Approved!',
+                    `Your request to borrow "${transaction.book_title}" has been approved. You can now chat with the lender.`,
+                    'transaction',
+                    transactionId
+                );
+
+                results.approved.push({ id: transactionId, book_title: transaction.book_title });
+
+            } catch (error) {
+                console.error(`Failed to approve transaction ${transactionId}:`, error);
+                results.failed.push({ id: transactionId, reason: error.message });
+            }
+        }
+
+        connection.release();
+
+        res.json({
+            message: `Bulk approval completed. ${results.approved.length} approved, ${results.failed.length} failed.`,
+            results
+        });
+
+    } catch (error) {
+        console.error('Bulk approve error:', error);
+        res.status(500).json({ error: 'Failed to process bulk approval' });
+    }
+});
+
+// POST /api/transactions/bulk-reject - Bulk reject requests
+router.post('/bulk-reject', [
+    authenticateToken,
+    body('transaction_ids').isArray({ min: 1 }).withMessage('At least one transaction ID is required'),
+    body('transaction_ids.*').isInt({ min: 1 }).withMessage('Valid transaction IDs are required'),
+    body('rejection_reason').notEmpty().withMessage('Rejection reason is required')
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ error: 'Validation failed', details: errors.array() });
+        }
+
+        const { transaction_ids, rejection_reason } = req.body;
+        const connection = await getConnection();
+
+        const results = {
+            rejected: [],
+            failed: []
+        };
+
+        for (const transactionId of transaction_ids) {
+            try {
+                // Get transaction details
+                const [transactions] = await connection.execute(`
+                    SELECT t.*, b.title as book_title, CONCAT(u.fname, ' ', u.lname) as borrower_name
+                    FROM transactions t
+                    JOIN books b ON t.book_id = b.id
+                    JOIN users u ON t.borrower_id = u.id
+                    WHERE t.id = ? AND t.lender_id = ?
+                `, [transactionId, req.user.id]);
+
+                if (transactions.length === 0) {
+                    results.failed.push({ id: transactionId, reason: 'Not found or not authorized' });
+                    continue;
+                }
+
+                const transaction = transactions[0];
+
+                if (transaction.status !== 'pending') {
+                    results.failed.push({ id: transactionId, reason: `Status is ${transaction.status}, not pending` });
+                    continue;
+                }
+
+                // Update transaction status to rejected
+                await connection.execute(`
+                    UPDATE transactions
+                    SET status = 'rejected', rejection_reason = ?
+                    WHERE id = ?
+                `, [rejection_reason, transactionId]);
+
+                // Make book available again
+                await connection.execute('UPDATE books SET is_available = TRUE WHERE id = ?', [transaction.book_id]);
+
+                // Send notification to borrower
+                await createNotification(
+                    connection,
+                    transaction.borrower_id,
+                    'Request Rejected',
+                    `Your request to borrow "${transaction.book_title}" was rejected: ${rejection_reason}`,
+                    'transaction',
+                    transactionId
+                );
+
+                results.rejected.push({ id: transactionId, book_title: transaction.book_title });
+
+            } catch (error) {
+                console.error(`Failed to reject transaction ${transactionId}:`, error);
+                results.failed.push({ id: transactionId, reason: error.message });
+            }
+        }
+
+        connection.release();
+
+        res.json({
+            message: `Bulk rejection completed. ${results.rejected.length} rejected, ${results.failed.length} failed.`,
+            results
+        });
+
+    } catch (error) {
+        console.error('Bulk reject error:', error);
+        res.status(500).json({ error: 'Failed to process bulk rejection' });
     }
 });
 

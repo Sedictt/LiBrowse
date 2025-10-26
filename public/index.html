@@ -495,6 +495,31 @@
                     </div>
                 </div>
 
+                <!-- Filter Bar (for incoming requests) -->
+                <div class="filter-bar" id="requests-filter-bar" style="display: none;">
+                    <div class="filter-grid">
+                        <input type="text" class="filter-input" id="filter-book-title" placeholder="Filter by book title...">
+                        <input type="text" class="filter-input" id="filter-borrower-name" placeholder="Filter by borrower name...">
+                        <select class="filter-input" id="filter-status">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="cancelled">Cancelled</option>
+                            <option value="borrowed">Borrowed</option>
+                            <option value="returned">Returned</option>
+                        </select>
+                        <div class="filter-date-group">
+                            <label for="filter-date-from" class="filter-label">From Date</label>
+                            <input type="date" class="filter-input" id="filter-date-from">
+                        </div>
+                        <div class="filter-date-group">
+                            <label for="filter-date-to" class="filter-label">To Date</label>
+                            <input type="date" class="filter-input" id="filter-date-to">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Incoming Requests Tab -->
                 <div id="incoming-tab" class="tab-content active">
                     <div class="requests-grid" id="incoming-requests">
