@@ -500,8 +500,10 @@
                 <!-- Filter Bar (for incoming requests) -->
                 <div class="filter-bar" id="requests-filter-bar" style="display: none;">
                     <div class="filter-grid">
-                        <input type="text" class="filter-input" id="filter-book-title" placeholder="Filter by book title...">
-                        <input type="text" class="filter-input" id="filter-borrower-name" placeholder="Filter by borrower name...">
+                        <input type="text" class="filter-input" id="filter-book-title"
+                            placeholder="Filter by book title...">
+                        <input type="text" class="filter-input" id="filter-borrower-name"
+                            placeholder="Filter by borrower name...">
                         <select class="filter-input" id="filter-status">
                             <option value="">All Statuses</option>
                             <option value="pending">Pending</option>
@@ -699,6 +701,7 @@
                             <button class="tab-btn" data-tab="books">My Books</button>
                             <button class="tab-btn" data-tab="reviews">Reviews</button>
                             <button class="tab-btn" data-tab="settings">Settings</button>
+                            <button class="tab-btn" data-tab="borrowing-history">Borrowing & Lending History</button>
                         </div>
                         <div class="profile-tab-content">
                             <!-- Personal Info Tab -->
@@ -763,6 +766,31 @@
                                     <p>Manage your account settings here.</p>
                                 </div>
                             </div>
+
+                            <!-- Borrowing & Lending History Tab -->
+                            <div class="tab-content" id="borrowing-history">
+                                <div id="history-container" class="profile-history">
+                                    <h3>Borrowing & Lending History</h3>
+                                    <div class="history-grid">
+                                        <!-- Borrowing Column -->
+                                        <div class="history-column">
+                                            <h4>Borrowing History</h4>
+                                            <div id="borrowing-history-list" class="history-list">
+                                                <!-- Borrowing history items load dynamically -->
+                                            </div>
+                                        </div>
+
+                                        <!-- Lending Column -->
+                                        <div class="history-column">
+                                            <h4>Lending History</h4>
+                                            <div id="lending-history-list" class="history-list">
+                                                <!-- Lending history items load dynamically -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
                 </div>
@@ -1614,7 +1642,8 @@
             <!-- Info Banner -->
             <div class="chat-info-banner">
                 <i class="fas fa-info-circle"></i>
-                <span id="chat-banner-text">Chat created for "test book" transaction. Discuss pickup details and terms.</span>
+                <span id="chat-banner-text">Chat created for "test book" transaction. Discuss pickup details and
+                    terms.</span>
             </div>
 
             <!-- Messages Area -->
@@ -1633,7 +1662,8 @@
                 <form id="chat-form">
                     <input type="hidden" id="chat-id">
                     <div class="chat-input-box">
-                        <textarea id="chat-message-input" class="chat-textarea" placeholder="Type a message..." maxlength="1000" rows="1"></textarea>
+                        <textarea id="chat-message-input" class="chat-textarea" placeholder="Type a message..."
+                            maxlength="1000" rows="1"></textarea>
                         <div class="chat-input-controls">
                             <button type="button" class="chat-btn-icon" id="attach-file-btn" title="Attach file">
                                 <i class="fas fa-paperclip"></i>
@@ -2019,7 +2049,8 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Borrow Request</h3>
-                <button class="modal-close" onclick="document.getElementById('borrow-request-modal').classList.remove('active')">
+                <button class="modal-close"
+                    onclick="document.getElementById('borrow-request-modal').classList.remove('active')">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -2046,7 +2077,8 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label for="borrow-start-date">Borrow Start Date</label>
-                            <input type="date" id="borrow-start-date" aria-describedby="err-borrow-start-date" required />
+                            <input type="date" id="borrow-start-date" aria-describedby="err-borrow-start-date"
+                                required />
                             <small id="err-borrow-start-date" class="error-message"></small>
                         </div>
                         <div class="form-group">
@@ -2065,9 +2097,11 @@
                     <div class="form-row">
                         <div class="form-group" style="flex: 1;">
                             <label for="expected-return-date">Expected Return Date</label>
-                            <input type="text" id="expected-return-date" disabled aria-describedby="erd-help erd-closure-note" />
+                            <input type="text" id="expected-return-date" disabled
+                                aria-describedby="erd-help erd-closure-note" />
                             <small id="erd-help" class="help-text">Auto-calculated from Start Date and Duration.</small>
-                            <small id="erd-closure-note" class="muted" style="display: none;">Adjusted for closure.</small>
+                            <small id="erd-closure-note" class="muted" style="display: none;">Adjusted for
+                                closure.</small>
                             <span id="erd-live" class="visually-hidden" role="status" aria-live="polite"></span>
                             <small id="err-expected-return-date" class="error-message"></small>
                         </div>
@@ -2094,12 +2128,14 @@
 
                     <div class="form-group">
                         <label for="request-message">Message to owner</label>
-                        <textarea id="request-message" rows="3" placeholder="Reason and any helpful details (min 10 chars)" required></textarea>
+                        <textarea id="request-message" rows="3"
+                            placeholder="Reason and any helpful details (min 10 chars)" required></textarea>
                         <small id="err-request-message" class="error-message"></small>
                     </div>
 
                     <div class="modal-footer" style="justify-content: flex-end; gap: 8px;">
-                        <button type="button" class="btn btn-outline" onclick="document.getElementById('borrow-request-modal').classList.remove('active')">Cancel</button>
+                        <button type="button" class="btn btn-outline"
+                            onclick="document.getElementById('borrow-request-modal').classList.remove('active')">Cancel</button>
                         <button id="borrow-request-submit" type="submit" class="btn btn-primary">
                             <i class="fas fa-paper-plane"></i>
                             Send Request

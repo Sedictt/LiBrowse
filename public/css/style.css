@@ -7867,3 +7867,246 @@ body {
         font-size: 1.4rem;
     }
 
+/* ==========================
+   Borrowing & Lending History
+=========================== */
+.history-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    margin-top: 1.5rem;
+}
+
+.history-column {
+    flex: 1;
+    min-width: 300px;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-md);
+}
+
+.history-list {
+    margin-top: 1rem;
+}
+
+.history-item {
+    background: var(--bg-secondary);
+    padding: 1rem;
+    border-radius: var(--radius-sm);
+    margin-bottom: 1rem;
+    border-left: 4px solid #667eea;
+}
+
+.history-item p {
+    margin: 0.25rem 0;
+    color: var(--text-secondary);
+}
+
+.history-item strong {
+    color: var(--text-primary);
+}
+
+.history-item span {
+    color: var(--info-light);
+    font-weight: 600;
+}
+
+.profile-history {
+  margin-top: 1.5rem;
+}
+
+.history-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.history-column {
+  flex: 1;
+  min-width: 280px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ========================================
+   BORROWING & LENDING HISTORY STYLES
+   Two-Column Layout (Side by Side)
+   ======================================== */
+
+.history-container {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.history-container h3 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin-bottom: 25px;
+  font-weight: 600;
+}
+
+/* Two-Column Grid Layout */
+.history-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* Perfect 50-50 split */
+  gap: 30px;
+  margin-top: 20px;
+}
+
+/* Each Column */
+.history-column {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  min-height: 400px;
+}
+
+.history-column h4 {
+  color: var(--primary);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding-bottom: 15px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.history-column h4 i {
+  font-size: 1.2rem;
+}
+
+/* History List Container */
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-height: 600px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+/* Custom Scrollbar */
+.history-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.history-list::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+  border-radius: 10px;
+}
+
+.history-list::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 10px;
+}
+
+.history-list::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-hover);
+}
+
+/* Loading State */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  gap: 15px;
+}
+
+.loading-state i {
+  font-size: 2rem;
+  color: var(--primary);
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  gap: 15px;
+}
+
+.empty-state i {
+  font-size: 3rem;
+  opacity: 0.5;
+}
+
+.empty-state p {
+  font-size: 0.95rem;
+}
+
+/* History Item Card */
+.history-item {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 15px;
+  transition: all 0.3s ease;
+  border-left: 4px solid transparent;
+}
+
+.history-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-left-color: var(--primary);
+}
+
+/* Status-based border colors */
+.history-item.status-pending {
+  border-left-color: #fbbf24;
+}
+
+.history-item.status-approved {
+  border-left-color: #3b82f6;
+}
+
+.history-item.status-ongoing {
+  border-left-color: #8b5cf6;
+}
+
+.history-item.status-completed {
+  border-left-color: #22c55e;
+}
+
+.history-item.status-cancelled,
+.history-item.status-rejected {
+  border-left-color: #ef4444;
+}
+
+/* Book Info Section */
+.history-book-info {
+  margin-bottom: 12px;
+}
+
+.history-book-info .book-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.history-book-info .book-author {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* History Details Section */
+.history-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex
+}
+

@@ -382,6 +382,15 @@ class ApiClient {
         });
     }
 
+    // --- Borrowing and Lending History ---
+    async getBorrowingHistory() {
+        return this.request('/transactions/history/borrowed');
+    }
+
+    async getLendingHistory() {
+        return this.request('/transactions/history/lent');
+    }
+
 }
 
 // Create global API instance

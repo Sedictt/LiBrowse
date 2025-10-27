@@ -24,7 +24,7 @@ function toYYYYMMDD(date) {
 }
 
 function durationToDays(val) {
-    const map = { '1w':7, '2w':14, '3w':21, '1m':30, '1-week':7, '2-weeks':14, '3-weeks':21, '1-month':30 };
+    const map = { '1w': 7, '2w': 14, '3w': 21, '1m': 30, '1-week': 7, '2-weeks': 14, '3-weeks': 21, '1-month': 30 };
     return map[val] || 0;
 }
 
@@ -135,9 +135,9 @@ router.post('/request', [
 
     body('request_message').trim().isLength({ min: 10 }).withMessage('Please provide a detailed reason for borrowing (minimum 10 characters)'),
     body('borrow_start_date').isISO8601().withMessage('Valid start date is required'),
-    body('borrow_duration').isIn(['1w','2w','3w','1m','1-week','2-weeks','3-weeks','1-month']).withMessage('Valid borrow duration is required'),
+    body('borrow_duration').isIn(['1w', '2w', '3w', '1m', '1-week', '2-weeks', '3-weeks', '1-month']).withMessage('Valid borrow duration is required'),
     body('borrower_address').optional({ nullable: true }).trim().isLength({ max: 255 }).withMessage('Address must be less than 255 characters'),
-    body('pickup_method').isIn(['pickup','meet','ship','meetup','delivery']).withMessage('Valid pickup method is required'),
+    body('pickup_method').isIn(['pickup', 'meet', 'ship', 'meetup', 'delivery']).withMessage('Valid pickup method is required'),
     body('pickup_location').trim().isLength({ min: 1, max: 255 }).withMessage('Meeting location is required'),
     body('preferred_pickup_time').optional({ nullable: true }).isISO8601().withMessage('Valid pickup time required if provided')
 ], async (req, res) => {
@@ -166,9 +166,9 @@ router.post('/request', [
 
         // Normalize to new schema enums
         const pickup_method_db = (pickup_method === 'meet') ? 'meetup' : (pickup_method === 'ship' ? 'delivery' : pickup_method);
-        const borrower_duration_db = (function(val){
+        const borrower_duration_db = (function (val) {
             if (val == null) return null;
-            const map = { '1w':'1-week','2w':'2-weeks','3w':'3-weeks','1m':'1-month','1-week':'1-week','2-weeks':'2-weeks','3-weeks':'3-weeks','1-month':'1-month','custom':'custom' };
+            const map = { '1w': '1-week', '2w': '2-weeks', '3w': '3-weeks', '1m': '1-month', '1-week': '1-week', '2-weeks': '2-weeks', '3-weeks': '3-weeks', '1-month': '1-month', 'custom': 'custom' };
             return map[val] || null;
         })(borrow_duration);
 
@@ -554,6 +554,84 @@ router.put('/:id/return', [
         res.status(500).json({ error: 'Failed to process book return' });
     }
 });
+
+// ============================
+// BORROWING & LENDING HISTORY
+// ============================
+
+// Borrowing history (books borrowed by the logged-in user)
+router.get("/history/borrowed", authenticateToken, async (req, res) => {
+    try {
+        const connection = await getConnection();
+        const [rows] = await connection.execute(`
+            SELECT 
+                t.id AS transaction_id,
+                t.status,
+                t.request_date AS created_at,
+                t.approved_date AS updated_at,
+                t.borrowed_date AS borrow_date,
+                t.expected_return_date AS due_date,
+                t.actual_return_date AS return_date,
+                b.id AS book_id,
+                b.title,
+                b.author,
+                b.cover_image,
+                CONCAT(lender.fname, ' ', lender.lname) AS owner_firstname,
+                lender.email AS lender_email
+            FROM transactions t
+            INNER JOIN books b ON t.book_id = b.id
+            INNER JOIN users lender ON t.lender_id = lender.id
+            WHERE t.borrower_id = ?
+            ORDER BY t.request_date DESC
+        `, [req.user.id]);
+
+        connection.release();
+
+        console.log(`✅ Borrowed history for user ${req.user.id}:`, rows.length, 'records');
+        res.json({ borrowedHistory: rows });
+    } catch (err) {
+        console.error("❌ Borrowed history error:", err);
+        res.status(500).json({ error: "Failed to fetch borrowed history", details: err.message });
+    }
+});
+
+// Lending history (books lent by the logged-in user)
+router.get("/history/lent", authenticateToken, async (req, res) => {
+    try {
+        const connection = await getConnection();
+        const [rows] = await connection.execute(`
+            SELECT 
+                t.id AS transaction_id,
+                t.status,
+                t.request_date AS created_at,
+                t.approved_date AS updated_at,
+                t.borrowed_date AS borrow_date,
+                t.expected_return_date AS due_date,
+                t.actual_return_date AS return_date,
+                b.id AS book_id,
+                b.title,
+                b.author,
+                b.cover_image,
+                CONCAT(borrower.fname, ' ', borrower.lname) AS borrower_firstname,
+                borrower.email AS borrower_email
+            FROM transactions t
+            INNER JOIN books b ON t.book_id = b.id
+            INNER JOIN users borrower ON t.borrower_id = borrower.id
+            WHERE t.lender_id = ?
+            ORDER BY t.request_date DESC
+        `, [req.user.id]);
+
+        connection.release();
+
+        console.log(`✅ Lent history for user ${req.user.id}:`, rows.length, 'records');
+        res.json({ lentHistory: rows });
+    } catch (err) {
+        console.error("❌ Lent history error:", err);
+        res.status(500).json({ error: "Failed to fetch lent history", details: err.message });
+    }
+});
+
+
 
 // PUT /api/transactions/:id/cancel - Cancel transaction (for both parties)
 router.put('/:id/cancel', [

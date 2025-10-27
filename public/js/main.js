@@ -514,6 +514,40 @@ class App {
                 tabContent.innerHTML = this.getSettingsTab();
                 this.setupSettingsEventListeners();
                 break;
+            case 'borrowing-history':
+                tabContent.innerHTML = `
+    <div class="history-container">
+      <h3>Borrowing & Lending History</h3>
+      <div class="history-grid">
+        <!-- Borrowing Column -->
+        <div class="history-column">
+          <h4><i class="fas fa-book-reader"></i> Books I Borrowed</h4>
+          <div id="borrowing-history-list" class="history-list">
+            <div class="loading-state">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>Loading borrowing history...</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Lending Column -->
+        <div class="history-column">
+          <h4><i class="fas fa-hands-helping"></i> Books I Lent</h4>
+          <div id="lending-history-list" class="history-list">
+            <div class="loading-state">
+              <i class="fas fa-spinner fa-spin"></i>
+              <p>Loading lending history...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+                // Load history after DOM is ready
+                setTimeout(() => this.loadBorrowingLendingHistory(), 100);
+                break;
+
         }
     }
 
@@ -833,6 +867,61 @@ class App {
             </div>
         `;
     }
+
+    renderHistory() {
+        const tabContent = document.querySelector('.profile-tab-content');
+        if (!tabContent) return;
+
+        tabContent.innerHTML = `
+        <div class="history-section" id="borrowing-history">
+            <h4>Borrowing History</h4>
+            <ul id="borrowing-list" class="history-items"></ul>
+        </div>
+        <div class="history-section" id="lending-history">
+            <h4>Lending History</h4>
+            <ul id="lending-list" class="history-items"></ul>
+        </div>
+    `;
+
+        // Fetch transaction data from backend
+        api.getTransactions().then(data => {
+            const borrowList = document.getElementById('borrowing-list');
+            const lendList = document.getElementById('lending-list');
+
+            borrowList.innerHTML = '';
+            lendList.innerHTML = '';
+
+            data.transactions.forEach(tx => {
+                const item = document.createElement('li');
+                item.classList.add('history-item');
+
+                item.innerHTML = `
+                <div class="history-book">
+                    <strong>${tx.book_title || 'Untitled Book'}</strong>
+                    <span>by ${tx.book_author || 'Unknown'}</span>
+                </div>
+                <div class="history-meta">
+                    <p>${tx.is_borrower ? `Lender: ${tx.lender_name}` : `Borrower: ${tx.borrower_name}`}</p>
+                    <p>${new Date(tx.created_at).toLocaleDateString()}</p>
+                    <span class="status ${tx.status.toLowerCase()}">${tx.status}</span>
+                </div>
+            `;
+
+                if (tx.is_borrower) {
+                    borrowList.appendChild(item);
+                } else {
+                    lendList.appendChild(item);
+                }
+            });
+
+            if (!borrowList.children.length) borrowList.innerHTML = "<p>No borrowing history yet.</p>";
+            if (!lendList.children.length) lendList.innerHTML = "<p>No lending history yet.</p>";
+        }).catch(err => {
+            console.error("Failed to load transactions:", err);
+            tabContent.innerHTML = `<p>Error loading history. Please try again later.</p>`;
+        });
+    }
+
 
     getMyBooksTab() {
         return `
@@ -1801,6 +1890,109 @@ class App {
         }
     }
 
+    async loadBorrowingLendingHistory() {
+        try {
+            const [borrowedResp, lentResp] = await Promise.all([
+                api.getBorrowingHistory(),
+                api.getLendingHistory()
+            ]);
+
+            this.renderHistoryList(
+                'borrowing-history-list',
+                borrowedResp.borrowedHistory || [],
+                'borrowed'
+            );
+
+            this.renderHistoryList(
+                'lending-history-list',
+                lentResp.lentHistory || [],
+                'lent'
+            );
+
+        } catch (error) {
+            console.error('Failed to load history:', error);
+            const borrowList = document.getElementById('borrowing-history-list');
+            const lendList = document.getElementById('lending-history-list');
+
+            if (borrowList) {
+                borrowList.innerHTML = '<p class="error-message">Failed to load borrowing history</p>';
+            }
+            if (lendList) {
+                lendList.innerHTML = '<p class="error-message">Failed to load lending history</p>';
+            }
+        }
+    }
+
+    renderHistoryList(containerId, transactions, type) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        if (transactions.length === 0) {
+            container.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-inbox"></i>
+        <p>No ${type === 'borrowed' ? 'borrowing' : 'lending'} history yet</p>
+      </div>
+    `;
+            return;
+        }
+
+        container.innerHTML = transactions.map(tx => `
+    <div class="history-item ${this.getTransactionStatusClass(tx.status)}">
+      <div class="history-book-info">
+        <div class="book-title">${tx.title || 'Untitled Book'}</div>
+        <div class="book-author">by ${tx.author || 'Unknown Author'}</div>
+      </div>
+      
+      <div class="history-details">
+        <div class="history-meta">
+          <span class="history-user">
+            <i class="fas fa-user"></i>
+            ${type === 'borrowed'
+                ? `${tx.owner_firstname} ${tx.owner_lastname}`
+                : `${tx.borrower_firstname} ${tx.borrower_lastname}`}
+          </span>
+          <span class="history-date">
+            <i class="fas fa-calendar"></i>
+            ${new Date(tx.created_at).toLocaleDateString()}
+          </span>
+        </div>
+        
+        <div class="history-status">
+          <span class="status-badge status-${tx.status}">
+            ${this.formatTransactionStatus(tx.status)}
+          </span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+    }
+
+    getTransactionStatusClass(status) {
+        const classes = {
+            'pending': 'status-pending',
+            'approved': 'status-approved',
+            'ongoing': 'status-ongoing',
+            'completed': 'status-completed',
+            'cancelled': 'status-cancelled',
+            'rejected': 'status-rejected'
+        };
+        return classes[status] || '';
+    }
+
+    formatTransactionStatus(status) {
+        const statuses = {
+            'pending': 'Pending',
+            'approved': 'Approved',
+            'ongoing': 'Ongoing',
+            'completed': 'Completed',
+            'cancelled': 'Cancelled',
+            'rejected': 'Rejected'
+        };
+        return statuses[status] || status;
+    }
+
+
     async handleEditProfileSubmit(event) {
         event.preventDefault();
 
@@ -2251,6 +2443,7 @@ document.addEventListener("DOMContentLoaded", () => {
     `).join('');
         }
 
+
         showSaveSearchModal() {
             // Get current search filters from BooksManager
             const currentFilters = booksManager.filters;
@@ -2416,6 +2609,52 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.appendChild(modal);
     }
 
+    // ============================
+    // BORROWING & LENDING HISTORY
+    // ============================
+
+    async function renderHistory() {
+        try {
+            const borrowSection = document.getElementById("borrowing-history-list");
+            const lendSection = document.getElementById("lending-history-list");
+
+            const borrowed = await api.getBorrowingHistory();
+            const lent = await api.getLendingHistory();
+
+            // Borrowed books
+            borrowSection.innerHTML = borrowed.borrowedHistory.length
+                ? borrowed.borrowedHistory.map(h => `
+        <div class="history-item">
+          <p><strong>${h.title}</strong> by ${h.author}</p>
+          <p>Status: <span>${h.status}</span></p>
+          <p>Owner: ${h.owner_firstname} ${h.owner_lastname}</p>
+          <p><small>${new Date(h.created_at).toLocaleDateString()}</small></p>
+        </div>
+      `).join("")
+                : "<p>No borrowed books yet.</p>";
+
+            // Lent books
+            lendSection.innerHTML = lent.lentHistory.length
+                ? lent.lentHistory.map(h => `
+        <div class="history-item">
+          <p><strong>${h.title}</strong> by ${h.author}</p>
+          <p>Status: <span>${h.status}</span></p>
+          <p>Borrower: ${h.borrower_firstname} ${h.borrower_lastname}</p>
+          <p><small>${new Date(h.created_at).toLocaleDateString()}</small></p>
+        </div>
+      `).join("")
+                : "<p>No lent books yet.</p>";
+
+        } catch (error) {
+            console.error("Failed to load history:", error);
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        if (document.getElementById("borrowing-history-list")) renderHistory();
+    });
+
+
     // ======================
     // EVENT LISTENERS
     // ======================
@@ -2431,6 +2670,86 @@ document.addEventListener("DOMContentLoaded", () => {
             performSearch();
         }
     });
+
+    // ============================
+    // BORROWING & LENDING HISTORY
+    // ============================
+
+    async function renderHistory() {
+        const historyContainer = document.getElementById("borrowing-history-list");
+        if (!historyContainer) {
+            console.warn("⚠️ borrowing-history-list container not found");
+            return;
+        }
+
+        try {
+            // Fetch all transactions
+            const transactions = await api.getTransactions();
+            console.log("📚 Transactions loaded:", transactions);
+
+            if (!transactions || transactions.length === 0) {
+                historyContainer.innerHTML = "<p>No borrowing or lending history found.</p>";
+                return;
+            }
+
+            // Separate borrowing and lending
+            const borrowHistory = transactions.filter(t => t.borrower_id === getUserId());
+            const lendHistory = transactions.filter(t => t.lender_id === getUserId());
+
+            // Render section
+            historyContainer.innerHTML = `
+            <div class="history-section">
+                <h4>Borrowing History</h4>
+                ${renderHistoryList(borrowHistory, "borrow")}
+            </div>
+            <div class="history-section">
+                <h4>Lending History</h4>
+                ${renderHistoryList(lendHistory, "lend")}
+            </div>
+        `;
+        } catch (error) {
+            console.error("❌ Failed to load history:", error);
+            historyContainer.innerHTML = "<p>Error loading borrowing history. Please try again later.</p>";
+        }
+    }
+
+    // Helper: Render individual transaction lists
+    function renderHistoryList(list, type) {
+        if (!list || list.length === 0) {
+            return `<p>No ${type === "borrow" ? "borrowed" : "lent"} books yet.</p>`;
+        }
+
+        return `
+        <ul class="history-items">
+            ${list.map(t => `
+                <li class="history-item">
+                    <div class="history-book">
+                        <strong>${t.book_title || "Untitled Book"}</strong>
+                        <span>by ${t.book_author || "Unknown Author"}</span>
+                    </div>
+                    <div class="history-meta">
+                        <p>Status: <span class="status ${t.status}">${t.status}</span></p>
+                        <p>Date: ${new Date(t.created_at).toLocaleDateString()}</p>
+                        ${type === "borrow"
+                ? `<p>Lender: ${t.lender_name || "Unknown"}</p>`
+                : `<p>Borrower: ${t.borrower_name || "Unknown"}</p>`}
+                    </div>
+                </li>
+            `).join("")}
+        </ul>
+    `;
+    }
+
+    // Helper: Get logged-in user ID from localStorage
+    function getUserId() {
+        try {
+            const user = JSON.parse(localStorage.getItem("user"));
+            return user?.id || null;
+        } catch {
+            return null;
+        }
+    }
+
 });
 
 // ========================================
