@@ -95,6 +95,9 @@ app.use('/api/books', require('./routes/books'));
 app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/feedback', require('./routes/feedback'));
 app.use('/api/chats', require('./routes/chats-new')); // Updated to use new chat system
+app.use('/api/chat-attachments', require('./routes/chat-attachments')); // Image attachment feature
+app.use('/api/reports', require('./routes/reports')); // Automated reporting system
+app.use('/api/cancellations', require('./routes/cancellations')); // Transaction cancellation
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/verification', require('./routes/verification'));
 app.use('/api/verification', require('./routes/emailVerification'));

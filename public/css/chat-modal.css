@@ -198,6 +198,55 @@
     background-clip: content-box;
 }
 
+/* Image Messages */
+.message-image-container {
+    margin: 4px 0;
+    display: inline-block;
+    max-width: 100%;
+}
+
+.message-image {
+    max-width: 300px;
+    max-height: 300px;
+    width: auto;
+    height: auto;
+    border-radius: 12px;
+    display: block;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.message-image:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.message-group.message-sent .message-image {
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.message-group.message-received .message-image {
+    border: 2px solid rgba(102, 126, 234, 0.3);
+}
+
+/* Remove padding from image messages */
+.chat-message:has(.message-image-container) {
+    padding: 4px;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.message-group.message-sent .chat-message:has(.message-image-container) {
+    background: transparent !important;
+}
+
+.message-group.message-received .chat-message:has(.message-image-container) {
+    background: transparent !important;
+    border: none !important;
+}
+
 /* Load More Button */
 .chat-load-more {
     align-self: center;

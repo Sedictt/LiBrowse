@@ -98,7 +98,37 @@ class ChatManager {
 
         document.addEventListener('change', (e) => {
             if (e.target.id === 'file-input') {
-                this.handleFileUpload(e.target.files[0]);
+                this.handleFileUpload(e.target.files);
+            }
+        });
+
+        // Report button
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'report-chat-btn' || e.target.closest('#report-chat-btn')) {
+                this.openReportModal();
+            }
+        });
+
+        // Cancel transaction button
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'cancel-transaction-btn' || e.target.closest('#cancel-transaction-btn')) {
+                this.openCancelTransactionModal();
+            }
+        });
+
+        // Report form submission
+        document.addEventListener('submit', (e) => {
+            if (e.target.id === 'report-form') {
+                e.preventDefault();
+                this.submitReport();
+            }
+        });
+
+        // Cancel transaction form submission
+        document.addEventListener('submit', (e) => {
+            if (e.target.id === 'cancel-transaction-form') {
+                e.preventDefault();
+                this.submitCancellation();
             }
         });
 
@@ -123,9 +153,31 @@ class ChatManager {
 
         // Escape key to close modal
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' &&
-                document.getElementById('chat-modal').classList.contains('active')) {
-                this.closeChat();
+            if (e.key === 'Escape') {
+                if (document.getElementById('chat-modal').classList.contains('active')) {
+                    this.closeChat();
+                }
+                if (document.getElementById('report-modal').classList.contains('active')) {
+                    document.getElementById('report-modal').classList.remove('active');
+                }
+                if (document.getElementById('cancel-transaction-modal').classList.contains('active')) {
+                    document.getElementById('cancel-transaction-modal').classList.remove('active');
+                }
+            }
+        });
+
+        // Close buttons for report and cancel modals
+        document.addEventListener('click', (e) => {
+            const closeBtn = e.target.closest('[data-modal="report-modal"], [data-close-modal="report-modal"]');
+            if (closeBtn) {
+                document.getElementById('report-modal').classList.remove('active');
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            const closeBtn = e.target.closest('[data-modal="cancel-transaction-modal"], [data-close-modal="cancel-transaction-modal"]');
+            if (closeBtn) {
+                document.getElementById('cancel-transaction-modal').classList.remove('active');
             }
         });
     }
@@ -404,11 +456,41 @@ class ChatManager {
         const stateClass = messageState === 'sending' ? 'sending' :
                           messageState === 'error' ? 'error' : '';
 
+        // Check if this is an image message
+        let messageContent;
+        if (message.message_type === 'img') {
+            // Handle image URLs (one or multiple)
+            const imageUrls = message.message.split('\n').filter(url => url.trim());
+            const token = localStorage.getItem('token');
+            
+            messageContent = imageUrls.map(url => {
+                const imageUrl = url.trim();
+                // Add token as query parameter for authentication
+                const authenticatedUrl = imageUrl.includes('?') 
+                    ? `${imageUrl}&token=${token}` 
+                    : `${imageUrl}?token=${token}`;
+                    
+                return `
+                    <div class="message-image-container">
+                        <img src="${this.escapeHtml(authenticatedUrl)}" 
+                             alt="Shared image" 
+                             class="message-image"
+                             onclick="window.open('${this.escapeHtml(authenticatedUrl)}', '_blank')"
+                             onerror="this.src='/images/image-error.png'; this.onerror=null;"
+                             loading="lazy" />
+                    </div>
+                `;
+            }).join('');
+        } else {
+            // Regular text message
+            messageContent = `<div class="message-content">${this.escapeHtml(message.message)}</div>`;
+        }
+
         return `
             <div class="chat-message ${isOwnMessage ? 'own-message' : 'other-message'} ${stateClass} message-${position}"
                  data-message-id="${message.id}"
                  data-state="${messageState}">
-                <div class="message-content">${this.escapeHtml(message.message)}</div>
+                ${messageContent}
                 ${messageState === 'error' ? '<div class="message-error-indicator" title="Failed to send"><i class="fas fa-exclamation-circle"></i></div>' : ''}
             </div>
         `;
@@ -661,27 +743,61 @@ class ChatManager {
         });
     }
 
-    async handleFileUpload(file) {
-        if (!file) return;
+    async handleFileUpload(files) {
+        if (!files || files.length === 0) return;
 
-        // Validate file
-        const maxSize = 5 * 1024 * 1024; // 5MB
-        if (file.size > maxSize) {
-            this.showError('File too large (max 5MB)');
-            return;
-        }
-
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
-        if (!allowedTypes.includes(file.type)) {
-            this.showError('Invalid file type. Only images and PDFs allowed.');
-            return;
+        // Validate files
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        
+        for (const file of files) {
+            if (file.size > maxSize) {
+                this.showError(`${file.name} is too large (max 10MB)`);
+                return;
+            }
+            if (!allowedTypes.includes(file.type)) {
+                this.showError(`${file.name} is not a supported image type`);
+                return;
+            }
         }
 
         try {
-            const formData = new FormData();
-            formData.append('file', file);
+            this.showSuccess('Uploading image(s)...');
 
-            const response = await fetch(`/api/chats/${this.currentChatId}/upload`, {
+            // First, create a text message to get a message ID
+            const createMessageResponse = await fetch(`/api/chats/${this.currentChatId}/messages`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    message: '[Image]',
+                    message_type: 'img'
+                })
+            });
+
+            if (!createMessageResponse.ok) {
+                throw new Error('Failed to create message');
+            }
+
+            const messageData = await createMessageResponse.json();
+            const messageId = messageData.message?.id || messageData.id;
+
+            if (!messageId) {
+                throw new Error('Could not get message ID');
+            }
+
+            // Now upload attachments
+            const formData = new FormData();
+            formData.append('chatId', this.currentChatId);
+            formData.append('messageId', messageId);
+            
+            for (const file of files) {
+                formData.append('attachments', file);
+            }
+
+            const response = await fetch('/api/chat-attachments/upload', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -690,18 +806,24 @@ class ChatManager {
             });
 
             if (!response.ok) {
-                throw new Error('File upload failed');
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'File upload failed');
             }
 
             const data = await response.json();
-
-            // Send message with file URL
+            
+            // Create image URLs
+            const imageUrls = data.attachments.map(a => `/api/chat-attachments/${a.id}/file`).join('\n');
+            
+            // Update the message via socket
             this.socket.emit('send_message', {
                 chatId: this.currentChatId,
-                message: data.fileUrl,
+                message: imageUrls,
                 messageType: 'img',
                 userId: authManager.currentUser.id
             });
+
+            this.showSuccess(`${data.attachments.length} file(s) uploaded successfully`);
 
             // Clear file input
             document.getElementById('file-input').value = '';
@@ -709,6 +831,138 @@ class ChatManager {
         } catch (error) {
             console.error('Error uploading file:', error);
             this.showError('Failed to upload file');
+        }
+    }
+
+    openReportModal() {
+        if (!this.currentChatInfo) return;
+
+        // Set hidden fields
+        document.getElementById('report-chat-id').value = this.currentChatId;
+        document.getElementById('report-user-id').value = this.currentChatInfo.otherUserId;
+
+        // Open modal
+        const modal = document.getElementById('report-modal');
+        if (modal) {
+            modal.classList.add('active');
+        }
+    }
+
+    async submitReport() {
+        try {
+            const chatId = document.getElementById('report-chat-id').value;
+            const reportedUserId = document.getElementById('report-user-id').value;
+            const reason = document.getElementById('report-reason').value;
+            const description = document.getElementById('report-description').value;
+
+            if (!reason) {
+                this.showError('Please select a reason for reporting');
+                return;
+            }
+
+            // Map frontend reasons to backend reasons
+            let mappedReason = reason;
+            if (reason === 'harassment' || reason === 'inappropriate_content') {
+                mappedReason = 'abuse';
+            }
+
+            const response = await fetch('/api/reports/submit', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    chatId: parseInt(chatId),
+                    reportedUserId: parseInt(reportedUserId),
+                    reason: mappedReason,
+                    description
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to submit report');
+            }
+
+            // Close modal
+            document.getElementById('report-modal').classList.remove('active');
+
+            // Show success message
+            if (result.autoResolved) {
+                this.showSuccess(`Report submitted and resolved. ${result.penaltyApplied} credits penalty applied.`);
+            } else {
+                this.showSuccess('Report submitted for manual review.');
+            }
+
+            // Reset form
+            document.getElementById('report-form').reset();
+
+        } catch (error) {
+            console.error('Error submitting report:', error);
+            this.showError(error.message || 'Failed to submit report');
+        }
+    }
+
+    openCancelTransactionModal() {
+        if (!this.currentChatInfo) return;
+
+        // Set hidden field
+        document.getElementById('cancel-transaction-id').value = this.currentChatInfo.transactionId;
+
+        // Open modal
+        const modal = document.getElementById('cancel-transaction-modal');
+        if (modal) {
+            modal.classList.add('active');
+        }
+    }
+
+    async submitCancellation() {
+        try {
+            const transactionId = document.getElementById('cancel-transaction-id').value;
+            const reason = document.getElementById('cancellation-reason').value;
+
+            if (!reason || reason.trim().length < 10) {
+                this.showError('Cancellation reason must be at least 10 characters');
+                return;
+            }
+
+            const response = await fetch('/api/cancellations/initiate', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    transactionId: parseInt(transactionId),
+                    reason: 'other',
+                    description: reason,
+                    refundType: 'full'
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to initiate cancellation');
+            }
+
+            // Close modal
+            document.getElementById('cancel-transaction-modal').classList.remove('active');
+
+            // Show success message
+            this.showSuccess('Cancellation request sent. The other party has 72 hours to respond.');
+
+            // Reset form
+            document.getElementById('cancel-transaction-form').reset();
+
+            // Close chat
+            this.closeChat();
+
+        } catch (error) {
+            console.error('Error submitting cancellation:', error);
+            this.showError(error.message || 'Failed to submit cancellation');
         }
     }
 
