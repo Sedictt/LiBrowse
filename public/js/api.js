@@ -391,6 +391,52 @@ class ApiClient {
         return this.request('/transactions/history/lent');
     }
 
+    // ========================================
+    // TRANSACTION STATUS MANAGEMENT METHODS
+    // ========================================
+
+    async approveTransaction(transactionId, data = {}) {
+        return this.request(`/transactions/${transactionId}/approve`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    }
+
+    async rejectTransaction(transactionId, rejectionReason) {
+        return this.request(`/transactions/${transactionId}/reject`, {
+            method: 'PUT',
+            body: JSON.stringify({ rejection_reason: rejectionReason })
+        });
+    }
+
+    async markAsBorrowed(transactionId, notes = '') {
+        return this.request(`/transactions/${transactionId}/borrowed`, {
+            method: 'PUT',
+            body: JSON.stringify({ lender_notes: notes })
+        });
+    }
+
+    async markAsReturned(transactionId, returnData) {
+        return this.request(`/transactions/${transactionId}/return`, {
+            method: 'PUT',
+            body: JSON.stringify(returnData)
+        });
+    }
+
+
+    async completeTransaction(transactionId) {
+        return this.request(`/transactions/${transactionId}/complete`, {
+            method: 'PUT'
+        });
+    }
+
+    async cancelTransaction(transactionId, reason) {
+        return this.request(`/transactions/${transactionId}/cancel`, {
+            method: 'PUT',
+            body: JSON.stringify({ cancellation_reason: reason })
+        });
+    }
+
 }
 
 // Create global API instance

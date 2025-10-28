@@ -89,36 +89,49 @@ router.get('/', authenticateToken, async (req, res) => {
         const connection = await getConnection();
 
         const [transactions] = await connection.execute(`
-            SELECT
-                t.*,
-                b.title as book_title,
-                b.author as book_author,
-                b.cover_image as book_cover,
-                CASE WHEN t.borrower_id = ? THEN 'borrowing' ELSE 'lending' END AS type,
-                CONCAT(borrower.fname, ' ', borrower.lname) AS borrower_name,
-                CONCAT(lender.fname, ' ', lender.lname) AS lender_name,
-                borrower.email as borrower_email,
-                lender.email as lender_email,
-                borrower.is_verified as borrower_verified,
-                borrower.credits as borrower_credits,
-                lender.is_verified as lender_verified,
-                lender.credits as lender_credits,
-                -- Borrower reputation badges
-                COALESCE((SELECT AVG(rating) FROM feedback WHERE reviewee_id = borrower.id), 0) as borrower_rating,
-                COALESCE((SELECT COUNT(*) FROM transactions t2 WHERE t2.borrower_id = borrower.id AND t2.status IN ('done', 'ongoing')), 0) as borrower_completed_transactions,
-                -- Check if feedback has been given (simplified approach)
-                COALESCE((SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = t.borrower_id), 0) as borrower_feedback_given,
-                COALESCE((SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = t.lender_id), 0) as lender_feedback_given
-            FROM transactions t
-            JOIN books b ON t.book_id = b.id
-            JOIN users borrower ON t.borrower_id = borrower.id
-            JOIN users lender ON t.lender_id = lender.id
-            WHERE t.borrower_id = ? OR t.lender_id = ?
-            ORDER BY t.request_date DESC
-        `, [req.user.id, req.user.id, req.user.id]);
+    SELECT
+        t.*,
+        b.title as book_title,
+        b.author as book_author,
+        b.cover_image as book_cover,
+        CASE WHEN t.borrower_id = ? THEN 'borrowing' ELSE 'lending' END AS type,
+        CONCAT(borrower.fname, ' ', borrower.lname) AS borrower_name,
+        CONCAT(lender.fname, ' ', lender.lname) AS lender_name,
+        borrower.email as borrower_email,
+        lender.email as lender_email,
+        borrower.is_verified as borrower_verified,
+        borrower.credits as borrower_credits,
+        lender.is_verified as lender_verified,
+        lender.credits as lender_credits,
+        -- Borrower reputation badges
+        COALESCE((SELECT AVG(rating) FROM feedback WHERE reviewee_id = borrower.id), 0) as borrower_rating,
+        COALESCE((SELECT COUNT(*) FROM transactions t2 WHERE t2.borrower_id = borrower.id AND t2.status IN ('done', 'ongoing')), 0) as borrower_completed_transactions,
+        -- Check if feedback has been given (simplified approach)
+        COALESCE((SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = t.borrower_id), 0) as borrower_feedback_given,
+        COALESCE((SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = t.lender_id), 0) as lender_feedback_given,
+        -- ✅ ADD THIS: Calculate if overdue
+        CASE 
+            WHEN t.status = 'borrowed' AND t.expected_return_date < CURDATE() 
+            THEN 1 
+            ELSE 0 
+        END as is_overdue,
+        -- ✅ ADD THIS: Calculate days overdue
+        CASE 
+            WHEN t.status = 'borrowed' AND t.expected_return_date < CURDATE()
+            THEN DATEDIFF(CURDATE(), t.expected_return_date)
+            ELSE 0
+        END as days_overdue
+    FROM transactions t
+    JOIN books b ON t.book_id = b.id
+    JOIN users borrower ON t.borrower_id = borrower.id
+    JOIN users lender ON t.lender_id = lender.id
+    WHERE t.borrower_id = ? OR t.lender_id = ?
+    ORDER BY t.request_date DESC
+`, [req.user.id, req.user.id, req.user.id]);
+
 
         connection.release();
-        res.json(transactions);
+        res.json({ transactions });
     } catch (error) {
         console.error('Get transactions error:', error);
         console.error('Error details:', error.message);
@@ -469,7 +482,9 @@ router.put('/:id/return', [
             FROM transactions t
             JOIN books b ON t.book_id = b.id
             JOIN users u ON t.borrower_id = u.id
-            WHERE t.id = ? AND t.lender_id = ?
+            WHERE t.id = ? AND t.borrower_id = ?
+
+
         `, [transactionId, req.user.id]);
 
         if (transactions.length === 0) {
@@ -554,6 +569,92 @@ router.put('/:id/return', [
         res.status(500).json({ error: 'Failed to process book return' });
     }
 });
+
+// ============================
+// COMPLETE TRANSACTION
+// ============================
+
+/**
+ * PUT /api/transactions/:id/complete
+ * Mark transaction as completed (final step: Returned → Completed)
+ * Only lender can complete after book is returned
+ */
+router.put("/:id/complete", authenticateToken, async (req, res) => {
+    try {
+        const transactionId = req.params.id;
+        const userId = req.user.id;
+
+        const connection = await getConnection();
+
+        const [transactions] = await connection.execute(`
+      SELECT 
+        t.*,
+        b.title as book_title,
+        CONCAT(borrower.fname, ' ', borrower.lname) as borrower_name,
+        borrower.id as borrower_id
+      FROM transactions t
+      INNER JOIN books b ON t.book_id = b.id
+      INNER JOIN users borrower ON t.borrower_id = borrower.id
+      WHERE t.id = ? AND t.lender_id = ?
+    `, [transactionId, userId]);
+
+        if (transactions.length === 0) {
+            connection.release();
+            return res.status(404).json({
+                error: 'Transaction not found or you are not authorized to complete it'
+            });
+        }
+
+        const transaction = transactions[0];
+
+        if (transaction.status !== 'returned') {
+            connection.release();
+            return res.status(400).json({
+                error: `Cannot complete. Current status: ${transaction.status}. Must be 'returned' first.`
+            });
+        }
+
+        // ✅ CORRECTED: Use 'updated' not 'updated_at'
+        await connection.execute(
+            'UPDATE transactions SET status = ?, updated = NOW() WHERE id = ?',
+            ['completed', transactionId]
+        );
+
+        // Create notification
+        await connection.execute(`
+      INSERT INTO notifications (user_id, title, message, created_at, is_read)
+      VALUES (?, ?, ?, NOW(), 0)
+    `, [
+            transaction.borrower_id,
+            'Transaction Completed! ✅',
+            `Your transaction for "${transaction.book_title}" has been completed!`
+        ]);
+
+
+
+        connection.release();
+
+        console.log(`✅ Transaction ${transactionId} marked as completed by user ${userId}`);
+
+        res.json({
+            success: true,
+            message: 'Transaction completed successfully!',
+            status: 'completed',
+            transaction_id: transactionId,
+            book_title: transaction.book_title,
+            borrower_name: transaction.borrower_name
+        });
+
+    } catch (err) {
+        console.error("❌ Complete transaction error:", err);
+        res.status(500).json({
+            error: 'Failed to complete transaction',
+            details: process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
+    }
+});
+
+
 
 // ============================
 // BORROWING & LENDING HISTORY
@@ -783,10 +884,12 @@ router.put('/:id/borrowed', [
         // Update transaction status to borrowed
         await connection.execute(`
             UPDATE transactions
-            SET status = 'ongoing',
-                date_borrowed = NOW(),
-                lender_note = COALESCE(?, lender_note)
-            WHERE id = ?
+SET status = 'borrowed',
+    borrowed_date = NOW(),
+    lender_notes = COALESCE(?, lender_notes),
+    updated = NOW()
+WHERE id = ?
+
         `, [lender_notes, transactionId]);
 
         // Send notification to borrower
@@ -825,6 +928,57 @@ router.put('/:id/borrowed', [
         res.status(500).json({ error: 'Failed to mark book as borrowed' });
     }
 });
+
+/**
+ * GET /api/transactions/:id
+ * Get single transaction details
+ * Only accessible by borrower or lender
+ */
+router.get("/:id", authenticateToken, async (req, res) => {
+    try {
+        const transactionId = req.params.id;
+        const userId = req.user.id;
+
+        const connection = await getConnection();
+
+        // Get transaction with full details
+        const [transactions] = await connection.execute(`
+      SELECT 
+        t.*,
+        b.title as book_title,
+        b.author as book_author,
+        b.cover_image as book_cover,
+        CONCAT(borrower.fname, ' ', borrower.lname) as borrower_name,
+        CONCAT(lender.fname, ' ', lender.lname) as lender_name,
+        borrower.email as borrower_email,
+        lender.email as lender_email
+      FROM transactions t
+      INNER JOIN books b ON t.book_id = b.id
+      INNER JOIN users borrower ON t.borrower_id = borrower.id
+      INNER JOIN users lender ON t.lender_id = lender.id
+      WHERE t.id = ? AND (t.borrower_id = ? OR t.lender_id = ?)
+    `, [transactionId, userId, userId]);
+
+        if (transactions.length === 0) {
+            connection.release();
+            return res.status(404).json({
+                error: 'Transaction not found or you do not have access to it'
+            });
+        }
+
+        connection.release();
+
+        res.json(transactions[0]);
+
+    } catch (err) {
+        console.error("Get transaction error:", err);
+        res.status(500).json({
+            error: 'Failed to get transaction details'
+        });
+    }
+});
+
+
 
 // POST /api/transactions/bulk-approve - Bulk approve requests
 router.post('/bulk-approve', [

@@ -251,6 +251,11 @@ class App {
                     await requestManager.loadRequests();
                 }
                 break;
+            case 'monitoring':  // ⭐ ADD THIS
+                if (monitoringManager) {
+                    await monitoringManager.loadTransactions();
+                }
+                break;
             case 'transactions':
                 await this.loadTransactions();
                 break;
@@ -262,6 +267,7 @@ class App {
                 break;
         }
     }
+
 
     async loadTransactions() {
         if (!authManager.isAuthenticated) return;
