@@ -437,6 +437,58 @@ class ApiClient {
         });
     }
 
+    // ============================================
+    // FEEDBACK & DISPUTES API METHODS
+    // ============================================
+
+    // Submit feedback for a transaction
+    async submitFeedback(transactionId, feedbackData) {
+        return this.request(`/feedback`, {
+            method: 'POST',
+            body: JSON.stringify({
+                transaction_id: transactionId,
+                rating: feedbackData.rating,
+                comment: feedbackData.comment,
+                book_condition_rating: feedbackData.book_condition_rating,
+                return_timeliness: feedbackData.return_timeliness
+            })
+        });
+    }
+
+    // Get feedback for a transaction
+    async getTransactionFeedback(transactionId) {
+        return this.request(`/feedback/transaction/${transactionId}`);
+    }
+
+    // Get feedback received by user
+    async getUserFeedback(userId) {
+        return this.request(`/feedback/${userId}`);
+    }
+
+    // File a dispute
+    async fileDispute(feedbackId, reason, description) {
+        return this.request(`/disputes`, {  // But this SHOULD work if backend exists
+            method: 'POST',
+            body: JSON.stringify({
+                feedback_id: feedbackId,
+                reason: reason,
+                description: description
+            })
+        });
+    }
+
+
+    // Get user's disputes
+    async getMyDisputes() {
+        return this.request(`/disputes/my`);
+    }
+
+    // Get dispute details
+    async getDisputeDetails(disputeId) {
+        return this.request(`/disputes/${disputeId}`);
+    }
+
+
 }
 
 // Create global API instance

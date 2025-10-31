@@ -1,0 +1,187 @@
+// LiBrowse - Disputes Routes
+const express = require('express');
+const { body, validationResult } = require('express-validator');
+const { authenticateToken } = require('../middleware/auth');
+const { getConnection } = require('../config/database');
+const router = express.Router();
+
+// POST /api/disputes - File a dispute for feedback
+router.post('/', [
+    authenticateToken,
+    body('feedback_id').isInt({ min: 1 }).withMessage('Valid feedback ID required'),
+    body('reason').isIn(['unfair_rating', 'false_accusation', 'system_error', 'other']).withMessage('Invalid reason'),
+    body('description').notEmpty().isLength({ max: 1000 }).withMessage('Description required (max 1000 chars)')
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ error: 'Validation failed', details: errors.array() });
+        }
+
+        const { feedback_id, reason, description } = req.body;
+        const connection = await getConnection();
+
+        // Get feedback details
+        const [feedback] = await connection.execute(`
+            SELECT f.*, t.id as transaction_id
+            FROM feedback f
+            JOIN transactions t ON t.id = f.transaction_id
+            WHERE f.id = ?
+        `, [feedback_id]);
+
+        if (feedback.length === 0) {
+            connection.release();
+            return res.status(404).json({ error: 'Feedback not found' });
+        }
+
+        const feedbackData = feedback[0];
+
+        // Verify user is the reviewee (person who received the feedback)
+        if (feedbackData.reviewee_id !== req.user.id) {
+            connection.release();
+            return res.status(403).json({ error: 'You can only dispute feedback you received' });
+        }
+
+        // Check if dispute already exists
+        const [existingDispute] = await connection.execute(`
+            SELECT id FROM disputes WHERE feedback_id = ? AND disputer_id = ?
+        `, [feedback_id, req.user.id]);
+
+        if (existingDispute.length > 0) {
+            connection.release();
+            return res.status(400).json({ error: 'Dispute already filed for this feedback' });
+        }
+
+        // Insert dispute
+        const [result] = await connection.execute(`
+            INSERT INTO disputes (
+                feedback_id, transaction_id, disputer_id, reason, description, status
+            ) VALUES (?, ?, ?, ?, ?, 'pending')
+        `, [feedback_id, feedbackData.transaction_id, req.user.id, reason, description]);
+
+        // Send notification to admins (optional - for now just log)
+        console.log(`New dispute filed: ID ${result.insertId} by user ${req.user.id}`);
+
+        connection.release();
+
+        res.status(201).json({
+            message: 'Dispute filed successfully',
+            dispute_id: result.insertId,
+            status: 'pending'
+        });
+
+    } catch (error) {
+        console.error('File dispute error:', error);
+        res.status(500).json({ error: 'Failed to file dispute' });
+    }
+});
+
+// GET /api/disputes/my - Get current user's disputes
+router.get('/my', authenticateToken, async (req, res) => {
+    try {
+        const connection = await getConnection();
+
+        const [disputes] = await connection.execute(`
+            SELECT 
+                d.*,
+                f.rating,
+                f.comment,
+                CONCAT(reviewer.fname, ' ', reviewer.lname) AS reviewer_name,
+                b.title as book_title,
+                t.status as transaction_status
+            FROM disputes d
+            JOIN feedback f ON f.id = d.feedback_id
+            JOIN users reviewer ON reviewer.id = f.reviewer_id
+            JOIN transactions t ON t.id = d.transaction_id
+            JOIN books b ON b.id = t.book_id
+            WHERE d.disputer_id = ?
+            ORDER BY d.created_at DESC
+        `, [req.user.id]);
+
+        connection.release();
+        res.json(disputes);
+
+    } catch (error) {
+        console.error('Get user disputes error:', error);
+        res.status(500).json({ error: 'Failed to load disputes' });
+    }
+});
+
+// GET /api/disputes/:id - Get dispute details
+router.get('/:id', authenticateToken, async (req, res) => {
+    try {
+        const disputeId = req.params.id;
+        const connection = await getConnection();
+
+        const [disputes] = await connection.execute(`
+            SELECT 
+                d.*,
+                f.rating,
+                f.comment,
+                f.feedback_type,
+                CONCAT(disputer.fname, ' ', disputer.lname) AS disputer_name,
+                CONCAT(reviewer.fname, ' ', reviewer.lname) AS reviewer_name,
+                b.title as book_title,
+                t.status as transaction_status
+            FROM disputes d
+            JOIN feedback f ON f.id = d.feedback_id
+            JOIN users disputer ON disputer.id = d.disputer_id
+            JOIN users reviewer ON reviewer.id = f.reviewer_id
+            JOIN transactions t ON t.id = d.transaction_id
+            JOIN books b ON b.id = t.book_id
+            WHERE d.id = ?
+        `, [disputeId]);
+
+        if (disputes.length === 0) {
+            connection.release();
+            return res.status(404).json({ error: 'Dispute not found' });
+        }
+
+        const dispute = disputes[0];
+
+        // Verify user is the disputer or admin (for now just disputer)
+        if (dispute.disputer_id !== req.user.id) {
+            connection.release();
+            return res.status(403).json({ error: 'Not authorized to view this dispute' });
+        }
+
+        connection.release();
+        res.json(dispute);
+
+    } catch (error) {
+        console.error('Get dispute details error:', error);
+        res.status(500).json({ error: 'Failed to load dispute details' });
+    }
+});
+
+// ADMIN ROUTES (Optional - for future admin panel)
+// PUT /api/disputes/:id/resolve - Resolve a dispute (admin only)
+router.put('/:id/resolve', authenticateToken, async (req, res) => {
+    try {
+        // TODO: Add admin role check
+        // if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+
+        const { resolution, admin_notes } = req.body;
+        const disputeId = req.params.id;
+        const connection = await getConnection();
+
+        await connection.execute(`
+            UPDATE disputes 
+            SET status = 'resolved', 
+                resolution = ?, 
+                admin_notes = ?,
+                resolved_by = ?,
+                resolved_at = NOW()
+            WHERE id = ?
+        `, [resolution, admin_notes, req.user.id, disputeId]);
+
+        connection.release();
+        res.json({ message: 'Dispute resolved successfully' });
+
+    } catch (error) {
+        console.error('Resolve dispute error:', error);
+        res.status(500).json({ error: 'Failed to resolve dispute' });
+    }
+});
+
+module.exports = router;

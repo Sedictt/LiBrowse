@@ -109,6 +109,12 @@ router.get('/', authenticateToken, async (req, res) => {
         -- Check if feedback has been given (simplified approach)
         COALESCE((SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = t.borrower_id), 0) as borrower_feedback_given,
         COALESCE((SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = t.lender_id), 0) as lender_feedback_given,
+        -- Check if feedback has been given (simplified approach)
+COALESCE((SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = t.borrower_id), 0) as borrower_feedback_given,
+COALESCE((SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = t.lender_id), 0) as lender_feedback_given,
+-- ✅ ADD THIS: Check if current user gave feedback
+COALESCE((SELECT COUNT(*) FROM feedback f WHERE f.transaction_id = t.id AND f.reviewer_id = ?), 0) as user_gave_feedback,
+
         -- ✅ ADD THIS: Calculate if overdue
         CASE 
             WHEN t.status = 'borrowed' AND t.expected_return_date < CURDATE() 
@@ -127,7 +133,7 @@ router.get('/', authenticateToken, async (req, res) => {
     JOIN users lender ON t.lender_id = lender.id
     WHERE t.borrower_id = ? OR t.lender_id = ?
     ORDER BY t.request_date DESC
-`, [req.user.id, req.user.id, req.user.id]);
+`, [req.user.id, req.user.id, req.user.id, req.user.id]);
 
 
         connection.release();

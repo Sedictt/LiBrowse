@@ -94,6 +94,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/books', require('./routes/books'));
 app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/feedback', require('./routes/feedback'));
+app.use('/api/disputes', require('./routes/disputes'));
 app.use('/api/chats', require('./routes/chats-new')); // Updated to use new chat system
 app.use('/api/chat-attachments', require('./routes/chat-attachments')); // Image attachment feature
 app.use('/api/reports', require('./routes/reports')); // Automated reporting system
