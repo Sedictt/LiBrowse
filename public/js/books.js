@@ -424,7 +424,7 @@ class BooksManager {
         setVal('request-message', '');
         setVal('expected-return-date', '—');
 
-        // Default start date = today (local) and min = today (configurable via backend)
+        
         const startInput = q('#borrow-start-date');
         if (startInput) {
             const today = new Date();
@@ -432,20 +432,49 @@ class BooksManager {
             startInput.value = todayStr;
             startInput.min = todayStr;
             startInput.onchange = () => this.updateExpectedReturnDate(modal);
+            if (window.flatpickr) {
+                try {
+                    if (this._fpBorrowStart) { this._fpBorrowStart.destroy(); }
+                    this._fpBorrowStart = flatpickr(startInput, {
+                        dateFormat: 'Y-m-d',
+                        altInput: true,
+                        altFormat: 'M j, Y',
+                        defaultDate: todayStr,
+                        minDate: 'today',
+                        disableMobile: true,
+                        onChange: () => this.updateExpectedReturnDate(modal)
+                    });
+                } catch (_) { /* noop */ }
+            }
         }
         const durSelect = q('#borrow-duration');
         if (durSelect) {
             durSelect.onchange = () => this.updateExpectedReturnDate(modal);
         }
+        
+        const pickupInput = q('#preferred-pickup-time');
+        if (pickupInput && window.flatpickr) {
+            try {
+                if (this._fpPickup) { this._fpPickup.destroy(); }
+                this._fpPickup = flatpickr(pickupInput, {
+                    enableTime: true,
+                    altInput: true,
+                    altFormat: 'M j, Y h:i K',
+                    dateFormat: 'Y-m-d\\TH:i',
+                    
+                    minuteIncrement: 15,
+                    disableMobile: true
+                });
+            } catch (_) { /* noop */ }
+        }
 
         // Clear inline errors
-        ['pickup-method','pickup-location','borrow-start-date','borrow-duration','request-contact','request-message']
+        ['pickup-method','pickup-location','borrow-start-date','borrow-duration','preferred-pickup-time','request-contact','request-message']
             .forEach(k => setErr(k, ''));
 
         // Preload config (closures, limits) then recalc
         this.loadLibraryConfigOnce().finally(() => this.updateExpectedReturnDate(modal));
 
-        // Ensure book details modal is closed to avoid overlapping modals
         this.closeBookModal();
 
         // Show modal
@@ -459,6 +488,20 @@ class BooksManager {
         const m = String(date.getMonth() + 1).padStart(2, '0');
         const d = String(date.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
+    }
+
+    // Helper: format a Date to 'Mon D, YYYY' (display-friendly)
+    formatDisplayDate(date) {
+        try {
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        } catch (_) {
+            // Fallback to ISO if formatting fails
+            return this.toYYYYMMDD(date);
+        }
     }
 
     // Helper: map duration value to days
@@ -517,12 +560,25 @@ class BooksManager {
             while (isClosed(due)) { due.setDate(due.getDate() + 1); adjusted = true; }
         }
 
-        const localized = this.toYYYYMMDD(due);
-        if (erdInput) erdInput.value = localized;
+        const isoDate = this.toYYYYMMDD(due);
+        const displayDate = this.formatDisplayDate(due);
+        if (erdInput) {
+            erdInput.value = displayDate;
+            erdInput.setAttribute('data-value', isoDate);
+        }
         if (closureNote) closureNote.style.display = adjusted ? '' : 'none';
         if (erdLive) erdLive.textContent = adjusted
-            ? `Expected return date updated to ${localized}. Adjusted for closure.`
-            : `Expected return date updated to ${localized}.`;
+            ? `Expected return date updated to ${displayDate}. Adjusted for closure.`
+            : `Expected return date updated to ${displayDate}.`;
+
+        // Enforce Preferred Pickup Time <= Expected Return Date
+        try {
+            const pickupInput = q('#preferred-pickup-time');
+            if (pickupInput && this._fpPickup) {
+                const maxDate = isoDate ? new Date(`${isoDate}T23:59:59`) : null;
+                this._fpPickup.set('maxDate', maxDate);
+            }
+        } catch (_) { /* noop */ }
     }
 
     // Submit handler for borrow request form
@@ -565,6 +621,19 @@ class BooksManager {
         } else if (borrow_start_date < minStr) {
             setErr('borrow-start-date', 'Start date cannot be in the past');
         }
+
+        // Preferred pickup must be <= expected return date if both provided
+        try {
+            const expectedIso = q('#expected-return-date')?.getAttribute('data-value');
+            if (expectedIso && raw_pickup_time) {
+                const pick = new Date(raw_pickup_time);
+                const max = new Date(`${expectedIso}T23:59:59`);
+                if (pick > max) {
+                    setErr('preferred-pickup-time', 'Must be on or before the expected return date');
+                }
+            }
+        } catch (_) { /* noop */ }
+
         if (hasError) return;
 
         // Final pre-check: ensure user meets credit requirement before sending

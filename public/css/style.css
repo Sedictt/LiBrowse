@@ -5398,6 +5398,11 @@ body {
     border-top: 1px solid var(--bg-glass);
 }
 
+/* Ensure Flatpickr calendar overlays modals */
+.flatpickr-calendar {
+    z-index: calc(var(--z-modal) + 20) !important;
+}
+
 /* Loading States */
 .loading {
     position: relative;

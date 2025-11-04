@@ -19,6 +19,11 @@
     <link rel="stylesheet" href="./css/new-landing.css?v=1.0">
     <link rel="stylesheet" href="./css/bookManagement.css?v=1.0">
     <link rel="stylesheet" href="./css/chat-modal.css?v=1.0">
+    <!-- Flatpickr for improved date/time pickers -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
     <style>
         /* Fallback styles to ensure basic functionality */
         body {
@@ -2140,6 +2145,7 @@
                         <div class="form-group">
                             <label for="preferred-pickup-time">Preferred Pickup Time</label>
                             <input type="datetime-local" id="preferred-pickup-time" />
+                            <small id="err-preferred-pickup-time" class="error-message"></small>
                         </div>
                         <div class="form-group">
                             <label for="request-contact">Your Contact</label>
