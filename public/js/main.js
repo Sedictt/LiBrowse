@@ -16,6 +16,8 @@ class App {
             this.showAuthenticatedFeatures();
             await this.updateRequestsBadge();
             this.startRequestsBadgePolling();
+            await this.updateChatBadge();
+            this.startChatBadgePolling();
         }
     }
 
@@ -146,10 +148,13 @@ class App {
         document.addEventListener('login-success', async () => {
             await this.updateRequestsBadge();
             this.startRequestsBadgePolling();
+            await this.updateChatBadge();
+            this.startChatBadgePolling();
         });
 
         document.addEventListener('logout', () => {
             this.clearRequestsBadgePolling();
+            this.clearChatBadgePolling();
         });
     }
 
@@ -1177,6 +1182,55 @@ class App {
             this._requestsBadgeTimer = null;
         }
         this.setRequestsBadge(0);
+    }
+
+    setChatBadge(count) {
+        const badge = document.getElementById('chat-count');
+        if (badge) {
+            badge.textContent = count;
+        }
+    }
+
+    async updateChatBadge() {
+        try {
+            if (!authManager || !authManager.isAuthenticated) {
+                this.setChatBadge(0);
+                return 0;
+            }
+
+            if (window.requestManager && window.requestManager.currentTab === 'active-chats' && Array.isArray(window.requestManager.currentChats)) {
+                const totalActive = window.requestManager.currentChats.length;
+                this.setChatBadge(totalActive);
+                return totalActive;
+            }
+
+            const chats = await api.get('/chats');
+            const list = Array.isArray(chats) ? chats : [];
+            const totalActive = list.length;
+            this.setChatBadge(totalActive);
+            return totalActive;
+        } catch (error) {
+            console.error('Failed to update chat badge:', error);
+            return 0;
+        }
+    }
+
+    startChatBadgePolling() {
+        if (this._chatBadgeTimer) return;
+        this._chatBadgeTimer = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                const p = this.updateChatBadge();
+                if (p && typeof p.catch === 'function') p.catch(() => {});
+            }
+        }, 30000);
+    }
+
+    clearChatBadgePolling() {
+        if (this._chatBadgeTimer) {
+            clearInterval(this._chatBadgeTimer);
+            this._chatBadgeTimer = null;
+        }
+        this.setChatBadge(0);
     }
 
     async loadPlatformStats() {

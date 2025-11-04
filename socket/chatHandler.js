@@ -52,6 +52,16 @@ module.exports = (io) => {
                     WHERE c.id = ? AND (t.borrower_id = ? OR t.lender_id = ?)
                 `, [chatId, userId, userId]);
 
+                const participants = access[0];
+
+                // Get participants for notification
+                const [participantsRows] = await connection.execute(`
+                    SELECT t.borrower_id, t.lender_id
+                    FROM chats c
+                    INNER JOIN transactions t ON c.transaction_id = t.id
+                    WHERE c.id = ?
+                `, [chatId]);
+
                 connection.release();
 
                 if (access.length === 0) {
@@ -107,6 +117,8 @@ module.exports = (io) => {
                     return;
                 }
 
+                const participants = access[0];
+
                 // Insert message
                 const [result] = await connection.execute(`
                     INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created)
@@ -138,6 +150,13 @@ module.exports = (io) => {
                 });
 
                 console.log(`Message sent in chat ${chatId} by user ${userId}`);
+
+                // Notify both participants to refresh chat badge (real-time)
+                if (participants) {
+                    const payload = { chatId, type: 'message', messageId: newMessage[0]?.id };
+                    emitToUser(participants.borrower_id, 'chat_activity', payload);
+                    emitToUser(participants.lender_id, 'chat_activity', payload);
+                }
             } catch (error) {
                 console.error('Send message error:', error);
                 socket.emit('error', { message: 'Failed to send message' });
@@ -195,6 +214,14 @@ module.exports = (io) => {
                     SELECT read_at FROM chat_messages WHERE id = ?
                 `, [messageId]);
 
+                // Get participants for notification
+                const [participantsRows] = await connection.execute(`
+                    SELECT t.borrower_id, t.lender_id
+                    FROM chats c
+                    INNER JOIN transactions t ON c.transaction_id = t.id
+                    WHERE c.id = ?
+                `, [chatId]);
+
                 connection.release();
 
                 // Broadcast read receipt to all in chat
@@ -204,6 +231,14 @@ module.exports = (io) => {
                     readAt: updated[0]?.read_at,
                     readBy: userId
                 });
+
+                // Notify both participants to refresh chat badge (real-time)
+                const participants = participantsRows && participantsRows[0];
+                if (participants) {
+                    const payload = { chatId, type: 'read', messageId };
+                    emitToUser(participants.borrower_id, 'chat_activity', payload);
+                    emitToUser(participants.lender_id, 'chat_activity', payload);
+                }
             } catch (error) {
                 console.error('Mark read error:', error);
             }
@@ -235,6 +270,14 @@ module.exports = (io) => {
                     chatId,
                     readBy: userId
                 });
+
+                // Notify both participants to refresh chat badge (real-time)
+                const participants = participantsRows && participantsRows[0];
+                if (participants) {
+                    const payload = { chatId, type: 'read_all' };
+                    emitToUser(participants.borrower_id, 'chat_activity', payload);
+                    emitToUser(participants.lender_id, 'chat_activity', payload);
+                }
             } catch (error) {
                 console.error('Mark all read error:', error);
             }
@@ -263,6 +306,19 @@ module.exports = (io) => {
             console.log('Socket disconnected:', socket.id);
         });
     });
+
+    // Emit to all sockets of a specific user
+    const emitToUser = (userId, event, data) => {
+        try {
+            const sockets = activeUsers.get(userId);
+            if (!sockets) return;
+            sockets.forEach(sockId => {
+                io.to(sockId).emit(event, data);
+            });
+        } catch (e) {
+            console.error('emitToUser error:', e);
+        }
+    };
 
     // Helper function to check if user is online
     const isUserOnline = (userId) => {

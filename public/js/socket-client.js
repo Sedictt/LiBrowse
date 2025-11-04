@@ -30,11 +30,15 @@ function initializeSocket() {
         console.log('✅ Socket.IO connected:', socket.id);
         isSocketConnected = true;
 
-        // Authenticate if user is logged in
         if (authManager && authManager.currentUser) {
             socket.emit('authenticate', {
                 userId: authManager.currentUser.id
             });
+        }
+
+        if (window.app) {
+            const p = window.app.updateChatBadge();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
         }
     });
 
@@ -64,7 +68,6 @@ function initializeSocket() {
         console.log(`✅ Reconnected after ${attemptNumber} attempts`);
         isSocketConnected = true;
 
-        // Re-authenticate
         if (authManager && authManager.currentUser) {
             socket.emit('authenticate', {
                 userId: authManager.currentUser.id
@@ -77,6 +80,11 @@ function initializeSocket() {
                 chatId: window.chatManager.currentChatId,
                 userId: authManager.currentUser.id
             });
+        }
+
+        if (window.app) {
+            const p = window.app.updateChatBadge();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
         }
     });
 
@@ -97,6 +105,18 @@ function initializeSocket() {
         console.error('Socket.IO error:', error);
         if (window.chatManager) {
             window.chatManager.showError(error.message || 'Connection error');
+        }
+    });
+
+    socket.on('chat_activity', () => {
+        if (window.app) {
+            const p = window.app.updateChatBadge();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+        }
+
+        if (window.requestManager && window.requestManager.currentTab === 'active-chats') {
+            const p2 = window.requestManager.loadRequests();
+            if (p2 && typeof p2.catch === 'function') p2.catch(() => {});
         }
     });
 

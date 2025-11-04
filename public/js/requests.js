@@ -703,9 +703,8 @@ class RequestManager {
         container.innerHTML = this.currentChats.map(chat => this.createChatCard(chat)).join('');
 
         // Update badge count
-        const totalUnread = this.currentChats.reduce((sum, chat) => sum + (chat.unread_count || 0), 0);
         const badge = document.getElementById('chat-count');
-        if (badge) badge.textContent = totalUnread;
+        if (badge) badge.textContent = this.currentChats.length;
     }
 
     createChatCard(chat) {
