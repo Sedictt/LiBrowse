@@ -5218,9 +5218,13 @@ body {
     border: 1px solid var(--bg-glass);
     min-width: 300px;
     max-width: 400px;
-    opacity: 0;
-    transform: translateX(100%);
     transition: all 0.3s ease;
+}
+
+/* Make container visible when active */
+.toast-container.show {
+    opacity: 1 !important;
+    transform: translateX(0) !important;
 }
 
 .toast.show {

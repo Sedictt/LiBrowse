@@ -2,12 +2,19 @@
 
 // Show toast notification
 function showToast(message, type = 'info', duration = 3000) {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
+    // Ensure container exists
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
 
     const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    
+    // Support both styling schemes: `.toast.error` and `.toast-error`
+    toast.className = `toast ${type} toast-${type}`;
+
     const icon = {
         success: 'fa-check-circle',
         error: 'fa-exclamation-circle',
@@ -18,22 +25,36 @@ function showToast(message, type = 'info', duration = 3000) {
     toast.innerHTML = `
         <i class="fas ${icon}"></i>
         <span>${message}</span>
-        <button class="toast-close"><i class="fas fa-times"></i></button>
+        <button class="toast-close" aria-label="Close notification"><i class="fas fa-times"></i></button>
     `;
 
     container.appendChild(toast);
 
+    // Ensure container is visible (some CSS variants hide it by default)
+    container.classList.add('show');
+
+    // Trigger show animation on next frame
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    const removeToast = () => {
+        toast.classList.add('hide');
+        setTimeout(() => {
+            toast.remove();
+            // Hide container if no more toasts
+            if (!container.querySelector('.toast')) {
+                container.classList.remove('show');
+            }
+        }, 300);
+    };
+
     // Close button
-    toast.querySelector('.toast-close').addEventListener('click', () => {
-        toast.classList.add('removing');
-        setTimeout(() => toast.remove(), 300);
-    });
+    toast.querySelector('.toast-close').addEventListener('click', removeToast);
 
     // Auto remove
-    setTimeout(() => {
-        toast.classList.add('removing');
-        setTimeout(() => toast.remove(), 300);
-    }, duration);
+    const timeout = setTimeout(removeToast, duration);
+
+    // Pause on hover (optional UX improvement)
+    toast.addEventListener('mouseenter', () => clearTimeout(timeout));
 }
 
 // Format date

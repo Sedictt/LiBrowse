@@ -273,7 +273,8 @@ class App {
         if (!authManager.isAuthenticated) return;
 
         try {
-            const transactions = await api.getTransactions();
+            const data = await api.getTransactions();
+            const transactions = Array.isArray(data?.transactions) ? data.transactions : (Array.isArray(data) ? data : []);
             this.renderTransactions(transactions);
         } catch (error) {
             console.error('Failed to load transactions:', error);

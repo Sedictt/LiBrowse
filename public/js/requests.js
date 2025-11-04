@@ -112,12 +112,14 @@ class RequestManager {
             console.log('Loading requests for tab:', this.currentTab);
 
             if (this.currentTab === 'incoming' || this.currentTab === 'outgoing') {
-                const response = await api.get('/transactions');
-                console.log('Transactions response:', response);
-                console.log('Total transactions:', response.length);
+                // Backend returns { transactions: [...] }
+                const data = await api.getTransactions();
+                const list = Array.isArray(data?.transactions) ? data.transactions : (Array.isArray(data) ? data : []);
+                console.log('Transactions array:', list);
+                console.log('Total transactions:', list.length);
                 console.log('Current user ID:', authManager.currentUser.id);
 
-                const transactions = response.filter(t => {
+                const transactions = list.filter(t => {
                     if (this.currentTab === 'incoming') {
                         // Show all incoming requests (where user is lender)
                         // Status filtering is handled by the status filter dropdown

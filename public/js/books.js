@@ -33,6 +33,14 @@ class BooksManager {
             this.isLoading = true;
             this.filters = { ...this.filters, ...filters };
 
+            // Refresh user profile to get up-to-date credits before rendering gating UI
+            if (typeof authManager !== 'undefined' && authManager?.isAuthenticated) {
+                try {
+                    const prof = await api.getProfile();
+                    if (prof?.user) authManager.currentUser = prof.user;
+                } catch (_) { /* non-blocking */ }
+            }
+
             if (reset) {
                 this.currentPage = 1;
                 this.books = [];
@@ -183,7 +191,7 @@ class BooksManager {
                 const resp = await api.getBook(bookId);
                 book = resp.book || resp;
             }
-            this.openBorrowRequestModal(book);
+            await this.openBorrowRequestModal(book);
         } catch (error) {
             console.error('Failed to open request form:', error);
             showToast('Failed to open request form', 'error');
@@ -366,21 +374,29 @@ class BooksManager {
     async requestBookFromModal() {
         if (!authManager.requireAuth()) return;
         if (!this.currentModalBook) return;
-        this.openBorrowRequestModal(this.currentModalBook);
+        await this.openBorrowRequestModal(this.currentModalBook);
     }
 
 
     // Open borrow request modal and prefill
-    openBorrowRequestModal(book) {
+    async openBorrowRequestModal(book) {
+        // Refresh profile to ensure we have the latest credits
+        if (typeof authManager !== 'undefined' && authManager?.isAuthenticated) {
+            try {
+                const prof = await api.getProfile();
+                if (prof?.user) authManager.currentUser = prof.user;
+            } catch (_) { /* non-blocking */ }
+        }
+
         // Check if user has enough credits before opening modal
         const currentUser = authManager.getCurrentUser();
         const userCredits = currentUser?.credits ?? 0;
-        const requiredCredits = book.minimum_credits || 0;
+        const requiredCredits = book.minimum_credits || book.min_credit || 0;
 
         if (userCredits < requiredCredits) {
             const deficit = requiredCredits - userCredits;
             showToast(
-                `Insufficient credits! You have ${userCredits} credits but need ${requiredCredits} credits. You need ${deficit} more credits to request this book.`,
+                `Insufficient credits! You have ${userCredits} but need ${requiredCredits}. You need ${deficit} more to request this book.`,
                 'error',
                 5000
             );
@@ -547,6 +563,22 @@ class BooksManager {
             setErr('borrow-start-date', 'Start date cannot be in the past');
         }
         if (hasError) return;
+
+        // Final pre-check: ensure user meets credit requirement before sending
+        try {
+            const currentUser = authManager.getCurrentUser();
+            const userCredits = currentUser?.credits ?? 0;
+            const requiredCredits = (this.requestBookCtx?.minimum_credits || this.requestBookCtx?.min_credit || 0);
+            if (userCredits < requiredCredits) {
+                const deficit = requiredCredits - userCredits;
+                showToast(
+                    `Insufficient credits! You have ${userCredits} but need ${requiredCredits}. You need ${deficit} more to request this book.`,
+                    'error',
+                    5000
+                );
+                return;
+            }
+        } catch (_) { /* noop */ }
 
         const submitBtn = q('#borrow-request-submit');
         const prevHtml = submitBtn ? submitBtn.innerHTML : '';

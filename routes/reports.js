@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/database');
+const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const { body, validationResult } = require('express-validator');
+const { calculateConfidence, isInCooldown } = require('../services/reports/logic');
 
 // Configuration - Adjudication Thresholds
 const CONFIG = {
@@ -64,11 +66,7 @@ async function getReporterTrust(connection, userId) {
     return trust[0];
 }
 
-// Check if reporter is in cooldown
-function isInCooldown(trust) {
-    if (!trust.cooldown_until) return false;
-    return new Date(trust.cooldown_until) > new Date();
-}
+// Check if reporter is in cooldown - moved to services/reports/logic.js
 
 // Check rate limiting
 async function checkRateLimit(connection, userId) {
@@ -190,21 +188,7 @@ async function checkMultipleReports(connection, reportedId, chatId) {
     return signals;
 }
 
-// Calculate confidence score
-function calculateConfidence(signals, trustScore) {
-    if (signals.length === 0) return 0;
-    
-    // Sum signal weights
-    const signalScore = signals.reduce((sum, signal) => sum + signal.weight, 0);
-    
-    // Factor in trust score
-    const trustFactor = (trustScore / 100) * CONFIG.TRUST_SCORE_WEIGHT * 100;
-    
-    // Combine (70% signals, 30% trust)
-    const finalScore = (signalScore * 0.7) + (trustFactor * 0.3);
-    
-    return Math.min(finalScore, 100);
-}
+// Calculate confidence score - moved to services/reports/logic.js
 
 // Apply penalty
 async function applyPenalty(connection, reportedId, reason, reportId) {
@@ -256,261 +240,278 @@ async function applyPenalty(connection, reportedId, reason, reportId) {
 }
 
 // Submit a report
-router.post('/submit', authenticateToken, async (req, res) => {
-    const connection = await pool.getConnection();
-    
-    try {
-        const reporterId = req.user.id;
-        const { chatId, reportedUserId, messageId, reason, description } = req.body;
-        
-        // Validation
-        if (!chatId || !reportedUserId || !reason) {
-            return res.status(400).json({ error: 'Missing required fields' });
-        }
-        
-        if (!['spam', 'abuse', 'scam', 'other'].includes(reason)) {
-            return res.status(400).json({ error: 'Invalid reason' });
-        }
-        
-        if (reporterId === reportedUserId) {
-            return res.status(400).json({ error: 'Cannot report yourself' });
-        }
-        
-        await connection.beginTransaction();
-        
-        // Get reporter trust score
-        const trust = await getReporterTrust(connection, reporterId);
-        
-        // Check cooldown
-        if (isInCooldown(trust)) {
-            await connection.rollback();
-            return res.status(429).json({ 
-                error: 'You are in cooldown period',
-                cooldownUntil: trust.cooldown_until
+router.post(
+    '/submit',
+    authenticateToken,
+    [
+        body('chatId').isInt({ min: 1 }).withMessage('chatId must be a positive integer').toInt(),
+        body('reportedUserId').isInt({ min: 1 }).withMessage('reportedUserId must be a positive integer').toInt(),
+        body('messageId').optional().isInt({ min: 1 }).withMessage('messageId must be a positive integer').toInt(),
+        body('reason').isIn(['spam', 'abuse', 'scam', 'other']).withMessage('Invalid reason'),
+        body('description').optional().isString().isLength({ max: 1000 }).trim()
+    ],
+    async (req, res) => {
+        const connection = await pool.getConnection();
+
+        try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                await connection.release();
+                return res.status(400).json({ error: 'Validation failed', details: errors.array() });
+            }
+
+            const reporterId = req.user.id;
+            const { chatId, reportedUserId, messageId, reason, description } = req.body;
+
+            if (reporterId === reportedUserId) {
+                await connection.release();
+                return res.status(400).json({ error: 'Cannot report yourself' });
+            }
+
+            await connection.beginTransaction();
+
+            // Get reporter trust score
+            const trust = await getReporterTrust(connection, reporterId);
+
+            // Check cooldown
+            if (isInCooldown(trust)) {
+                await connection.rollback();
+                return res.status(429).json({
+                    error: 'You are in cooldown period',
+                    cooldownUntil: trust.cooldown_until
+                });
+            }
+
+            // Check rate limit
+            const withinLimit = await checkRateLimit(connection, reporterId);
+            if (!withinLimit) {
+                await connection.rollback();
+                return res.status(429).json({
+                    error: `Maximum ${CONFIG.MAX_REPORTS_PER_DAY} reports per day exceeded`
+                });
+            }
+
+            // Check for duplicate
+            const duplicateId = await findDuplicateReport(
+                connection, reporterId, reportedUserId, chatId, messageId, reason
+            );
+
+            if (duplicateId) {
+                await connection.rollback();
+                return res.status(409).json({
+                    error: 'You have already reported this',
+                    duplicateReportId: duplicateId
+                });
+            }
+
+            // Gather signals
+            let signals = [];
+
+            if (messageId) {
+                const messageSignals = await analyzeMessage(connection, messageId);
+                signals = signals.concat(messageSignals);
+            }
+
+            const historySignals = await checkUserHistory(connection, reportedUserId);
+            signals = signals.concat(historySignals);
+
+            const multipleSignals = await checkMultipleReports(connection, reportedUserId, chatId);
+            signals = signals.concat(multipleSignals);
+
+// Calculate confidence
+            const confidence = calculateConfidence(signals, trust.trust_score, {
+                trustScoreWeight: CONFIG.TRUST_SCORE_WEIGHT,
+                combine: { signals: 0.7, trust: 0.3 }
             });
-        }
-        
-        // Check rate limit
-        const withinLimit = await checkRateLimit(connection, reporterId);
-        if (!withinLimit) {
-            await connection.rollback();
-            return res.status(429).json({ 
-                error: `Maximum ${CONFIG.MAX_REPORTS_PER_DAY} reports per day exceeded`
-            });
-        }
-        
-        // Check for duplicate
-        const duplicateId = await findDuplicateReport(
-            connection, reporterId, reportedUserId, chatId, messageId, reason
-        );
-        
-        if (duplicateId) {
-            await connection.rollback();
-            return res.status(409).json({ 
-                error: 'You have already reported this',
-                duplicateReportId: duplicateId
-            });
-        }
-        
-        // Gather signals
-        let signals = [];
-        
-        if (messageId) {
-            const messageSignals = await analyzeMessage(connection, messageId);
-            signals = signals.concat(messageSignals);
-        }
-        
-        const historySignals = await checkUserHistory(connection, reportedUserId);
-        signals = signals.concat(historySignals);
-        
-        const multipleSignals = await checkMultipleReports(connection, reportedUserId, chatId);
-        signals = signals.concat(multipleSignals);
-        
-        // Calculate confidence
-        const confidence = calculateConfidence(signals, trust.trust_score);
-        
-        // Determine if auto-resolve
-        const shouldAutoResolve = (
-            confidence >= CONFIG.CONFIDENCE_THRESHOLD &&
-            signals.length >= CONFIG.MIN_SIGNAL_COUNT
-        );
-        
-        // Create report
-        const [reportResult] = await connection.query(`
-            INSERT INTO chat_reports 
-            (chat_id, reporter_id, reported_id, message_id, reason, description,
-             evidence_type, confidence_score, signal_count, auto_resolved, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'message', ?, ?, ?, ?)
-        `, [
-            chatId,
-            reporterId,
-            reportedUserId,
-            messageId,
-            reason,
-            description,
-            confidence,
-            signals.length,
-            shouldAutoResolve ? 1 : 0,
-            shouldAutoResolve ? 'checked' : 'pending'
-        ]);
-        
-        const reportId = reportResult.insertId;
-        
-        // Store signals
-        for (const signal of signals) {
-            await connection.query(`
-                INSERT INTO report_signals (report_id, signal_type, signal_weight, signal_data)
-                VALUES (?, ?, ?, ?)
-            `, [reportId, signal.type, signal.weight, JSON.stringify(signal.data)]);
-        }
-        
-        // Audit log
-        await connection.query(`
-            INSERT INTO report_audit_log 
-            (report_id, action, actor_type, actor_id, new_status, details)
-            VALUES (?, 'created', 'user', ?, 'pending', ?)
-        `, [reportId, reporterId, JSON.stringify({ confidence, signalCount: signals.length })]);
-        
-        let penaltyApplied = 0;
-        
-        // Auto-resolve if threshold met
-        if (shouldAutoResolve) {
-            penaltyApplied = await applyPenalty(connection, reportedUserId, reason, reportId);
-            
-            await connection.query(`
-                UPDATE chat_reports 
-                SET resolution_reason = ?, penalty_applied = ?
-                WHERE id = ?
+
+            // Determine if auto-resolve
+            const shouldAutoResolve = (
+                confidence >= CONFIG.CONFIDENCE_THRESHOLD &&
+                signals.length >= CONFIG.MIN_SIGNAL_COUNT
+            );
+
+            // Create report
+            const [reportResult] = await connection.query(`
+                INSERT INTO chat_reports 
+                (chat_id, reporter_id, reported_id, message_id, reason, description,
+                 evidence_type, confidence_score, signal_count, auto_resolved, status)
+                VALUES (?, ?, ?, ?, ?, ?, 'message', ?, ?, ?, ?)
             `, [
-                'Automatically resolved based on confidence score and signals',
-                penaltyApplied,
-                reportId
+                chatId,
+                reporterId,
+                reportedUserId,
+                messageId,
+                reason,
+                description,
+                confidence,
+                signals.length,
+                shouldAutoResolve ? 1 : 0,
+                shouldAutoResolve ? 'checked' : 'pending'
             ]);
-            
+
+            const reportId = reportResult.insertId;
+
+            // Store signals
+            for (const signal of signals) {
+                await connection.query(`
+                    INSERT INTO report_signals (report_id, signal_type, signal_weight, signal_data)
+                    VALUES (?, ?, ?, ?)
+                `, [reportId, signal.type, signal.weight, JSON.stringify(signal.data)]);
+            }
+
+            // Audit log
             await connection.query(`
                 INSERT INTO report_audit_log 
-                (report_id, action, actor_type, old_status, new_status, details)
-                VALUES (?, 'resolved', 'system', 'pending', 'checked', ?)
-            `, [reportId, JSON.stringify({ penalty: penaltyApplied, reason })]);
-            
-            // Update trust score (valid report)
-            await connection.query(`
-                UPDATE reporter_trust_scores
-                SET trust_score = LEAST(100, trust_score + ?),
-                    valid_reports = valid_reports + 1,
-                    total_reports = total_reports + 1,
-                    last_report_date = NOW()
-                WHERE user_id = ?
-            `, [CONFIG.TRUST_ADJUSTMENTS.valid_report, reporterId]);
-        } else {
-            // Update trust (pending report)
-            await connection.query(`
-                UPDATE reporter_trust_scores
-                SET total_reports = total_reports + 1,
-                    last_report_date = NOW()
-                WHERE user_id = ?
-            `, [reporterId]);
+                (report_id, action, actor_type, actor_id, new_status, details)
+                VALUES (?, 'created', 'user', ?, 'pending', ?)
+            `, [reportId, reporterId, JSON.stringify({ confidence, signalCount: signals.length })]);
+
+            let penaltyApplied = 0;
+
+            // Auto-resolve if threshold met
+            if (shouldAutoResolve) {
+                penaltyApplied = await applyPenalty(connection, reportedUserId, reason, reportId);
+
+                await connection.query(`
+                    UPDATE chat_reports 
+                    SET resolution_reason = ?, penalty_applied = ?
+                    WHERE id = ?
+                `, [
+                    'Automatically resolved based on confidence score and signals',
+                    penaltyApplied,
+                    reportId
+                ]);
+
+                await connection.query(`
+                    INSERT INTO report_audit_log 
+                    (report_id, action, actor_type, old_status, new_status, details)
+                    VALUES (?, 'resolved', 'system', 'pending', 'checked', ?)
+                `, [reportId, JSON.stringify({ penalty: penaltyApplied, reason })]);
+
+                // Update trust score (valid report)
+                await connection.query(`
+                    UPDATE reporter_trust_scores
+                    SET trust_score = LEAST(100, trust_score + ?),
+                        valid_reports = valid_reports + 1,
+                        total_reports = total_reports + 1,
+                        last_report_date = NOW()
+                    WHERE user_id = ?
+                `, [CONFIG.TRUST_ADJUSTMENTS.valid_report, reporterId]);
+            } else {
+                // Update trust (pending report)
+                await connection.query(`
+                    UPDATE reporter_trust_scores
+                    SET total_reports = total_reports + 1,
+                        last_report_date = NOW()
+                    WHERE user_id = ?
+                `, [reporterId]);
+            }
+
+            // Notify reported user if auto-resolved
+            if (shouldAutoResolve) {
+                await connection.query(`
+                    INSERT INTO notifications (user_id, title, body, category, type)
+                    VALUES (?, ?, ?, 'system', 'system')
+                `, [
+                    reportedUserId,
+                    'Community Guidelines Violation',
+                    `Your account has been flagged for ${reason}. ${penaltyApplied} credits have been deducted. You may appeal this decision.`
+                ]);
+            }
+
+            await connection.commit();
+
+            res.status(201).json({
+                success: true,
+                reportId,
+                autoResolved: shouldAutoResolve,
+                confidence: confidence.toFixed(2),
+                signalCount: signals.length,
+                penaltyApplied,
+                message: shouldAutoResolve
+                    ? 'Report submitted and automatically resolved'
+                    : 'Report submitted and pending review'
+            });
+
+        } catch (error) {
+            await connection.rollback();
+            console.error('Error submitting report:', error);
+            res.status(500).json({ error: 'Failed to submit report' });
+        } finally {
+            connection.release();
         }
-        
-        // Notify reported user if auto-resolved
-        if (shouldAutoResolve) {
-            await connection.query(`
-                INSERT INTO notifications (user_id, title, body, category, type)
-                VALUES (?, ?, ?, 'system', 'system')
-            `, [
-                reportedUserId,
-                'Community Guidelines Violation',
-                `Your account has been flagged for ${reason}. ${penaltyApplied} credits have been deducted. You may appeal this decision.`
-            ]);
-        }
-        
-        await connection.commit();
-        
-        res.status(201).json({
-            success: true,
-            reportId,
-            autoResolved: shouldAutoResolve,
-            confidence: confidence.toFixed(2),
-            signalCount: signals.length,
-            penaltyApplied,
-            message: shouldAutoResolve 
-                ? 'Report submitted and automatically resolved'
-                : 'Report submitted and pending review'
-        });
-        
-    } catch (error) {
-        await connection.rollback();
-        console.error('Error submitting report:', error);
-        res.status(500).json({ error: 'Failed to submit report' });
-    } finally {
-        connection.release();
     }
-});
+);
 
 // Appeal a report
-router.post('/appeal/:reportId', authenticateToken, async (req, res) => {
-    const connection = await pool.getConnection();
-    
-    try {
-        const userId = req.user.id;
-        const { reportId } = req.params;
-        const { appealReason } = req.body;
-        
-        if (!appealReason || appealReason.trim().length < 20) {
-            return res.status(400).json({ 
-                error: 'Appeal reason must be at least 20 characters'
+router.post(
+    '/appeal/:reportId',
+    authenticateToken,
+    [body('appealReason').isString().isLength({ min: 20, max: 2000 }).withMessage('Appeal reason must be at least 20 characters').trim()],
+    async (req, res) => {
+        const connection = await pool.getConnection();
+
+        try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                await connection.release();
+                return res.status(400).json({ error: 'Validation failed', details: errors.array() });
+            }
+
+            const userId = req.user.id;
+            const { reportId } = req.params;
+            const { appealReason } = req.body;
+
+            await connection.beginTransaction();
+
+            // Get report
+            const [report] = await connection.query(
+                'SELECT * FROM chat_reports WHERE id = ? AND reported_id = ?',
+                [reportId, userId]
+            );
+
+            if (report.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ error: 'Report not found' });
+            }
+
+            if (report[0].appeal_status !== 'none') {
+                await connection.rollback();
+                return res.status(409).json({ error: 'Appeal already submitted' });
+            }
+
+            // Update report
+            await connection.query(`
+                UPDATE chat_reports
+                SET appeal_status = 'pending',
+                    appeal_date = NOW(),
+                    appeal_reason = ?
+                WHERE id = ?
+            `, [appealReason, reportId]);
+
+            // Audit log
+            await connection.query(`
+                INSERT INTO report_audit_log 
+                (report_id, action, actor_type, actor_id, details)
+                VALUES (?, 'appealed', 'user', ?, ?)
+            `, [reportId, userId, JSON.stringify({ reason: appealReason })]);
+
+            await connection.commit();
+
+            res.json({
+                success: true,
+                message: 'Appeal submitted successfully. It will be reviewed by staff.'
             });
-        }
-        
-        await connection.beginTransaction();
-        
-        // Get report
-        const [report] = await connection.query(
-            'SELECT * FROM chat_reports WHERE id = ? AND reported_id = ?',
-            [reportId, userId]
-        );
-        
-        if (report.length === 0) {
+
+        } catch (error) {
             await connection.rollback();
-            return res.status(404).json({ error: 'Report not found' });
+            console.error('Error submitting appeal:', error);
+            res.status(500).json({ error: 'Failed to submit appeal' });
+        } finally {
+            connection.release();
         }
-        
-        if (report[0].appeal_status !== 'none') {
-            await connection.rollback();
-            return res.status(409).json({ error: 'Appeal already submitted' });
-        }
-        
-        // Update report
-        await connection.query(`
-            UPDATE chat_reports
-            SET appeal_status = 'pending',
-                appeal_date = NOW(),
-                appeal_reason = ?
-            WHERE id = ?
-        `, [appealReason, reportId]);
-        
-        // Audit log
-        await connection.query(`
-            INSERT INTO report_audit_log 
-            (report_id, action, actor_type, actor_id, details)
-            VALUES (?, 'appealed', 'user', ?, ?)
-        `, [reportId, userId, JSON.stringify({ reason: appealReason })]);
-        
-        await connection.commit();
-        
-        res.json({ 
-            success: true, 
-            message: 'Appeal submitted successfully. It will be reviewed by staff.'
-        });
-        
-    } catch (error) {
-        await connection.rollback();
-        console.error('Error submitting appeal:', error);
-        res.status(500).json({ error: 'Failed to submit appeal' });
-    } finally {
-        connection.release();
     }
-});
+);
 
 // Get user's reports (reporter view)
 router.get('/my-reports', authenticateToken, async (req, res) => {
