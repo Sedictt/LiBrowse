@@ -445,6 +445,9 @@ class BooksManager {
         // Preload config (closures, limits) then recalc
         this.loadLibraryConfigOnce().finally(() => this.updateExpectedReturnDate(modal));
 
+        // Ensure book details modal is closed to avoid overlapping modals
+        this.closeBookModal();
+
         // Show modal
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
