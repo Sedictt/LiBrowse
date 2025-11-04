@@ -317,27 +317,47 @@ class BooksManager {
         // Condition and requirements
         const condition = formatCondition(book.condition_rating || book.condition);
         const conditionElement = document.getElementById('modal-book-condition');
-        conditionElement.textContent = condition.text;
-        conditionElement.className = condition.class;
+        if (conditionElement) {
+            conditionElement.textContent = condition.text;
+            conditionElement.className = condition.class;
+        }
 
-        document.getElementById('modal-book-credits').textContent = `${book.minimum_credits || book.min_credit || 0} credits`;
+        // Credits and owner info
+        const creditsEl = document.getElementById('modal-book-credits');
+        if (creditsEl) {
+            creditsEl.textContent = `${book.minimum_credits || book.min_credit || 0} credits`;
+        }
+        const ownerEl = document.getElementById('modal-book-owner');
+        if (ownerEl) {
+            ownerEl.textContent = book.owner_name || 'Unknown';
+        }
+        const ownerProgEl = document.getElementById('modal-book-owner-program');
+        if (ownerProgEl) {
+            ownerProgEl.textContent = book.owner_program || book.program || 'Not specified';
+        }
 
-        // Owner information
-        document.getElementById('modal-book-owner').textContent = book.owner_name || 'Unknown';
-        document.getElementById('modal-book-owner-program').textContent = book.owner_program || book.program || 'Not specified';
-
-        // Image
-        const imageUrl = book.image_url || book.cover_image || book.cover || getPlaceholderImage(book.title);
+        // Image (reset any fallback visibility and set best-available source)
+        const imageUrl = book.image_url || book.image || book.cover_image || book.cover || getPlaceholderImage(book.title);
         const imageElement = document.getElementById('modal-book-image');
-        imageElement.src = imageUrl;
+        if (imageElement) {
+            imageElement.style.display = '';
+            const fallbackEl = imageElement.nextElementSibling;
+            if (fallbackEl && fallbackEl.classList && fallbackEl.classList.contains('book-image-fallback')) {
+                fallbackEl.style.display = 'none';
+            }
+            imageElement.alt = book.title ? `Cover of ${book.title}` : 'Book cover';
+            imageElement.src = imageUrl;
+        }
 
         // Status badge
         const isAvailable = book.is_available === 1 || book.is_available === true;
         const status = isAvailable ? 'available' : 'borrowed';
         const statusText = isAvailable ? 'Available' : 'Borrowed';
         const statusElement = document.getElementById('modal-book-status');
-        statusElement.textContent = statusText;
-        statusElement.className = `book-status-badge ${status}`;
+        if (statusElement) {
+            statusElement.textContent = statusText;
+            statusElement.className = `book-status-badge ${status}`;
+        }
 
         // Description (if available)
         const descriptionSection = document.getElementById('modal-book-description-section');

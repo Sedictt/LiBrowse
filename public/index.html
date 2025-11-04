@@ -2250,6 +2250,8 @@
                                     document.body.classList.remove('menu-open');
                                 }
                             }
+                            const anyActive = document.querySelector('.modal.active, .modal.show');
+                            document.body.style.overflow = anyActive ? 'hidden' : '';
                         }
                     });
                 });
