@@ -521,6 +521,15 @@ class AuthManager {
         this.isAuthenticated = true;
         this.currentUser = user;
         this.updateUIForAuthState(true);
+
+        try {
+            const evt1 = new Event('login-success');
+            const evt2 = new Event('user-logged-in');
+            const evt3 = new Event('userLoggedIn');
+            document.dispatchEvent(evt1);
+            document.dispatchEvent(evt2);
+            document.dispatchEvent(evt3);
+        } catch (_) { /* noop */ }
     }
 
     logout() {
@@ -535,6 +544,15 @@ class AuthManager {
         if (window.app) {
             window.app.navigateToSection('home');
         }
+
+        try {
+            const evt1 = new Event('logout');
+            const evt2 = new Event('user-logged-out');
+            const evt3 = new Event('userLoggedOut');
+            document.dispatchEvent(evt1);
+            document.dispatchEvent(evt2);
+            document.dispatchEvent(evt3);
+        } catch (_) { /* noop */ }
     }
 
     updateUIForAuthState(isAuthenticated) {

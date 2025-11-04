@@ -14,6 +14,8 @@ class App {
         this.hideLoadingScreen();
         if (authManager.isAuthenticated) {
             this.showAuthenticatedFeatures();
+            await this.updateRequestsBadge();
+            this.startRequestsBadgePolling();
         }
     }
 
@@ -140,6 +142,15 @@ class App {
 
         // Hash change handler
         window.addEventListener('hashchange', this.handleHashChange.bind(this));
+
+        document.addEventListener('login-success', async () => {
+            await this.updateRequestsBadge();
+            this.startRequestsBadgePolling();
+        });
+
+        document.addEventListener('logout', () => {
+            this.clearRequestsBadgePolling();
+        });
     }
 
     setupNavigation() {
@@ -1120,6 +1131,52 @@ class App {
             badge.textContent = unreadCount;
             badge.style.display = unreadCount > 0 ? 'block' : 'none';
         }
+    }
+
+    setRequestsBadge(count) {
+        const navBadge = document.getElementById('requests-badge');
+        if (navBadge) {
+            navBadge.textContent = count;
+            navBadge.style.display = count > 0 ? 'inline' : 'none';
+        }
+    }
+
+    async updateRequestsBadge() {
+        try {
+            if (!authManager || !authManager.isAuthenticated) {
+                this.setRequestsBadge(0);
+                return 0;
+            }
+
+            const data = await api.getTransactions();
+            const list = Array.isArray(data?.transactions) ? data.transactions : (Array.isArray(data) ? data : []);
+            const userId = authManager.currentUser?.id;
+            const incoming = list.filter(t => t.lender_id === userId);
+            const count = incoming.length;
+            this.setRequestsBadge(count);
+            return count;
+        } catch (error) {
+            console.error('Failed to update requests badge:', error);
+            return 0;
+        }
+    }
+
+    startRequestsBadgePolling() {
+        if (this._requestsBadgeTimer) return;
+        this._requestsBadgeTimer = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                const p = this.updateRequestsBadge();
+                if (p && typeof p.catch === 'function') p.catch(() => {});
+            }
+        }, 30000);
+    }
+
+    clearRequestsBadgePolling() {
+        if (this._requestsBadgeTimer) {
+            clearInterval(this._requestsBadgeTimer);
+            this._requestsBadgeTimer = null;
+        }
+        this.setRequestsBadge(0);
     }
 
     async loadPlatformStats() {
