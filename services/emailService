@@ -1,0 +1,304 @@
+// services/emailService.js
+// Email service using SendGrid for reliable email delivery
+
+const sgMail = require('@sendgrid/mail');
+require('dotenv').config();
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+class EmailService {
+    /**
+     * Send notification email
+     * @param {string} recipientEmail - Email address
+     * @param {string} subject - Email subject
+     * @param {string} type - Email type (request, approval, reminder, etc.)
+     * @param {object} data - Dynamic data for email template
+     */
+    static async sendNotificationEmail(recipientEmail, subject, type, data) {
+        try {
+            const html = this.getEmailTemplate(type, data);
+            
+            const msg = {
+                to: recipientEmail,
+                from: process.env.SENDGRID_FROM_EMAIL || 'noreply@librowse.app',
+                subject: subject,
+                html: html,
+                trackingSettings: {
+                    clickTracking: {
+                        enable: false,
+                        enableText: false
+                    }
+                }
+            };
+
+            await sgMail.send(msg);
+            console.log(`Email sent successfully to ${recipientEmail}`);
+            return true;
+        } catch (error) {
+            console.error('Error sending email:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Get HTML email template based on type
+     */
+    static getEmailTemplate(type, data) {
+        const templates = {
+            'request': this.templateBorrowRequest(data),
+            'approval': this.templateApproval(data),
+            'rejection': this.templateRejection(data),
+            'reminder': this.templateReminder(data),
+            'overdue': this.templateOverdue(data),
+            'feedback': this.templateFeedback(data)
+        };
+
+        return templates[type] || this.templateDefault(data);
+    }
+
+    static templateBorrowRequest(data) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { padding: 30px 20px; }
+        .book-info { background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .book-title { font-size: 18px; font-weight: 600; color: #333; }
+        .book-author { color: #666; font-size: 14px; }
+        .action-section { margin: 30px 0; padding: 20px; background: #f0f4ff; border-left: 4px solid #667eea; border-radius: 8px; }
+        .btn { display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #e0e0e0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 New Borrow Request</h1>
+        </div>
+        <div class="content">
+            <p>Hello ${data.lenderName},</p>
+            <p>${data.borrowerName} has requested to borrow a book from you:</p>
+            
+            <div class="book-info">
+                <div class="book-title">${data.bookTitle}</div>
+                <div class="book-author">by ${data.bookAuthor}</div>
+            </div>
+
+            <p><strong>Request Details:</strong></p>
+            <ul>
+                <li><strong>Duration:</strong> ${data.duration}</li>
+                <li><strong>Request Message:</strong> ${data.message || '(No message provided)'}</li>
+            </ul>
+
+            <div class="action-section">
+                <p>Please review and respond to this request:</p>
+                <a href="${data.actionUrl}" class="btn">View Request</a>
+            </div>
+
+            <p>Best regards,<br><strong>LiBrowse Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated notification. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+    }
+
+    static templateApproval(data) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; padding: 30px 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { padding: 30px 20px; }
+        .success-badge { display: inline-block; background: #ecfdf5; color: #065f46; padding: 10px 15px; border-radius: 6px; font-weight: 600; margin: 10px 0; }
+        .book-info { background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .btn { display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #e0e0e0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✓ Request Approved!</h1>
+        </div>
+        <div class="content">
+            <p>Great news, ${data.borrowerName}!</p>
+            <p><strong>${data.lenderName}</strong> has approved your borrow request for:</p>
+            
+            <div class="book-info">
+                <div style="font-size: 18px; font-weight: 600; color: #333;">${data.bookTitle}</div>
+                <div style="color: #666; font-size: 14px;">by ${data.bookAuthor}</div>
+            </div>
+
+            <div class="success-badge">✓ Ready to Pick Up</div>
+
+            <p><strong>Next Steps:</strong></p>
+            <ul>
+                <li>Contact ${data.lenderName} to arrange pickup</li>
+                <li>Return date: <strong>${data.returnDate}</strong></li>
+            </ul>
+
+            <a href="${data.actionUrl}" class="btn">View Transaction Details</a>
+
+            <p>Thank you for using LiBrowse!<br><strong>Happy reading!</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated notification. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+    }
+
+    static templateReminder(data) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { padding: 30px 20px; }
+        .reminder-box { background: #fffbeb; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0; }
+        .book-info { background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .btn { display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #e0e0e0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 Return Reminder</h1>
+        </div>
+        <div class="content">
+            <p>Hello ${data.borrowerName},</p>
+            
+            <div class="reminder-box">
+                <p style="margin: 0; font-weight: 600;">This is a friendly reminder that the following book is due for return soon:</p>
+            </div>
+
+            <div class="book-info">
+                <div style="font-size: 18px; font-weight: 600; color: #333;">${data.bookTitle}</div>
+                <div style="color: #666; font-size: 14px;">by ${data.bookAuthor}</div>
+                <div style="margin-top: 10px; color: #d97706; font-weight: 600;">Due: ${data.returnDate}</div>
+            </div>
+
+            <p>Please arrange to return the book on or before the due date to avoid any late fees.</p>
+
+            <a href="${data.actionUrl}" class="btn">View Details</a>
+
+            <p>Thank you!<br><strong>LiBrowse Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated notification. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+    }
+
+    static templateOverdue(data) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { padding: 30px 20px; }
+        .alert-box { background: #fef2f2; padding: 20px; border-radius: 8px; border-left: 4px solid #ef4444; margin: 20px 0; }
+        .book-info { background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .btn { display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #e0e0e0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚠️ Overdue Notice</h1>
+        </div>
+        <div class="content">
+            <p>Hello ${data.borrowerName},</p>
+            
+            <div class="alert-box">
+                <p style="margin: 0; font-weight: 600; color: #991b1b;">The following book is OVERDUE and must be returned immediately:</p>
+            </div>
+
+            <div class="book-info">
+                <div style="font-size: 18px; font-weight: 600; color: #333;">${data.bookTitle}</div>
+                <div style="color: #666; font-size: 14px;">by ${data.bookAuthor}</div>
+                <div style="margin-top: 10px; color: #dc2626; font-weight: 600;">Due Date: ${data.dueDate}</div>
+                <div style="margin-top: 5px; color: #dc2626;">Days Overdue: <strong>${data.daysOverdue}</strong></div>
+            </div>
+
+            <p>Please return this book immediately to avoid late fees and penalties.</p>
+
+            <a href="${data.actionUrl}" class="btn">View Details & Return Book</a>
+
+            <p>If you have already returned this book, please disregard this notice.</p>
+            <p>LiBrowse Team</p>
+        </div>
+        <div class="footer">
+            <p>This is an automated notification. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+    }
+
+    static templateDefault(data) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
+        .content { padding: 30px 20px; }
+        .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #e0e0e0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📬 LiBrowse Notification</h1>
+        </div>
+        <div class="content">
+            <p>${data.message || 'You have a new notification from LiBrowse.'}</p>
+        </div>
+        <div class="footer">
+            <p>This is an automated notification. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+    }
+}
+
+module.exports = EmailService;

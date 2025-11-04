@@ -1,3 +1,4 @@
++
 <!DOCTYPE html>
 <html lang="en">
 
@@ -170,6 +171,34 @@
             </div>
         </div>
     </nav>
+
+    <!-- Notification Dropdown Panel -->
+    <div class="notification-dropdown" id="notification-dropdown">
+        <div class="notification-header">
+            <h3><i class="fas fa-bell"></i> Notifications</h3>
+            <button class="btn-text" id="mark-all-read-btn">
+                <i class="fas fa-check-double"></i> Mark all read
+            </button>
+        </div>
+
+        <div class="notification-tabs">
+            <button class="notification-tab active" data-tab="all">All</button>
+            <button class="notification-tab" data-tab="unread">Unread</button>
+        </div>
+
+        <div class="notification-list" id="notification-list">
+            <div class="notification-loading">
+                <i class="fas fa-spinner fa-spin"></i> Loading notifications...
+            </div>
+        </div>
+
+        <div class="notification-footer">
+            <a href="#notifications" class="btn-text" onclick="app.switchSection('notifications')">
+                View All Notifications
+            </a>
+        </div>
+    </div>
+
 
     <!-- Main Content -->
     <main class="main-content">

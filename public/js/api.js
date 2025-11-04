@@ -488,6 +488,32 @@ class ApiClient {
         return this.request(`/disputes/${disputeId}`);
     }
 
+    // Get all notifications for current user
+    async getNotifications(unreadOnly = false, limit = 20, offset = 0) {
+        return this.request(`/notifications?unreadOnly=${unreadOnly}&limit=${limit}&offset=${offset}`);
+    }
+
+    // Mark a single notification as read
+    async markNotificationAsRead(notificationId) {
+        return this.request(`/notifications/${notificationId}/read`, {
+            method: 'PUT'
+        });
+    }
+
+    // Mark all notifications as read
+    async markAllNotificationsAsRead() {
+        return this.request(`/notifications/mark-all-read`, {
+            method: 'PUT'
+        });
+    }
+
+    // Delete a notification
+    async deleteNotification(notificationId) {
+        return this.request(`/notifications/${notificationId}`, {
+            method: 'DELETE'
+        });
+    }
+
 
 }
 

@@ -1,0 +1,111 @@
+// tasks/reminderTask.js
+// Scheduled task to check due dates and send reminders/overdue alerts
+
+const { getConnection } = require('../config/database');
+const NotificationHelper = require('../services/notificationHelper');
+
+class ReminderTask {
+    /**
+     * Run scheduled checks for reminders and overdue books
+     * Should be called every 24 hours (e.g., daily at 8 AM)
+     */
+    static async checkDueDates() {
+        try {
+            console.log('[ReminderTask] Starting due date check...');
+
+            const connection = await getConnection();
+
+            // 1. Check for books due TOMORROW (send reminder)
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+            const [dueTomorrow] = await connection.execute(`
+                SELECT 
+                    t.id,
+                    t.borrower_id,
+                    t.expected_return_date,
+                    b.title,
+                    b.author,
+                    u.fname,
+                    u.lname
+                FROM transactions t
+                JOIN books b ON t.book_id = b.id
+                JOIN users u ON t.borrower_id = u.id
+                WHERE t.status = 'borrowed'
+                AND DATE(t.expected_return_date) = ?
+                AND t.id NOT IN (
+                    SELECT transaction_id FROM notifications 
+                    WHERE type = 'reminder' 
+                    AND DATE(created_at) = CURDATE()
+                )
+            `, [tomorrowStr]);
+
+            // Send reminders
+            for (const trans of dueTomorrow) {
+                try {
+                    await NotificationHelper.notifyReturnReminder(
+                        trans.borrower_id,
+                        trans.title,
+                        trans.author,
+                        new Date(trans.expected_return_date).toLocaleDateString(),
+                        `https://librowse.app/transactions/${trans.id}`
+                    );
+                    console.log(`Reminder sent to user ${trans.borrower_id} for book ${trans.title}`);
+                } catch (err) {
+                    console.error(`Error sending reminder for transaction ${trans.id}:`, err);
+                }
+            }
+
+            // 2. Check for OVERDUE books (due date has passed)
+            const today = new Date().toISOString().split('T')[0];
+
+            const [overdueBooks] = await connection.execute(`
+                SELECT 
+                    t.id,
+                    t.borrower_id,
+                    t.expected_return_date,
+                    b.title,
+                    b.author,
+                    u.fname,
+                    u.lname,
+                    DATEDIFF(CURDATE(), DATE(t.expected_return_date)) as days_overdue
+                FROM transactions t
+                JOIN books b ON t.book_id = b.id
+                JOIN users u ON t.borrower_id = u.id
+                WHERE t.status = 'borrowed'
+                AND DATE(t.expected_return_date) < CURDATE()
+                AND t.id NOT IN (
+                    SELECT transaction_id FROM notifications 
+                    WHERE type = 'overdue' 
+                    AND DATE(created_at) = CURDATE()
+                )
+            `, []);
+
+            // Send overdue alerts
+            for (const trans of overdueBooks) {
+                try {
+                    await NotificationHelper.notifyOverdue(
+                        trans.borrower_id,
+                        trans.title,
+                        trans.author,
+                        new Date(trans.expected_return_date).toLocaleDateString(),
+                        trans.days_overdue,
+                        `https://librowse.app/transactions/${trans.id}`
+                    );
+                    console.log(`Overdue alert sent to user ${trans.borrower_id} for book ${trans.title}`);
+                } catch (err) {
+                    console.error(`Error sending overdue alert for transaction ${trans.id}:`, err);
+                }
+            }
+
+            connection.release();
+            console.log('[ReminderTask] Due date check completed');
+
+        } catch (error) {
+            console.error('[ReminderTask] Error during check:', error);
+        }
+    }
+}
+
+module.exports = ReminderTask;

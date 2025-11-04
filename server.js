@@ -55,9 +55,9 @@ const limiter = rateLimit({
         // Allow more requests for dev on static + healthcheck
         if (process.env.NODE_ENV !== 'production') {
             return req.path === '/api/health' ||
-                   req.path.startsWith('/uploads/') ||
-                   req.path.startsWith('/css/') ||
-                   req.path.startsWith('/js/');
+                req.path.startsWith('/uploads/') ||
+                req.path.startsWith('/css/') ||
+                req.path.startsWith('/js/');
         }
         return false;
     }
@@ -68,8 +68,8 @@ app.use(limiter);
 // CORS Configuration
 // =======================
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production' 
-        ? 'your-domain.com' 
+    origin: process.env.NODE_ENV === 'production'
+        ? 'your-domain.com'
         : '*',
     credentials: true
 }));
@@ -115,8 +115,8 @@ app.get('/', (req, res) => {
 
 // Health Check
 app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'OK', 
+    res.json({
+        status: 'OK',
         timestamp: new Date().toISOString(),
         service: 'LiBrowse API'
     });
@@ -137,7 +137,7 @@ app.use('*', (req, res) => {
 // =======================
 app.use((error, req, res, next) => {
     console.error('Global error handler:', error);
-    res.status(500).json({ 
+    res.status(500).json({
         error: process.env.NODE_ENV === 'production'
             ? 'Internal server error'
             : error.message
@@ -166,6 +166,23 @@ const startServer = async () => {
         process.exit(1);
     }
 };
+
+// Schedule reminder task to run daily at 8 AM
+const cron = require('node-cron');
+const ReminderTask = require('./tasks/reminderTask');
+
+// Run every day at 8:00 AM
+cron.schedule('0 8 * * *', () => {
+    console.log('[Scheduler] Running daily reminder task...');
+    ReminderTask.checkDueDates();
+});
+
+// Also run once on startup after 5 seconds
+setTimeout(() => {
+    console.log('[Scheduler] Running initial reminder check...');
+    ReminderTask.checkDueDates();
+}, 5000);
+
 
 startServer();
 

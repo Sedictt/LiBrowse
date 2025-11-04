@@ -2756,6 +2756,290 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // ============================================
+    // NOTIFICATION MANAGER
+    // ============================================
+
+    class NotificationManager {
+        constructor() {
+            this.notificationBell = document.getElementById('notification-bell');
+            this.notificationDropdown = document.getElementById('notification-dropdown');
+            this.notificationBadge = document.getElementById('notification-badge');
+            this.notificationList = document.getElementById('notification-list');
+            this.markAllReadBtn = document.getElementById('mark-all-read-btn');
+
+            this.currentTab = 'all';
+            this.notifications = [];
+            this.unreadCount = 0;
+
+            this.init();
+        }
+
+        init() {
+            // Event listeners
+            if (this.notificationBell) {
+                this.notificationBell.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleDropdown();
+                });
+            }
+
+            if (this.markAllReadBtn) {
+                this.markAllReadBtn.addEventListener('click', () => this.markAllAsRead());
+            }
+
+            // Tab switching
+            document.querySelectorAll('.notification-tab').forEach(tab => {
+                tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#notification-bell') &&
+                    !e.target.closest('.notification-dropdown')) {
+                    this.closeDropdown();
+                }
+            });
+
+            // Start polling for notifications
+            this.startPolling();
+        }
+
+        toggleDropdown() {
+            if (this.notificationDropdown.classList.contains('active')) {
+                this.closeDropdown();
+            } else {
+                this.openDropdown();
+            }
+        }
+
+        async openDropdown() {
+            this.notificationDropdown.classList.add('active');
+            await this.loadNotifications();
+        }
+
+        closeDropdown() {
+            this.notificationDropdown.classList.remove('active');
+        }
+
+        switchTab(tab) {
+            this.currentTab = tab;
+
+            // Update UI
+            document.querySelectorAll('.notification-tab').forEach(t => {
+                t.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Render notifications
+            this.renderNotifications();
+        }
+
+        async loadNotifications() {
+            try {
+                const unreadOnly = this.currentTab === 'unread';
+                const response = await api.getNotifications(unreadOnly, 20, 0);
+
+                this.notifications = response.notifications || [];
+                this.unreadCount = response.unreadCount || 0;
+
+                this.updateBadge();
+                this.renderNotifications();
+            } catch (error) {
+                console.error('Failed to load notifications:', error);
+                this.notificationList.innerHTML = `
+                <div class="notification-empty">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>Failed to load notifications</p>
+                </div>
+            `;
+            }
+        }
+
+        renderNotifications() {
+            if (this.notifications.length === 0) {
+                this.notificationList.innerHTML = `
+                <div class="notification-empty">
+                    <i class="fas fa-inbox"></i>
+                    <p>No ${this.currentTab === 'unread' ? 'unread ' : ''}notifications yet</p>
+                </div>
+            `;
+                return;
+            }
+
+            this.notificationList.innerHTML = this.notifications.map(notif => `
+            <div class="notification-item ${!notif.is_read ? 'unread' : ''}" 
+                 onclick="notificationManager.handleNotificationClick(${notif.id}, '${notif.type}')">
+                <div class="notification-content">
+                    <div class="notification-icon ${this.getNotificationClass(notif.type)}">
+                        ${this.getNotificationIcon(notif.type)}
+                    </div>
+                    <div class="notification-text">
+                        <div class="notification-title">${escapeHtml(notif.title)}</div>
+                        <div class="notification-message">${escapeHtml(notif.message)}</div>
+                        <div class="notification-time">${this.formatTime(notif.created_at)}</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        }
+
+        getNotificationIcon(type) {
+            const icons = {
+                'request': '<i class="fas fa-envelope-open"></i>',
+                'approval': '<i class="fas fa-check-circle"></i>',
+                'rejection': '<i class="fas fa-times-circle"></i>',
+                'pickup': '<i class="fas fa-box-open"></i>',
+                'return': '<i class="fas fa-undo"></i>',
+                'reminder': '<i class="fas fa-clock"></i>',
+                'overdue': '<i class="fas fa-exclamation-triangle"></i>',
+                'feedback': '<i class="fas fa-star"></i>'
+            };
+            return icons[type] || '<i class="fas fa-bell"></i>';
+        }
+
+        getNotificationClass(type) {
+            const classes = {
+                'request': 'request',
+                'approval': 'approval',
+                'rejection': 'rejection',
+                'pickup': 'request',
+                'return': 'approval',
+                'reminder': 'reminder',
+                'overdue': 'overdue',
+                'feedback': 'feedback'
+            };
+            return classes[type] || 'request';
+        }
+
+        formatTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+
+            if (minutes < 1) return 'Just now';
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            if (days < 7) return `${days}d ago`;
+
+            return date.toLocaleDateString();
+        }
+
+        updateBadge() {
+            if (this.notificationBadge) {
+                this.notificationBadge.textContent = this.unreadCount;
+                if (this.unreadCount > 0) {
+                    this.notificationBadge.classList.add('active');
+                } else {
+                    this.notificationBadge.classList.remove('active');
+                }
+            }
+        }
+
+        async handleNotificationClick(notificationId, type) {
+            try {
+                // Mark as read
+                if (this.notifications.find(n => n.id === notificationId && !n.is_read)) {
+                    await api.markNotificationAsRead(notificationId);
+                }
+
+                // Navigate based on type
+                switch (type) {
+                    case 'request':
+                    case 'approval':
+                    case 'rejection':
+                        app.switchSection('transactions');
+                        break;
+                    case 'feedback':
+                        app.switchSection('profile');
+                        break;
+                    case 'reminder':
+                    case 'overdue':
+                        app.switchSection('transactions');
+                        break;
+                }
+
+                // Reload notifications
+                await this.loadNotifications();
+                this.closeDropdown();
+            } catch (error) {
+                console.error('Error handling notification click:', error);
+            }
+        }
+
+        async markAllAsRead() {
+            try {
+                await api.markAllNotificationsAsRead();
+                await this.loadNotifications();
+            } catch (error) {
+                console.error('Failed to mark all as read:', error);
+            }
+        }
+
+        startPolling() {
+            // Poll for new notifications every 30 seconds
+            setInterval(async () => {
+                if (document.visibilityState === 'visible') {
+                    try {
+                        const response = await api.getNotifications(false, 1, 0);
+                        const newUnreadCount = response.unreadCount || 0;
+
+                        // Update badge if count changed
+                        if (newUnreadCount !== this.unreadCount) {
+                            this.unreadCount = newUnreadCount;
+                            this.updateBadge();
+
+                            // Play notification sound
+                            this.playNotificationSound();
+                        }
+
+                        // If dropdown is open, refresh the list
+                        if (this.notificationDropdown.classList.contains('active')) {
+                            await this.loadNotifications();
+                        }
+                    } catch (error) {
+                        console.error('Error polling notifications:', error);
+                    }
+                }
+            }, 30000); // 30 seconds
+        }
+
+        playNotificationSound() {
+            // Simple beep notification
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } catch (error) {
+                // Silent fail if audio context not available
+            }
+        }
+    }
+
+    // Initialize notification manager when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!window.notificationManager) {
+            window.notificationManager = new NotificationManager();
+        }
+    });
+
 });
 
 // ========================================

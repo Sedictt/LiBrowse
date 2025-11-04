@@ -1,0 +1,197 @@
+// services/notificationHelper.js
+// Helper to create both in-app and email notifications
+
+const { getConnection } = require('../config/database');
+const EmailService = require('./emailService');
+
+class NotificationHelper {
+    /**
+     * Send borrow request notification
+     */
+    static async notifyBorrowRequest(lenderId, borrowerName, bookTitle, bookAuthor, message, actionUrl) {
+        const connection = await getConnection();
+
+        // Get lender email
+        const [lender] = await connection.execute(
+            'SELECT email FROM users WHERE id = ?',
+            [lenderId]
+        );
+
+        // Create in-app notification
+        await connection.execute(`
+            INSERT INTO notifications 
+            (user_id, title, message, type, related_id, body, category, is_read)
+            VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+        `, [
+            lenderId,
+            `New Borrow Request from ${borrowerName}`,
+            `${borrowerName} wants to borrow "${bookTitle}"`,
+            'request',
+            0,
+            JSON.stringify({ borrowerName, bookTitle, message }),
+            'request'
+        ]);
+
+        // Send email
+        if (lender && lender[0].email) {
+            await EmailService.sendNotificationEmail(
+                lender[0].email,
+                `📚 New Borrow Request for "${bookTitle}"`,
+                'request',
+                {
+                    lenderName: lender[0].fname,
+                    borrowerName,
+                    bookTitle,
+                    bookAuthor,
+                    message,
+                    duration: '2 weeks',
+                    actionUrl: actionUrl || 'https://librowse.app/transactions'
+                }
+            );
+        }
+
+        connection.release();
+    }
+
+    /**
+     * Send approval notification
+     */
+    static async notifyApproval(borrowerId, lenderName, bookTitle, bookAuthor, returnDate, actionUrl) {
+        const connection = await getConnection();
+
+        // Get borrower email
+        const [borrower] = await connection.execute(
+            'SELECT email FROM users WHERE id = ?',
+            [borrowerId]
+        );
+
+        // Create in-app notification
+        await connection.execute(`
+            INSERT INTO notifications 
+            (user_id, title, message, type, related_id, body, category, is_read)
+            VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+        `, [
+            borrowerId,
+            `Request Approved by ${lenderName}`,
+            `Your request for "${bookTitle}" has been approved!`,
+            'approval',
+            0,
+            JSON.stringify({ lenderName, bookTitle, returnDate }),
+            'approval'
+        ]);
+
+        // Send email
+        if (borrower && borrower[0].email) {
+            await EmailService.sendNotificationEmail(
+                borrower[0].email,
+                `✓ Borrow Request Approved for "${bookTitle}"`,
+                'approval',
+                {
+                    borrowerName: borrower[0].fname,
+                    lenderName,
+                    bookTitle,
+                    bookAuthor,
+                    returnDate,
+                    actionUrl: actionUrl || 'https://librowse.app/transactions'
+                }
+            );
+        }
+
+        connection.release();
+    }
+
+    /**
+     * Send return reminder (1 day before due date)
+     */
+    static async notifyReturnReminder(borrowerId, bookTitle, bookAuthor, returnDate, actionUrl) {
+        const connection = await getConnection();
+
+        // Get borrower email
+        const [borrower] = await connection.execute(
+            'SELECT email FROM users WHERE id = ?',
+            [borrowerId]
+        );
+
+        // Create in-app notification
+        await connection.execute(`
+            INSERT INTO notifications 
+            (user_id, title, message, type, related_id, body, category, is_read)
+            VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+        `, [
+            borrowerId,
+            `Reminder: Return "${bookTitle}"`,
+            `Your borrowed book "${bookTitle}" is due tomorrow!`,
+            'reminder',
+            0,
+            JSON.stringify({ bookTitle, returnDate }),
+            'reminder'
+        ]);
+
+        // Send email
+        if (borrower && borrower[0].email) {
+            await EmailService.sendNotificationEmail(
+                borrower[0].email,
+                `📅 Reminder: Return "${bookTitle}" Soon`,
+                'reminder',
+                {
+                    borrowerName: borrower[0].fname,
+                    bookTitle,
+                    bookAuthor,
+                    returnDate,
+                    actionUrl: actionUrl || 'https://librowse.app/transactions'
+                }
+            );
+        }
+
+        connection.release();
+    }
+
+    /**
+     * Send overdue alert
+     */
+    static async notifyOverdue(borrowerId, bookTitle, bookAuthor, dueDate, daysOverdue, actionUrl) {
+        const connection = await getConnection();
+
+        // Get borrower email
+        const [borrower] = await connection.execute(
+            'SELECT email FROM users WHERE id = ?',
+            [borrowerId]
+        );
+
+        // Create in-app notification
+        await connection.execute(`
+            INSERT INTO notifications 
+            (user_id, title, message, type, related_id, body, category, is_read)
+            VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+        `, [
+            borrowerId,
+            `Overdue: Return "${bookTitle}"`,
+            `"${bookTitle}" is ${daysOverdue} day(s) overdue. Please return immediately!`,
+            'overdue',
+            0,
+            JSON.stringify({ bookTitle, dueDate, daysOverdue }),
+            'overdue'
+        ]);
+
+        // Send email
+        if (borrower && borrower[0].email) {
+            await EmailService.sendNotificationEmail(
+                borrower[0].email,
+                `⚠️ OVERDUE: "${bookTitle}" Must Be Returned Now`,
+                'overdue',
+                {
+                    borrowerName: borrower[0].fname,
+                    bookTitle,
+                    bookAuthor,
+                    dueDate,
+                    daysOverdue,
+                    actionUrl: actionUrl || 'https://librowse.app/transactions'
+                }
+            );
+        }
+
+        connection.release();
+    }
+}
+
+module.exports = NotificationHelper;

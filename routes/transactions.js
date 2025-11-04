@@ -3,6 +3,8 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { authenticateToken } = require('../middleware/auth');
 const { getConnection } = require('../config/database');
+const NotificationHelper = require('../services/notificationHelper');
+
 
 const router = express.Router();
 
@@ -283,9 +285,11 @@ router.post('/request', [
             `, updateValues);
         }
 
-        // Step 6: Send notification to lender
-        const [borrowerRows] = await connection.execute('SELECT fname, lname FROM users WHERE id = ?', [req.user.id]);
+        // Step 6: Send notification to lender (both in-app and email)
+        const [borrowerRows] = await connection.execute('SELECT fname, lname, email FROM users WHERE id = ?', [req.user.id]);
         const borrowerFullName = borrowerRows.length ? `${borrowerRows[0].fname} ${borrowerRows[0].lname}` : 'A borrower';
+
+        // Create in-app notification
         await createNotification(
             connection,
             book.owner_id,
@@ -294,6 +298,24 @@ router.post('/request', [
             'transaction',
             result.insertId
         );
+
+        // Send email notification
+        try {
+            const NotificationHelper = require('../services/notificationHelper');
+            await NotificationHelper.notifyBorrowRequest(
+                book.owner_id,
+                borrowerFullName,
+                book.title,
+                book.author || 'Unknown Author',
+                request_message,
+                `https://librowse.app/transactions/${result.insertId}`
+            );
+            console.log(`Email notification sent to lender (ID: ${book.owner_id})`);
+        } catch (emailError) {
+            console.error('Error sending email notification:', emailError);
+            // Don't fail the transaction if email fails
+        }
+
 
         // Step 7: Mark book as temporarily unavailable (pending request)
         await connection.execute('UPDATE books SET is_available = FALSE WHERE id = ?', [book_id]);
@@ -311,6 +333,9 @@ router.post('/request', [
         res.status(500).json({ error: 'Failed to create borrow request' });
     }
 });
+
+
+
 
 // PUT /api/transactions/:id/approve - Lender approves borrow request
 router.put('/:id/approve', [
@@ -331,7 +356,7 @@ router.put('/:id/approve', [
 
         // Get transaction details
         const [transactions] = await connection.execute(`
-            SELECT t.*, b.title as book_title, CONCAT(u.fname, ' ', u.lname) as borrower_name
+            SELECT t.*, b.title as book_title, b.author as book_author, CONCAT(u.fname, ' ', u.lname) as borrower_name
             FROM transactions t
             JOIN books b ON t.book_id = b.id
             JOIN users u ON t.borrower_id = u.id
@@ -372,7 +397,7 @@ router.put('/:id/approve', [
             VALUES (?, ?, ?, 'sys', NOW())
         `, [chatResult.insertId, req.user.id, `Chat created for "${transaction.book_title}" transaction. You can now discuss pickup details and terms.`]);
 
-        // Send notification to borrower
+        // Send notification to borrower (both in-app and email)
         await createNotification(
             connection,
             transaction.borrower_id,
@@ -381,6 +406,22 @@ router.put('/:id/approve', [
             'transaction',
             transactionId
         );
+
+        // Send approval email
+        try {
+            const NotificationHelper = require('../services/notificationHelper');
+            await NotificationHelper.notifyApproval(
+                transaction.borrower_id,
+                `${req.user.fname} ${req.user.lname}`,
+                transaction.book_title,
+                transaction.book_author || 'Unknown Author',
+                new Date(transaction.expected_return_date).toLocaleDateString(),
+                `https://librowse.app/transactions/${transactionId}`
+            );
+        } catch (emailError) {
+            console.error('Error sending approval email:', emailError);
+            // Continue without failing - email is secondary
+        }
 
         connection.release();
 
@@ -394,6 +435,7 @@ router.put('/:id/approve', [
         res.status(500).json({ error: 'Failed to approve transaction' });
     }
 });
+
 
 // PUT /api/transactions/:id/reject - Lender rejects borrow request
 router.put('/:id/reject', [
