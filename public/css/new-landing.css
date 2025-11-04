@@ -6,8 +6,12 @@
     min-height: 90vh;
     display: flex;
     align-items: center;
-    padding: 8rem 0 4rem;
+    padding: 3rem 0 4rem;
     overflow: hidden;
+}
+
+#home-section.section {
+    padding-top: 0;
 }
 
 .hero-background {
@@ -416,7 +420,7 @@
 
 @media (max-width: 768px) {
     .hero-new {
-        padding: 6rem 0 3rem;
+        padding: 4rem 0 3rem;
         min-height: 80vh;
     }
     
