@@ -413,12 +413,14 @@ class App {
         try {
             const profileData = await api.get('/auth/profile');
             this.renderProfile(profileData.user, profileData.stats);
+            await this.updateUserStatsAndRating();
         } catch (error) {
             console.error('Failed to load profile:', error);
             // Fallback to basic user data
             const user = authManager.getCurrentUser();
             if (user) {
                 this.renderProfile(user, { books_count: 0, transactions_count: 0, average_rating: 0, credits: 100 });
+                await this.updateUserStatsAndRating();
             }
         }
     }
@@ -434,11 +436,17 @@ class App {
         const profileStudentId = document.getElementById('profile-student-id');
         const profileProgram = document.getElementById('profile-program');
         const verificationBadge = document.getElementById('verification-badge');
+        const profileImg = document.getElementById('profile-image');
 
         if (profileName) profileName.textContent = `${userData.firstname} ${userData.lastname}`;
         if (profileEmail) profileEmail.textContent = userData.email;
         if (profileStudentId) profileStudentId.textContent = `Student ID: ${userData.student_id}`;
         if (profileProgram) profileProgram.textContent = userData.program;
+        if (profileImg) {
+            const imgSrc = userData.avatar_url || userData.profile_image || '/assets/default-avatar.svg';
+            profileImg.src = imgSrc;
+            profileImg.onerror = function () { this.onerror = null; this.src = '/assets/default-avatar.svg'; };
+        }
 
         // Update verification badge
         if (verificationBadge) {
@@ -473,6 +481,28 @@ class App {
         setTimeout(() => {
             this.setupEditProfileButton();
         }, 100);
+    }
+
+    async updateUserStatsAndRating() {
+        try {
+            const user = authManager.getCurrentUser();
+            const userStats = await api.getUserStats();
+            const booksEl = document.getElementById('user-books');
+            const txEl = document.getElementById('user-transactions');
+            const creditsEl = document.getElementById('user-credits');
+            if (booksEl) this.animateNumber(booksEl, userStats.ownedBooks || 0);
+            if (txEl) this.animateNumber(txEl, userStats.totalTransactions || 0);
+            if (creditsEl) this.animateNumber(creditsEl, userStats.credits || 0);
+
+            if (user && user.id) {
+                const feedback = await api.getUserFeedback(user.id);
+                if (Array.isArray(feedback) && feedback.length) {
+                    const avg = feedback.reduce((s, f) => s + (parseInt(f.rating, 10) || 0), 0) / feedback.length;
+                    const ratingEl = document.getElementById('user-rating');
+                    if (ratingEl) this.animateNumber(ratingEl, parseFloat(avg.toFixed(1)) || 0, 1);
+                }
+            }
+        } catch (_) { }
     }
 
     setupProfileTabs() {
@@ -532,6 +562,7 @@ class App {
                 break;
             case 'reviews':
                 tabContent.innerHTML = this.getReviewsTab();
+                this.loadUserReviews();
                 break;
             case 'settings':
                 tabContent.innerHTML = this.getSettingsTab();
@@ -961,9 +992,61 @@ class App {
         return `
             <div class="reviews-content">
                 <h3>Reviews & Ratings</h3>
-                <p>Loading reviews...</p>
+                <div id="reviews-list" class="reviews-list">
+                    <div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading reviews...</div>
+                </div>
             </div>
         `;
+    }
+
+    async loadUserReviews() {
+        const container = document.getElementById('reviews-list') || document.querySelector('.reviews-content');
+        const user = authManager.getCurrentUser();
+        if (!container || !user) return;
+        try {
+            const feedback = await api.getUserFeedback(user.id);
+            if (!Array.isArray(feedback) || feedback.length === 0) {
+                container.innerHTML = `
+                    <div class="no-feedback">
+                        <i class="far fa-star"></i>
+                        <p>No reviews yet.</p>
+                    </div>
+                `;
+                const ratingEl = document.getElementById('user-rating');
+                if (ratingEl) this.animateNumber(ratingEl, 0, 1);
+                return;
+            }
+
+            const html = feedback.map(f => {
+                const rating = Math.max(0, Math.min(5, parseInt(f.rating, 10) || 0));
+                const stars = `${'<i class=\"fas fa-star\"></i>'.repeat(rating)}${'<i class=\"far fa-star\"></i>'.repeat(5 - rating)}`;
+                const date = new Date(f.created).toLocaleDateString();
+                const details = [
+                    f.book_cond ? `<div class=\"feedback-detail-item\"><i class=\"fas fa-book\"></i><span>Condition: ${String(f.book_cond).replace('_', ' ')}</span></div>` : '',
+                    f.return_time ? `<div class=\"feedback-detail-item\"><i class=\"fas fa-clock\"></i><span>Returned: ${f.return_time}</span></div>` : ''
+                ].join('');
+                return `
+                    <div class=\"feedback-item\">
+                        <div class=\"feedback-header\">
+                            <div>
+                                <strong>${(f.reviewer_name || 'Anonymous')}</strong>
+                                <div class=\"feedback-rating\">${stars}</div>
+                            </div>
+                            <div class=\"feedback-date\">${date}</div>
+                        </div>
+                        ${f.comment ? `<p class=\"feedback-comment\">${f.comment}</p>` : ''}
+                        ${details ? `<div class=\"feedback-details\">${details}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+            container.innerHTML = html;
+
+            const avg = feedback.reduce((s, f) => s + (parseInt(f.rating, 10) || 0), 0) / feedback.length;
+            const ratingEl = document.getElementById('user-rating');
+            if (ratingEl) this.animateNumber(ratingEl, parseFloat(avg.toFixed(1)) || 0, 1);
+        } catch (error) {
+            container.innerHTML = `<p class=\"error-message\">Failed to load reviews</p>`;
+        }
     }
 
     getSettingsTab() {

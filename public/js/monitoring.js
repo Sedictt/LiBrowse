@@ -714,8 +714,8 @@ class MonitoringManager {
         modal.innerHTML = `
         <div class="modal-content feedback-modal">
             <div class="modal-header">
-                <h2><i class="fas fa-star"></i> Leave Feedback</h2>
-                <button class="close-modal" onclick="this.closest('.modal').remove()">&times;</button>
+                <h3><i class="fas fa-star"></i> Leave Feedback</h3>
+                <button class="modal-close" onclick="this.closest('.modal').remove()"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div class="feedback-book-info">
@@ -784,6 +784,11 @@ class MonitoringManager {
     `;
 
         document.body.appendChild(modal);
+
+        // Close on outside click for consistency with other modals
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
 
         // Initialize star rating
         this.initializeStarRating();
