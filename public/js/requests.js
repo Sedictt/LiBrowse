@@ -719,13 +719,19 @@ class RequestManager {
         // Format time (e.g., "2:30 PM" or "Yesterday")
         const timeFormatted = chat.last_message_time ? this.formatTimeAgo(chat.last_message_time) : '';
 
+        let previewText = chat.last_message || 'No messages yet';
+        if (chat.last_message_type === 'img' || (typeof previewText === 'string' && previewText.includes('/api/chat-attachments/'))) {
+            const count = (previewText || '').split('\n').filter(Boolean).length;
+            previewText = count > 1 ? `${count} Photos` : 'Photo';
+        }
+
         return `
             <div class="chat-card" data-chat-id="${chat.id}" onclick="requestManager.openChatById(${chat.id})">
                 <div class="chat-avatar">${initials}</div>
                 <div class="chat-header">
                     <div class="chat-content">
                         <h4>${this.escapeHtml(chat.other_user_name)}</h4>
-                        <p class="chat-last-message">${this.escapeHtml(chat.last_message) || 'No messages yet'}</p>
+                        <p class="chat-last-message">${this.escapeHtml(previewText)}</p>
                     </div>
                     <div class="chat-meta">
                         ${timeFormatted ? `<span class="chat-time">${timeFormatted}</span>` : ''}

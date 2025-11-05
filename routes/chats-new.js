@@ -41,6 +41,9 @@ router.get('/', authenticateToken, async (req, res) => {
                 (SELECT created FROM chat_messages 
                  WHERE chat_id = c.id 
                  ORDER BY created DESC LIMIT 1) as last_message_time,
+                (SELECT message_type FROM chat_messages 
+                 WHERE chat_id = c.id 
+                 ORDER BY created DESC LIMIT 1) as last_message_type,
                 (SELECT COUNT(*) FROM chat_messages 
                  WHERE chat_id = c.id 
                  AND sender_id != ? 

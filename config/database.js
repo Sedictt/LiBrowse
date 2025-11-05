@@ -27,6 +27,7 @@ const testConnection = async () => {
         return true;
     } catch (error) {
         console.error('❌ Database connection failed:', error.message);
+        console.error('   Make sure MySQL is running. Check your DB_HOST, DB_USER, and DB_PASSWORD in .env');
         return false;
     }
 };

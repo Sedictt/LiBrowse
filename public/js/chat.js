@@ -969,8 +969,16 @@ class ChatManager {
     showNotification(message) {
         // Browser notification
         if ('Notification' in window && Notification.permission === 'granted') {
+            let bodyText = (message && message.message) ? message.message : '';
+            if (message && (message.message_type === 'img' || (typeof bodyText === 'string' && bodyText.includes('/api/chat-attachments/')))) {
+                const count = (bodyText || '').split('\n').filter(Boolean).length;
+                bodyText = count > 1 ? `${count} Photos` : 'Photo';
+            } else {
+                bodyText = bodyText.substring(0, 100);
+            }
+
             const notification = new Notification(`New message from ${message.sender_name}`, {
-                body: message.message.substring(0, 100),
+                body: bodyText,
                 icon: '/images/logo.png',
                 tag: `chat-${message.chat_id}`
             });

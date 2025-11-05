@@ -174,13 +174,17 @@ const ReminderTask = require('./tasks/reminderTask');
 // Run every day at 8:00 AM
 cron.schedule('0 8 * * *', () => {
     console.log('[Scheduler] Running daily reminder task...');
-    ReminderTask.checkDueDates();
+    ReminderTask.checkDueDates().catch(err => {
+        console.error('[Scheduler] Reminder task failed:', err.message);
+    });
 });
 
-// Also run once on startup after 5 seconds
+// Also run once on startup after 5 seconds (only if DB is connected)
 setTimeout(() => {
     console.log('[Scheduler] Running initial reminder check...');
-    ReminderTask.checkDueDates();
+    ReminderTask.checkDueDates().catch(err => {
+        console.error('[Scheduler] Initial reminder check failed:', err.message);
+    });
 }, 5000);
 
 

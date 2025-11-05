@@ -5215,7 +5215,7 @@ body {
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
     backdrop-filter: blur(10px);
-    border: 1px solid var(--bg-glass);
+    /* border: 1px solid var(--bg-glass); */
     min-width: 300px;
     max-width: 400px;
     transition: all 0.3s ease;
