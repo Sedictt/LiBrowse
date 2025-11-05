@@ -306,8 +306,8 @@ router.post('/upload-documents',
 
             // Update user verification status
             await executeQuery(
-                'UPDATE users SET verification_status = ?, verification_method = ?, is_verified = ?, modified = NOW() WHERE id = ?',
-                [verificationStatus, 'document_upload', autoApproved, user.id]
+                "UPDATE users SET verification_status = ?, verification_method = ?, is_verified = CASE WHEN ? AND email_verified = 1 THEN 1 ELSE 0 END, modified = NOW() WHERE id = ?",
+                [verificationStatus, 'document_upload', autoApproved ? 1 : 0, user.id]
             );
 
             // Generate appropriate message

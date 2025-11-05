@@ -134,8 +134,9 @@ router.post('/logout', authenticateToken, async (req, res) => {
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const dbUser = await getOne(
-      `SELECT id, email, student_no, fname, lname, course, year, is_verified, credits 
-             FROM users WHERE id = ?`,
+      `SELECT id, email, student_no, fname, lname, course, year, 
+              is_verified, credits, email_verified, verification_status, verification_method 
+       FROM users WHERE id = ?`,
       [req.user.id]
     );
 
@@ -153,6 +154,9 @@ router.get('/profile', authenticateToken, async (req, res) => {
       program: dbUser.course,
       year: dbUser.year,
       is_verified: !!dbUser.is_verified,
+      email_verified: !!dbUser.email_verified,
+      verification_status: dbUser.verification_status,
+      verification_method: dbUser.verification_method,
       credits: dbUser.credits ?? 100,
     };
 
@@ -355,8 +359,12 @@ router.post("/verify-otp", async (req, res) => {
     }
 
     try {
-      await executeQuery("UPDATE users SET is_verified = TRUE, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?", [email]);
-      console.log(`[OTP] verify-otp: verification success`, { email });
+      // Mark email as verified; fully verified only if document status is already 'verified'
+      await executeQuery(
+        "UPDATE users SET email_verified = TRUE, is_verified = CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?",
+        [email]
+      );
+      console.log(`[OTP] verify-otp: email marked verified`, { email });
       return res.json({ message: "Email verified successfully" });
     } catch (dbErr) {
       console.error(`[OTP] verify-otp: failed to update user verification`, { error: dbErr.message });

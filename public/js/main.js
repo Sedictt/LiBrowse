@@ -448,9 +448,9 @@ class App {
             profileImg.onerror = function () { this.onerror = null; this.src = '/assets/default-avatar.svg'; };
         }
 
-        // Update verification badge
+        // Update verification badge (fully verified only when BOTH methods verified)
         if (verificationBadge) {
-            const isVerified = userData.is_verified !== undefined ? userData.is_verified : true;
+            const isVerified = !!(userData.email_verified && userData.verification_status === 'verified');
             verificationBadge.className = `verification-badge ${isVerified ? 'verified' : 'unverified'}`;
             verificationBadge.innerHTML = `
                 <i class="fas fa-${isVerified ? 'check-circle' : 'exclamation-triangle'}"></i>
@@ -642,9 +642,10 @@ class App {
         const user = authManager.getCurrentUser();
         if (!user) return '';
 
-        const isVerified = user.is_verified || user.verification_status === 'verified';
+        const emailVerified = !!user.email_verified;
+        const docVerified = user.verification_status === 'verified';
+        const isVerified = emailVerified && docVerified;
         const verificationMethod = user.verification_method || 'none';
-        const emailVerified = user.email_verified || false;
 
         return `
             <div class="verification-content">
@@ -693,14 +694,14 @@ class App {
                 }
                                     </div>
                                 </div>
-                                <button class="method-btn ${emailVerified ? 'btn-outline' : 'btn-primary'}" 
-                                        id="email-verify-btn">
-                                    <i class="fas ${emailVerified ? 'fa-redo' : 'fa-paper-plane'}"></i>
-                                    ${emailVerified ? 'Re-verify Email' : 'Verify Email'}
-                                </button>
+                                ${!emailVerified ? `
+                                <button class="method-btn btn-primary" id="email-verify-btn">
+                                    <i class="fas fa-paper-plane"></i>
+                                    Verify Email
+                                </button>` : ''}
                             </div>
 
-                            <div class="method-card" data-method="document">
+                            <div class="method-card ${docVerified ? 'completed' : ''}" data-method="document">
                                 <div class="method-icon">
                                     <i class="fas fa-id-card"></i>
                                 </div>
@@ -708,13 +709,17 @@ class App {
                                     <h5>Document Upload</h5>
                                     <p>Upload your Student ID for automatic OCR verification</p>
                                     <div class="method-status">
-                                        <span class="status-badge pending"><i class="fas fa-upload"></i> Ready</span>
+                                        ${docVerified ?
+                        '<span class="status-badge verified"><i class="fas fa-check"></i> Completed</span>' :
+                        '<span class="status-badge pending"><i class="fas fa-upload"></i> Ready</span>'
+                    }
                                     </div>
                                 </div>
+                                ${!docVerified ? `
                                 <button class="method-btn btn-primary" id="document-verify-btn">
                                     <i class="fas fa-camera"></i>
                                     Upload Documents
-                                </button>
+                                </button>` : ''}
                             </div>
                         </div>
                     </div>
@@ -875,24 +880,14 @@ class App {
                             </div>
                             <div class="detail-item">
                                 <span class="label">Method:</span>
-                                <span class="value">${verificationMethod === 'email' ? 'Email Verification' : 'Document Upload'}</span>
+                                <span class="value">${(emailVerified && docVerified) ? 'Email + Document' : (verificationMethod === 'email' ? 'Email Verification' : 'Document Upload')}</span>
                             </div>
-                            ${verificationMethod === 'email' ? `
+                            ${emailVerified ? `
                                 <div class="detail-item">
                                     <span class="label">Email:</span>
                                     <span class="value">${user.email}</span>
                                 </div>
                             ` : ''}
-                        </div>
-                        <div class="verification-actions">
-                            <button class="btn btn-outline-primary" id="re-verify-btn">
-                                <i class="fas fa-shield-alt"></i>
-                                Re-verify Account
-                            </button>
-                            <button class="btn btn-ghost" id="change-method-btn">
-                                <i class="fas fa-exchange-alt"></i>
-                                Change Method
-                            </button>
                         </div>
                     </div>
                 `}
@@ -1051,7 +1046,9 @@ class App {
 
     getSettingsTab() {
         const user = authManager.getCurrentUser();
-        const isVerified = user ? true : false; // Assume verified if logged in
+        const emailVerified = !!(user && user.email_verified);
+        const docVerified = !!(user && user.verification_status === 'verified');
+        const isVerified = emailVerified && docVerified;
 
         return `
             <div class="settings-content">
@@ -1066,23 +1063,10 @@ class App {
                         </div>
                         <p class="status-description">
                             ${isVerified
-                ? 'Your account has been successfully verified. You can re-verify using a different method if needed.'
-                : 'Please verify your account to access all features and build trust with other users.'
+                ? 'Your account is fully verified.'
+                : 'Verify your student email and upload your ID/COR to become fully verified.'
             }
                         </p>
-                    </div>
-                    
-                    <div class="verification-actions">
-                        <button class="btn btn-primary" id="reverify-account">
-                            <i class="fas fa-shield-alt"></i>
-                            ${isVerified ? 'Re-verify Account' : 'Verify Account'}
-                        </button>
-                        ${isVerified ? `
-                            <button class="btn btn-outline" id="change-verification-method">
-                                <i class="fas fa-exchange-alt"></i>
-                                Change Verification Method
-                            </button>
-                        ` : ''}
                     </div>
                     
                     <div class="verification-methods-info">

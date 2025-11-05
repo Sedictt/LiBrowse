@@ -799,26 +799,29 @@ class AuthManager {
                 this.closeModal('document-upload-modal');
 
                 if (response.autoApproved) {
-                    this.showToast('✓ Verification successful! Your account is now verified.', 'success');
-                    // Update local user state
+                    this.showToast('✓ Document verified! Verify your PLV email to become fully verified.', 'success');
+                    // Update local user state (document verified), keep full verification gated on email
                     try {
                         const userStr = localStorage.getItem('user');
                         if (userStr) {
                             const u = JSON.parse(userStr);
-                            u.is_verified = true;
+                            u.verification_status = 'verified';
+                            u.verification_method = 'document_upload';
+                            u.is_verified = !!u.email_verified; // fully verified only if email already verified
                             localStorage.setItem('user', JSON.stringify(u));
                             this.currentUser = u;
                         }
                     } catch (_) { }
-                    // Update UI status card
-                    this.updateVerificationStatusUI('verified', 'Your account is verified.');
-                    // Show success modal
-                    // Slight delay to avoid race with closing upload modal
+                    // Show success modal (document verified)
                     console.log('🔔 Showing verification success modal...');
                     setTimeout(() => this.showVerificationSuccessModal({
-                        title: 'Verification Successful',
-                        message: 'Your Student ID has been verified. You now have full access to LiBrowse features.',
+                        title: 'Document Verified',
+                        message: 'Your Student ID has been verified. Verify your PLV email to complete verification.',
                     }), 120);
+                    // Refresh section to reflect updated verification state
+                    if (window.app) {
+                        window.app.loadCurrentSection();
+                    }
                 } else {
                     this.showToast('Documents uploaded! Admin review in progress.', 'info');
                     // Update UI status card
@@ -890,6 +893,21 @@ class AuthManager {
             const response = await api.verifyOTP(email, otp);
             this.showToast(response.message, "success");
             this.closeModal("otp-modal");
+            // Update local user: email verified; recompute full verification based on document status
+            try {
+                const userStr = localStorage.getItem('user');
+                if (userStr) {
+                    const u = JSON.parse(userStr);
+                    u.email_verified = true;
+                    u.is_verified = (u.verification_status === 'verified');
+                    localStorage.setItem('user', JSON.stringify(u));
+                    this.currentUser = u;
+                }
+            } catch (_) { }
+            // Refresh current section to reflect changes
+            if (window.app) {
+                window.app.loadCurrentSection();
+            }
         } catch (err) {
             this.showToast(err.message || "Invalid or expired OTP", "error");
         }
