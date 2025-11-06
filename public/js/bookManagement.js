@@ -767,7 +767,9 @@ displayValidationErrors(details) {
                     <h3>No Books Yet</h3>
                     <p>Start by adding your first book to share with others!</p>
                     <button class="btn btn-primary" onclick="bookManagement.showAddBookModal()">
-                        <i class="fas fa-plus"></i>
+                        <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" role="img">
+                            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+                        </svg>
                         Add Your First Book
                     </button>
                 </div>
@@ -779,7 +781,9 @@ displayValidationErrors(details) {
             <div class="my-books-header">
                 <h3>My Books (${books.length})</h3>
                 <button class="btn btn-primary" onclick="bookManagement.showAddBookModal()">
-                    <i class="fas fa-plus"></i>
+                    <svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" role="img">
+                        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+                    </svg>
                     Add Book
                 </button>
             </div>

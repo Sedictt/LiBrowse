@@ -1766,10 +1766,40 @@ body {
     color: var(--text-secondary);
 }
 
-.empty-state i {
+/* only target the large decorative icon that is a direct child of the empty-state
+   container. This prevents other icons inside the empty state (eg. button icons)
+   from inheriting the large size. */
+.empty-state > i {
     font-size: 4rem;
     margin-bottom: var(--spacing-lg);
     opacity: 0.5;
+}
+
+/* specifically size/space any icon that appears inside a button within the
+   empty-state so the plus icon aligns with the button text */
+.empty-state .btn i {
+    /* center icon inside the button and use a slightly smaller size to
+       better match the text baseline. Keep a tiny nudge to fine-tune.
+       Using inline-flex avoids unexpected baseline shifts from grid. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    line-height: 1;
+    margin-right: var(--spacing-sm);
+    transform: translateY(1px); /* small visual nudge */
+    opacity: 0.95;
+}
+
+/* style inline SVG used in empty-state buttons so it aligns with text like the
+   font icon did. Use currentColor so the SVG inherits button color. */
+.empty-state .btn svg {
+    display: inline-block;
+    width: 1.05rem;
+    height: 1.05rem;
+    vertical-align: middle;
+    margin-right: var(--spacing-sm);
+    fill: none;
 }
 
 .empty-state h3 {
