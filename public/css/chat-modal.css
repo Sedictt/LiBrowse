@@ -132,6 +132,58 @@
     color: var(--error-light);
 }
 
+/* Labeled cancel button (used in header beside report icon) */
+.chat-btn-cancel {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.chat-btn-cancel i,
+.chat-btn-cancel svg {
+    font-size: 14px;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.chat-btn-cancel .chat-btn-label {
+    line-height: 1;
+    white-space: nowrap;
+    color: inherit;
+    font-weight: 600;
+}
+
+.chat-btn-cancel:hover {
+    background: rgba(255, 107, 107, 0.12);
+    color: var(--error-light);
+    border-color: rgba(255, 107, 107, 0.18);
+}
+
+@media (max-width: 480px) {
+    .chat-btn-cancel {
+        padding: 6px 8px;
+        font-size: 13px;
+        height: 32px;
+    }
+
+    .chat-btn-cancel .chat-btn-label {
+        display: none; /* shorten header on very small screens */
+    }
+}
+
 /* Info Banner */
 .chat-info-banner {
     display: flex;
