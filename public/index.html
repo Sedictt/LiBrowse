@@ -1,4 +1,4 @@
-+
+﻿+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -658,7 +658,8 @@
                         <div class="profile-card">
                             <div class="profile-header">
                                 <div class="profile-avatar">
-                                    <img id="profile-image" src="/assets/default-avatar.svg" alt="Profile" onerror="this.onerror=null;this.src='/assets/default-avatar.svg'">
+                                    <img id="profile-image" src="/assets/default-avatar.svg" alt="Profile"
+                                        onerror="this.onerror=null;this.src='/assets/default-avatar.svg'">
                                     <button class="avatar-edit" id="edit-avatar">
                                         <i class="fas fa-camera"></i>
                                     </button>
@@ -1190,28 +1191,41 @@
     </script>
 
     <script>
-        // Handle registration form submission
         const registerForm = document.getElementById("register-form");
 
-        registerForm.addEventListener("submit", function (e) {
-            e.preventDefault(); // Prevents form from refreshing the page
+        registerForm.addEventListener("submit", async function (e) {
+            e.preventDefault();
 
-            // OPTIONAL: Add validation or backend request here using fetch()
+            // Get form input values
+            const formData = new FormData(registerForm);
+            const data = Object.fromEntries(formData.entries());
 
-            // Simulate success (replace this with actual API callback)
-            showSuccessMessage("Your account has been successfully registered!");
+            try {
+                // Send data to backend
+                const response = await fetch("http://localhost:3000/register", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
 
-            // Reset form after submission
-            registerForm.reset();
+                const result = await response.json();
+
+                if (response.ok) {
+                    showSuccessMessage(result.message || "Your account has been successfully registered!");
+                    registerForm.reset();
+                } else {
+                    alert(result.message || "Registration failed.");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("Something went wrong while connecting to the server.");
+            }
         });
 
         function showSuccessMessage(message) {
-            // Create message container
             const successMsg = document.createElement("div");
             successMsg.textContent = message;
             successMsg.className = "success-message";
-
-            // Style the message
             successMsg.style.backgroundColor = "#d1fae5";
             successMsg.style.color = "#065f46";
             successMsg.style.padding = "12px";
@@ -1219,14 +1233,11 @@
             successMsg.style.marginTop = "15px";
             successMsg.style.borderRadius = "6px";
             successMsg.style.border = "1px solid #10b981";
-
-            // Insert below the form
             registerForm.parentNode.insertBefore(successMsg, registerForm.nextSibling);
-
-            // Remove message after 4 seconds
             setTimeout(() => successMsg.remove(), 4000);
         }
     </script>
+
 
 
     <!-- Verification Choice Modal -->
