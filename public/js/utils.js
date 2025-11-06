@@ -14,6 +14,8 @@ function showToast(message, type = 'info', duration = 3000) {
     const toast = document.createElement('div');
     // Support both styling schemes: `.toast.error` and `.toast-error`
     toast.className = `toast ${type} toast-${type}`;
+    // Ensure clicks work even if container disables pointer events
+    toast.style.pointerEvents = 'auto';
 
     const icon = {
         success: 'fa-check-circle',
@@ -23,9 +25,11 @@ function showToast(message, type = 'info', duration = 3000) {
     }[type] || 'fa-info-circle';
 
     toast.innerHTML = `
-        <i class="fas ${icon}"></i>
-        <span>${message}</span>
-        <button class="toast-close" aria-label="Close notification"><i class="fas fa-times"></i></button>
+        <div class="toast-content">
+            <div class="toast-icon"><i class="fas ${icon}"></i></div>
+            <div class="toast-message">${escapeHtml(String(message))}</div>
+            <button class="toast-close" aria-label="Close notification"><i class="fas fa-times"></i></button>
+        </div>
     `;
 
     container.appendChild(toast);
@@ -50,11 +54,31 @@ function showToast(message, type = 'info', duration = 3000) {
     // Close button
     toast.querySelector('.toast-close').addEventListener('click', removeToast);
 
-    // Auto remove
-    const timeout = setTimeout(removeToast, duration);
+    // Auto remove with pause/resume on hover to avoid stuck toasts
+    let remaining = Math.max(0, duration | 0);
+    let timerId;
+    let startTime;
+    const startTimer = () => {
+        startTime = Date.now();
+        timerId = setTimeout(removeToast, remaining);
+    };
+    const pauseTimer = () => {
+        clearTimeout(timerId);
+        remaining -= Date.now() - startTime;
+        if (remaining < 0) remaining = 0;
+    };
+    const resumeTimer = () => {
+        clearTimeout(timerId);
+        if (remaining === 0) {
+            removeToast();
+        } else {
+            startTimer();
+        }
+    };
+    startTimer();
 
-    // Pause on hover (optional UX improvement)
-    toast.addEventListener('mouseenter', () => clearTimeout(timeout));
+    toast.addEventListener('mouseenter', pauseTimer);
+    toast.addEventListener('mouseleave', resumeTimer);
 }
 
 // Format date

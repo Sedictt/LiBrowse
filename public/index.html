@@ -905,59 +905,7 @@
         </div>
     </div>
 
-    <!-- Script -->
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const form = document.getElementById("login-form");
-            const emailInput = document.getElementById("login-email");
-            const passwordInput = document.getElementById("login-password");
-            const emailError = document.getElementById("email-error");
-            const passwordError = document.getElementById("password-error");
-
-            const passwordPattern =
-                /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
-
-            form.addEventListener("submit", async (e) => {
-                e.preventDefault();
-                emailError.textContent = "";
-                passwordError.textContent = "";
-
-                const email = emailInput.value.trim();
-                const password = passwordInput.value.trim();
-
-                if (!email.endsWith("@plv.edu.ph")) {
-                    emailError.textContent = "Please use your PLV email address.";
-                    return;
-                }
-
-                if (!passwordPattern.test(password)) {
-                    passwordError.textContent =
-                        "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.";
-                    return;
-                }
-
-                try {
-                    const response = await api.login(email, password);
-
-                    if (response.token && response.user) {
-                        localStorage.setItem("token", response.token);
-                        localStorage.setItem("user", JSON.stringify(response.user));
-
-                        const modal = document.getElementById("login-modal");
-                        if (modal) modal.classList.remove("active");
-
-                        alert("âœ… Login successful!");
-                        window.location.reload();
-                    } else {
-                        passwordError.textContent = response.error || "Login failed.";
-                    }
-                } catch (err) {
-                    console.error("Login error:", err);
-                    passwordError.textContent = "Invalid email or password.";
-                }
-            });
-        });
-    </script>
+    <!-- Auth is handled by public/js/auth.js; inline login handler removed -->
 
     <!-- Forgot Password Modal -->
     <div id="forgot-password-modal" class="modal">
