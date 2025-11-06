@@ -1000,7 +1000,8 @@ body {
 
 /* Main Content */
 .main-content {
-    margin-top: 0;
+    margin-top: 70px;
+    /* Add this - matches navbar height */
     min-height: calc(100vh - 70px);
 }
 
@@ -1008,12 +1009,14 @@ body {
     display: none;
     min-height: calc(100vh - 70px);
     padding: var(--spacing-xxl) 0;
+    /* Keep existing padding */
     animation: fadeIn 0.6s ease-out;
 }
 
 .section.active {
     display: block;
 }
+
 
 .container {
     max-width: 1200px;
@@ -1769,7 +1772,7 @@ body {
 /* only target the large decorative icon that is a direct child of the empty-state
    container. This prevents other icons inside the empty state (eg. button icons)
    from inheriting the large size. */
-.empty-state > i {
+.empty-state>i {
     font-size: 4rem;
     margin-bottom: var(--spacing-lg);
     opacity: 0.5;
@@ -1787,7 +1790,8 @@ body {
     font-size: 0.95rem;
     line-height: 1;
     margin-right: var(--spacing-sm);
-    transform: translateY(1px); /* small visual nudge */
+    transform: translateY(1px);
+    /* small visual nudge */
     opacity: 0.95;
 }
 
