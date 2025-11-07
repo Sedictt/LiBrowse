@@ -1,17 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/database');
+const { getConnection, pool: dbPool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 
 // Configuration
 const CONFIG = {
-    CANCELLATION_TIMEOUT: 72 * 60 * 60 * 1000, // 72 hours in milliseconds
+    CANCELLATION_TIMEOUT: 48 * 60 * 60 * 1000, // 48 hours in milliseconds
     REFUND_PERCENTAGE_PARTIAL: 0.5, // 50% refund for partial
 };
 
 // Initiate cancellation request
 router.post('/initiate', authenticateToken, async (req, res) => {
-    const connection = await pool.getConnection();
+    const connection = await getConnection();
     
     try {
         const initiatorId = req.user.id;
@@ -38,7 +38,11 @@ router.post('/initiate', authenticateToken, async (req, res) => {
         
         // Get transaction details
         const [transaction] = await connection.query(`
-            SELECT t.*, b.title as book_title, b.minimum_credits
+            SELECT 
+                t.id, t.book_id, t.borrower_id, t.lender_id,
+                LOWER(COALESCE(t.status, 'waiting')) AS txn_status,
+                b.title as book_title,
+                b.minimum_credits
             FROM transactions t
             JOIN books b ON t.book_id = b.id
             WHERE t.id = ?
@@ -57,24 +61,23 @@ router.post('/initiate', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'You are not part of this transaction' });
         }
         
-        // Check transaction status - can only cancel approved or borrowed transactions
-        if (!['approved', 'borrowed'].includes(txn.status)) {
-            await connection.rollback();
-            return res.status(400).json({ 
-                error: `Cannot cancel transaction with status: ${txn.status}` 
-            });
-        }
-        
-        // Check if there's already an active cancellation request
+        // Check if there's already an active cancellation request (do this first)
         const [existing] = await connection.query(`
             SELECT id FROM cancellation_requests
             WHERE transaction_id = ? AND status IN ('pending', 'consented')
         `, [transactionId]);
-        
         if (existing.length > 0) {
             await connection.rollback();
-            return res.status(409).json({ 
-                error: 'A cancellation request is already in progress for this transaction' 
+            return res.status(409).json({ error: 'A cancellation request is already in progress for this transaction' });
+        }
+
+        // Check transaction status - allow waiting/approved/ongoing
+        const cancellableStatuses = ['waiting', 'approved', 'ongoing'];
+        const txnStatus = String(txn.txn_status || '').trim();
+        if (!txnStatus || !cancellableStatuses.includes(txnStatus)) {
+            await connection.rollback();
+            return res.status(400).json({ 
+                error: `Cannot cancel transaction with status: ${txnStatus || '(unknown)'}` 
             });
         }
         
@@ -83,15 +86,16 @@ router.post('/initiate', authenticateToken, async (req, res) => {
         
         // Calculate refund amount if partial
         let calculatedRefundAmount = null;
+        const baseCredits = Number(txn.minimum_credits) || 0;
         if (refundTypeValue === 'partial') {
             if (refundAmount !== undefined && refundAmount !== null) {
                 calculatedRefundAmount = refundAmount;
             } else {
-                // Default to 50% of held credits
-                calculatedRefundAmount = Math.floor(txn.escrow_held * CONFIG.REFUND_PERCENTAGE_PARTIAL);
+                // Default to 50% of held/minimum credits
+                calculatedRefundAmount = Math.floor(baseCredits * CONFIG.REFUND_PERCENTAGE_PARTIAL);
             }
         } else if (refundTypeValue === 'full') {
-            calculatedRefundAmount = txn.escrow_held || txn.minimum_credits;
+            calculatedRefundAmount = baseCredits;
         }
         
         // Create cancellation request
@@ -135,16 +139,64 @@ router.post('/initiate', authenticateToken, async (req, res) => {
         
         // Notify the other party
         await connection.query(`
-            INSERT INTO notifications (user_id, title, body, category, type, related_id)
-            VALUES (?, ?, ?, 'transaction', 'transaction', ?)
+            INSERT INTO notifications (user_id, title, body, category, related_id)
+            VALUES (?, ?, ?, 'transaction', ?)
         `, [
             otherPartyId,
             'Cancellation Request',
-            `A cancellation request has been made for "${txn.book_title}". Please review and respond within 72 hours.`,
+            `A cancellation request has been made for \"${txn.book_title}\". Please review and respond within 48 hours.`,
             transactionId
         ]);
         
+        // Ensure there is a chat for this transaction and post a system message with action buttons
+        let chatId = null;
+        const [existingChats] = await connection.query('SELECT id FROM chats WHERE transaction_id = ?', [transactionId]);
+        if (existingChats.length > 0) {
+            chatId = existingChats[0].id;
+        } else {
+            const [chatInsert] = await connection.query('INSERT INTO chats (transaction_id, created) VALUES (?, NOW())', [transactionId]);
+            chatId = chatInsert.insertId;
+        }
+
+        const cancelPayload = {
+            type: 'cancellation_request',
+            cancellation_id: cancellationId,
+            transaction_id: transactionId,
+            initiator_id: initiatorId,
+            other_party_id: otherPartyId,
+            book_title: txn.book_title,
+            reason,
+            refund_type: refundTypeValue,
+            refund_amount: calculatedRefundAmount,
+            expires_at: new Date(expiresAt).toISOString()
+        };
+
+        const [msgInsert] = await connection.query(`
+            INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created)
+            VALUES (?, ?, ?, 'sys', NOW())
+        `, [chatId, initiatorId, JSON.stringify(cancelPayload)]);
+
         await connection.commit();
+
+        // Broadcast chat notification so the other party sees it in chatbox immediately
+        try {
+            const io = req.app.get('socketio');
+            if (io && chatId && msgInsert.insertId) {
+                const [newMsgRows] = await connection.query(`
+                    SELECT cm.*, CONCAT(u.first_name, ' ', u.last_name) as sender_name, u.profile_image as sender_avatar
+                    FROM chat_messages cm
+                    LEFT JOIN users u ON cm.sender_id = u.id
+                    WHERE cm.id = ?
+                `, [msgInsert.insertId]);
+                const newMsg = newMsgRows && newMsgRows[0] ? newMsgRows[0] : null;
+                if (newMsg) {
+                    io.to(`chat_${chatId}`).emit('new_message', { chatId, message: newMsg });
+                    io.emit('chat_activity', { chatId, type: 'message', messageId: newMsg.id });
+                }
+            }
+        } catch (e) {
+            console.error('Socket broadcast error (cancellation initiate):', e);
+        }
         
         res.status(201).json({
             success: true,
@@ -164,7 +216,7 @@ router.post('/initiate', authenticateToken, async (req, res) => {
 
 // Respond to cancellation request (consent or reject)
 router.post('/:cancellationId/respond', authenticateToken, async (req, res) => {
-    const connection = await pool.getConnection();
+    const connection = await getConnection();
     
     try {
         const userId = req.user.id;
@@ -179,7 +231,7 @@ router.post('/:cancellationId/respond', authenticateToken, async (req, res) => {
         
         // Get cancellation request
         const [cancellation] = await connection.query(`
-            SELECT cr.*, t.borrower_id, t.lender_id, t.escrow_held, t.escrow_status,
+            SELECT cr.*, t.borrower_id, t.lender_id,
                    b.title as book_title, b.minimum_credits
             FROM cancellation_requests cr
             JOIN transactions t ON cr.transaction_id = t.id
@@ -245,17 +297,58 @@ router.post('/:cancellationId/respond', authenticateToken, async (req, res) => {
             
             // Notify initiator
             await connection.query(`
-                INSERT INTO notifications (user_id, title, body, category, type, related_id)
-                VALUES (?, ?, ?, 'transaction', 'transaction', ?)
+                INSERT INTO notifications (user_id, title, body, category, related_id)
+                VALUES (?, ?, ?, 'transaction', ?)
             `, [
                 cancel.initiator_id,
                 'Cancellation Approved',
-                `Your cancellation request for "${cancel.book_title}" has been approved. The transaction has been cancelled.`,
+                `Your cancellation request for \"${cancel.book_title}\" has been approved. The transaction has been cancelled.`,
                 cancel.transaction_id
             ]);
-            
+
+            // Post system message in chat
+            let chatId = null;
+            const [existingChats] = await connection.query('SELECT id FROM chats WHERE transaction_id = ?', [cancel.transaction_id]);
+            if (existingChats.length > 0) chatId = existingChats[0].id;
+            let msgId = null;
+            if (chatId) {
+                const responsePayload = {
+                    type: 'cancellation_response',
+                    status: 'approved',
+                    cancellation_id: cancel.id,
+                    transaction_id: cancel.transaction_id,
+                    responder_id: userId,
+                    book_title: cancel.book_title
+                };
+                const [msgInsert] = await connection.query(`
+                    INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created)
+                    VALUES (?, ?, ?, 'sys', NOW())
+                `, [chatId, userId, JSON.stringify(responsePayload)]);
+                msgId = msgInsert.insertId;
+            }
+
             await connection.commit();
-            
+
+            // Broadcast to chat participants
+            try {
+                const io = req.app.get('socketio');
+                if (io && chatId && msgId) {
+                    const [newMsgRows] = await connection.query(`
+                        SELECT cm.*, CONCAT(u.first_name, ' ', u.last_name) as sender_name, u.profile_image as sender_avatar
+                        FROM chat_messages cm
+                        LEFT JOIN users u ON cm.sender_id = u.id
+                        WHERE cm.id = ?
+                    `, [msgId]);
+                    const newMsg = newMsgRows && newMsgRows[0] ? newMsgRows[0] : null;
+                    if (newMsg) {
+                        io.to(`chat_${chatId}`).emit('new_message', { chatId, message: newMsg });
+                        io.emit('chat_activity', { chatId, type: 'message', messageId: newMsg.id });
+                    }
+                }
+            } catch (e) {
+                console.error('Socket broadcast error (cancellation approve):', e);
+            }
+
             res.json({
                 success: true,
                 message: 'Cancellation approved. Transaction has been cancelled and refund processed.'
@@ -292,11 +385,52 @@ router.post('/:cancellationId/respond', authenticateToken, async (req, res) => {
             `, [
                 cancel.initiator_id,
                 'Cancellation Rejected',
-                `Your cancellation request for "${cancel.book_title}" has been rejected. The transaction continues.`,
+                `Your cancellation request for \"${cancel.book_title}\" has been rejected. The transaction continues.`,
                 cancel.transaction_id
             ]);
-            
+
+            // Post system message in chat
+            let chatId = null;
+            const [existingChats] = await connection.query('SELECT id FROM chats WHERE transaction_id = ?', [cancel.transaction_id]);
+            if (existingChats.length > 0) chatId = existingChats[0].id;
+            let msgId = null;
+            if (chatId) {
+                const responsePayload = {
+                    type: 'cancellation_response',
+                    status: 'rejected',
+                    cancellation_id: cancel.id,
+                    transaction_id: cancel.transaction_id,
+                    responder_id: userId,
+                    book_title: cancel.book_title
+                };
+                const [msgInsert] = await connection.query(`
+                    INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created)
+                    VALUES (?, ?, ?, 'sys', NOW())
+                `, [chatId, userId, JSON.stringify(responsePayload)]);
+                msgId = msgInsert.insertId;
+            }
+
             await connection.commit();
+
+            // Broadcast to chat participants
+            try {
+                const io = req.app.get('socketio');
+                if (io && chatId && msgId) {
+                    const [newMsgRows] = await connection.query(`
+                        SELECT cm.*, CONCAT(u.first_name, ' ', u.last_name) as sender_name, u.profile_image as sender_avatar
+                        FROM chat_messages cm
+                        LEFT JOIN users u ON cm.sender_id = u.id
+                        WHERE cm.id = ?
+                    `, [msgId]);
+                    const newMsg = newMsgRows && newMsgRows[0] ? newMsgRows[0] : null;
+                    if (newMsg) {
+                        io.to(`chat_${chatId}`).emit('new_message', { chatId, message: newMsg });
+                        io.emit('chat_activity', { chatId, type: 'message', messageId: newMsg.id });
+                    }
+                }
+            } catch (e) {
+                console.error('Socket broadcast error (cancellation reject):', e);
+            }
             
             res.json({
                 success: true,
@@ -318,7 +452,7 @@ async function processCancellation(connection, cancel) {
     // Update cancellation status
     await connection.query(`
         UPDATE cancellation_requests
-        SET status = 'completed', completed_at = NOW()
+        SET status = 'processed'
         WHERE id = ?
     `, [cancel.id]);
     
@@ -374,13 +508,6 @@ async function processCancellation(connection, cancel) {
         }
     }
     
-    // Update escrow status
-    await connection.query(`
-        UPDATE transactions
-        SET escrow_status = 'refunded'
-        WHERE id = ?
-    `, [cancel.transaction_id]);
-    
     // Make book available again
     await connection.query(`
         UPDATE books
@@ -391,9 +518,9 @@ async function processCancellation(connection, cancel) {
     // Log in history
     await connection.query(`
         INSERT INTO cancellation_history 
-        (cancellation_id, action, actor_type, details)
-        VALUES (?, 'completed', 'system', ?)
-    `, [cancel.id, JSON.stringify({ refundAmount: cancel.refund_amount })]);
+        (cancellation_id, action, actor_id, details)
+        VALUES (?, 'system', NULL, ?)
+    `, [cancel.id, JSON.stringify({ event: 'completed', refundAmount: cancel.refund_amount })]);
 }
 
 // Get cancellation status
@@ -403,7 +530,7 @@ router.get('/transaction/:transactionId', authenticateToken, async (req, res) =>
         const { transactionId } = req.params;
         
         // Verify user is part of transaction
-        const [transaction] = await pool.query(
+        const [transaction] = await dbPool.query(
             'SELECT borrower_id, lender_id FROM transactions WHERE id = ?',
             [transactionId]
         );
@@ -417,7 +544,7 @@ router.get('/transaction/:transactionId', authenticateToken, async (req, res) =>
         }
         
         // Get cancellation request
-        const [cancellation] = await pool.query(`
+        const [cancellation] = await dbPool.query(`
             SELECT cr.*, 
                    u1.first_name as initiator_first, u1.last_name as initiator_last,
                    u2.first_name as other_first, u2.last_name as other_last
@@ -425,7 +552,7 @@ router.get('/transaction/:transactionId', authenticateToken, async (req, res) =>
             JOIN users u1 ON cr.initiator_id = u1.id
             JOIN users u2 ON cr.other_party_id = u2.id
             WHERE cr.transaction_id = ?
-            ORDER BY cr.created_at DESC
+            ORDER BY cr.created DESC
             LIMIT 1
         `, [transactionId]);
         
@@ -451,7 +578,7 @@ router.get('/:cancellationId/history', authenticateToken, async (req, res) => {
         const { cancellationId } = req.params;
         
         // Verify access
-        const [cancellation] = await pool.query(`
+        const [cancellation] = await dbPool.query(`
             SELECT cr.*, t.borrower_id, t.lender_id
             FROM cancellation_requests cr
             JOIN transactions t ON cr.transaction_id = t.id
@@ -467,12 +594,12 @@ router.get('/:cancellationId/history', authenticateToken, async (req, res) => {
         }
         
         // Get history
-        const [history] = await pool.query(`
+        const [history] = await dbPool.query(`
             SELECT ch.*, u.first_name, u.last_name
             FROM cancellation_history ch
             LEFT JOIN users u ON ch.actor_id = u.id
             WHERE ch.cancellation_id = ?
-            ORDER BY ch.created_at ASC
+            ORDER BY ch.created ASC
         `, [cancellationId]);
         
         res.json({ history });
@@ -485,42 +612,82 @@ router.get('/:cancellationId/history', authenticateToken, async (req, res) => {
 
 // Cron job to expire old cancellation requests (should be called periodically)
 router.post('/expire-old-requests', async (req, res) => {
-    const connection = await pool.getConnection();
+    const connection = await getConnection();
     
     try {
         await connection.beginTransaction();
         
-        // Find expired requests
+        // Find expired requests (auto-approve after timeout)
         const [expired] = await connection.query(`
-            SELECT id, transaction_id
-            FROM cancellation_requests
-            WHERE status = 'pending' AND expires_at < NOW()
+            SELECT cr.*, t.borrower_id, t.lender_id, b.title as book_title
+            FROM cancellation_requests cr
+            JOIN transactions t ON cr.transaction_id = t.id
+            JOIN books b ON t.book_id = b.id
+            WHERE cr.status = 'pending' AND cr.expires_at < NOW()
         `);
-        
+
+        // Collect broadcasts to emit after commit
+        const broadcasts = [];
+
         for (const request of expired) {
-            // Mark as expired
+            // Mark as consented by system and process cancellation
             await connection.query(`
                 UPDATE cancellation_requests
-                SET status = 'expired'
+                SET other_confirmed = 1, other_response_date = NOW(), status = 'consented'
                 WHERE id = ?
             `, [request.id]);
-            
-            // Restore transaction status
-            await connection.query(`
-                UPDATE transactions
-                SET status = 'approved'
-                WHERE id = ? AND status = 'cancellation_pending'
-            `, [request.transaction_id]);
-            
-            // Log
+
+            // Log auto-approval
             await connection.query(`
                 INSERT INTO cancellation_history 
-                (cancellation_id, action, actor_type)
-                VALUES (?, 'expired', 'system')
-            `, [request.id]);
+                (cancellation_id, action, actor_id, details)
+                VALUES (?, 'system', NULL, ?)
+            `, [request.id, JSON.stringify({ event: 'auto_approved' })]);
+
+            // Process the cancellation (updates transaction, refunds, etc.)
+            await processCancellation(connection, request);
+
+            // Post system message in chat
+            const [chatRows] = await connection.query('SELECT id FROM chats WHERE transaction_id = ?', [request.transaction_id]);
+            const chatId = chatRows.length ? chatRows[0].id : null;
+            if (chatId) {
+                const payload = {
+                    type: 'cancellation_auto_approved',
+                    cancellation_id: request.id,
+                    transaction_id: request.transaction_id,
+                    book_title: request.book_title
+                };
+                const [msgInsert] = await connection.query(`
+                    INSERT INTO chat_messages (chat_id, sender_id, message, message_type, created)
+                    VALUES (?, ?, ?, 'sys', NOW())
+                `, [chatId, request.initiator_id, JSON.stringify(payload)]);
+                const [newMsgRows] = await connection.query(`
+                    SELECT cm.*, CONCAT(u.first_name, ' ', u.last_name) as sender_name, u.profile_image as sender_avatar
+                    FROM chat_messages cm
+                    LEFT JOIN users u ON cm.sender_id = u.id
+                    WHERE cm.id = ?
+                `, [msgInsert.insertId]);
+                const newMsg = newMsgRows && newMsgRows[0] ? newMsgRows[0] : null;
+                broadcasts.push({ chatId, message: newMsg });
+            }
         }
         
         await connection.commit();
+
+        // Emit broadcasts after commit
+        try {
+            const io = req.app.get('socketio');
+            if (io) {
+                for (const b of broadcasts) {
+                    if (b && b.chatId && b.message) {
+                        io.to(`chat_${b.chatId}`).emit('new_message', { chatId: b.chatId, message: b.message });
+                        io.emit('chat_activity', { chatId: b.chatId, type: 'message', messageId: b.message.id });
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Socket broadcast error (expire-old-requests):', e);
+        }
         
         res.json({ 
             success: true,

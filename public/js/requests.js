@@ -730,11 +730,7 @@ class RequestManager {
         // Format time (e.g., "2:30 PM" or "Yesterday")
         const timeFormatted = chat.last_message_time ? this.formatTimeAgo(chat.last_message_time) : '';
 
-        let previewText = chat.last_message || 'No messages yet';
-        if (chat.last_message_type === 'img' || (typeof previewText === 'string' && previewText.includes('/api/chat-attachments/'))) {
-            const count = (previewText || '').split('\n').filter(Boolean).length;
-            previewText = count > 1 ? `${count} Photos` : 'Photo';
-        }
+        const previewText = this.getChatPreviewText(chat);
 
         return `
             <div class="chat-card" data-chat-id="${chat.id}" onclick="requestManager.openChatById(${chat.id})">
@@ -751,6 +747,58 @@ class RequestManager {
                 </div>
             </div>
         `;
+    }
+
+    // Build a clean, human-friendly preview for the chat list
+    getChatPreviewText(chat) {
+        try {
+            let previewText = chat.last_message || 'No messages yet';
+            const type = chat.last_message_type;
+
+            // Photos (single or bundle)
+            if (type === 'img' || (typeof previewText === 'string' && previewText.includes('/api/chat-attachments/'))) {
+                const count = (previewText || '').split('\n').filter(Boolean).length;
+                return count > 1 ? `${count} Photos` : 'Photo';
+            }
+
+            // System messages may contain structured JSON payloads
+            if (type === 'sys' || (typeof previewText === 'string' && /^\s*[\[{]/.test(previewText))) {
+                try {
+                    const payload = typeof previewText === 'string' ? JSON.parse(previewText) : previewText;
+                    if (payload && typeof payload === 'object' && payload.type) {
+                        switch (payload.type) {
+                            case 'cancellation_request': {
+                                const book = payload.book_title || '';
+                                const reason = payload.reason === 'other' ? (payload.reason_details || payload.description || 'Other') : payload.reason;
+                                const base = book ? `Cancellation request — "${book}"` : 'Cancellation request';
+                                return reason ? `${base} — ${reason}` : base;
+                            }
+                            case 'cancellation_response': {
+                                const book = payload.book_title || '';
+                                const statusText = payload.status === 'approved' ? 'Cancellation approved' : 'Cancellation rejected';
+                                return book ? `${statusText} — "${book}"` : statusText;
+                            }
+                            case 'cancellation_auto_approved': {
+                                const book = payload.book_title || '';
+                                return book ? `Cancellation auto‑approved — "${book}"` : 'Cancellation auto‑approved';
+                            }
+                            default:
+                                return 'System update';
+                        }
+                    }
+                } catch (_) {
+                    // Fall through to truncation
+                }
+            }
+
+            // Text message fallback (truncate)
+            if (typeof previewText === 'string') {
+                return previewText.length > 140 ? previewText.substring(0, 140) + '…' : previewText;
+            }
+            return 'Message';
+        } catch (_) {
+            return 'Message';
+        }
     }
 
     formatTimeAgo(dateString) {

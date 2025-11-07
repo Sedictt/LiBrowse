@@ -44,16 +44,18 @@ class EmailService {
      * Get HTML email template based on type
      */
     static getEmailTemplate(type, data) {
-        const templates = {
-            'request': this.templateBorrowRequest(data),
-            'approval': this.templateApproval(data),
-            'rejection': this.templateRejection(data),
-            'reminder': this.templateReminder(data),
-            'overdue': this.templateOverdue(data),
-            'feedback': this.templateFeedback(data)
+        // Lazily resolve template to avoid calling all builders
+        const map = {
+            'request': (d) => this.templateBorrowRequest(d),
+            'approval': (d) => this.templateApproval(d),
+            'rejection': (d) => this.templateRejection(d),
+            'reminder': (d) => this.templateReminder(d),
+            'overdue': (d) => this.templateOverdue(d),
+            'feedback': (d) => this.templateFeedback(d)
         };
 
-        return templates[type] || this.templateDefault(data);
+        const builder = map[type];
+        return builder ? builder(data) : this.templateDefault(data);
     }
 
     static templateBorrowRequest(data) {
@@ -136,25 +138,96 @@ class EmailService {
             <h1>✓ Request Approved!</h1>
         </div>
         <div class="content">
-            <p>Great news, ${data.borrowerName}!</p>
-            <p><strong>${data.lenderName}</strong> has approved your borrow request for:</p>
+            <p>Great news, ${data.borrowerName || ''}!</p>
+            <p><strong>${data.lenderName || 'The lender'}</strong> has approved your borrow request for:</p>
             
             <div class="book-info">
                 <div style="font-size: 18px; font-weight: 600; color: #333;">${data.bookTitle}</div>
-                <div style="color: #666; font-size: 14px;">by ${data.bookAuthor}</div>
+                <div style="color: #666; font-size: 14px;">by ${data.bookAuthor || ''}</div>
             </div>
 
             <div class="success-badge">✓ Ready to Pick Up</div>
 
             <p><strong>Next Steps:</strong></p>
             <ul>
-                <li>Contact ${data.lenderName} to arrange pickup</li>
-                <li>Return date: <strong>${data.returnDate}</strong></li>
+                <li>Contact ${data.lenderName || 'the lender'} to arrange pickup</li>
+                <li>Return date: <strong>${data.returnDate || ''}</strong></li>
             </ul>
 
             <a href="${data.actionUrl}" class="btn">View Transaction Details</a>
 
             <p>Thank you for using LiBrowse!<br><strong>Happy reading!</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated notification. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+    }
+
+    static templateRejection(data) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { padding: 30px 20px; }
+        .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #e0e0e0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Request Rejected</h1>
+        </div>
+        <div class="content">
+            <p>Hello ${data.borrowerName || ''},</p>
+            <p>Unfortunately, your request to borrow "${data.bookTitle}" was not approved.</p>
+            ${data.reason ? `<p><strong>Reason:</strong> ${data.reason}</p>` : ''}
+            <p>You can browse other available books and send a new request.</p>
+            <a href="${data.actionUrl}" class="btn">Browse Books</a>
+        </div>
+        <div class="footer">
+            <p>This is an automated notification. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+    }
+
+    static templateFeedback(data) {
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 30px 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { padding: 30px 20px; }
+        .btn { display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        .footer { background: #f9f9f9; padding: 20px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #e0e0e0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>We value your feedback</h1>
+        </div>
+        <div class="content">
+            <p>Hello ${data.userName || ''},</p>
+            <p>Please take a moment to share your feedback about your recent transaction for "${data.bookTitle || ''}".</p>
+            <a href="${data.actionUrl || '#'}" class="btn">Leave Feedback</a>
         </div>
         <div class="footer">
             <p>This is an automated notification. Please do not reply to this email.</p>

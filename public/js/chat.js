@@ -158,6 +158,18 @@ class ChatManager {
             }
         });
 
+        // Cancellation action buttons in chat (Approve/Reject)
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-cancel-action]');
+            if (!btn) return;
+            const action = btn.getAttribute('data-cancel-action');
+            const idStr = btn.getAttribute('data-cancellation-id');
+            const cancellationId = idStr ? parseInt(idStr) : null;
+            if (!cancellationId) return;
+            const consent = action === 'approve';
+            this.respondToCancellation(cancellationId, consent, btn);
+        });
+
         // Close modal via close button
         document.addEventListener('click', (e) => {
             const closeBtn = e.target.closest('.chat-btn-close, .modal-close');
@@ -548,10 +560,90 @@ class ChatManager {
     }
 
     renderSystemMessage(message) {
+        // Try to parse structured system message payloads (e.g., cancellation request)
+        try {
+            const payload = typeof message.message === 'string' ? JSON.parse(message.message) : message.message;
+            if (payload && typeof payload === 'object' && payload.type) {
+                if (payload.type === 'cancellation_request') {
+                    return this.renderCancellationRequestMessage(payload);
+                }
+                if (payload.type === 'cancellation_response') {
+                    return this.renderCancellationResponseMessage(payload);
+                }
+                if (payload.type === 'cancellation_auto_approved') {
+                    return this.renderCancellationAutoApprovedMessage(payload);
+                }
+            }
+        } catch (_) { /* fall back to plain text */ }
+        
+        // Fallback: simple informational text
         return `
             <div class="chat-message message-system">
                 <i class="fas fa-info-circle"></i>
                 <span>${this.escapeHtml(message.message)}</span>
+            </div>
+        `;
+    }
+
+    renderCancellationRequestMessage(data) {
+        const viewerId = (window.authManager && authManager.currentUser) ? authManager.currentUser.id : null;
+        const cur = viewerId != null ? Number(viewerId) : null;
+        const other = data && data.other_party_id != null ? Number(data.other_party_id) : null;
+        const initiator = data && data.initiator_id != null ? Number(data.initiator_id) : null;
+        // Primary check: payload-provided other_party_id
+        let isResponder = cur != null && other != null && cur === other;
+        // Fallback: if user is not the initiator, treat as responder (chat access already restricts to the two parties)
+        if (!isResponder) {
+            const isInitiator = initiator != null && cur === initiator;
+            if (!isInitiator) {
+                isResponder = true;
+            }
+        }
+        const isExpired = data.expires_at ? (new Date(data.expires_at) < new Date()) : false;
+
+        const actions = isResponder && !isExpired ? `
+            <div class="cancel-actions">
+                <button class="btn btn-success btn-sm" data-cancel-action="approve" data-cancellation-id="${data.cancellation_id}">
+                    Approve Cancellation
+                </button>
+                <button class="btn btn-error btn-sm" data-cancel-action="reject" data-cancellation-id="${data.cancellation_id}">
+                    Reject
+                </button>
+            </div>
+        ` : `<div class="cancel-actions"><em>${isExpired ? 'Expired' : 'Awaiting response'}</em></div>`;
+
+        const expiresHtml = data.expires_at ? `<div class="cancel-expires">Respond by ${new Date(data.expires_at).toLocaleString()}</div>` : '';
+        const refundHtml = (data.refund_type && data.refund_type !== 'none') ? `<div class="cancel-refund">Proposed refund: ${data.refund_type}${data.refund_amount != null ? ` (${data.refund_amount} credits)` : ''}</div>` : '<div class="cancel-refund">No refund proposed</div>';
+
+        return `
+            <div class="chat-message message-system">
+                <div class="cancellation-card" data-cancellation-id="${data.cancellation_id}">
+                    <div class="cancel-title"><i class="fas fa-ban"></i> Cancellation request for "${this.escapeHtml(data.book_title || '')}"</div>
+                    <div class="cancel-reason">Reason: ${this.escapeHtml(data.reason || 'not specified')}</div>
+                    ${refundHtml}
+                    ${expiresHtml}
+                    ${actions}
+                </div>
+            </div>
+        `;
+    }
+
+    renderCancellationResponseMessage(data) {
+        const statusText = data.status === 'approved' ? 'Cancellation approved' : 'Cancellation rejected';
+        const icon = data.status === 'approved' ? 'fa-check-circle' : 'fa-times-circle';
+        return `
+            <div class="chat-message message-system">
+                <i class="fas ${icon}"></i>
+                <span>${this.escapeHtml(statusText)} for "${this.escapeHtml(data.book_title || '')}"</span>
+            </div>
+        `;
+    }
+
+    renderCancellationAutoApprovedMessage(data) {
+        return `
+            <div class="chat-message message-system">
+                <i class="fas fa-clock"></i>
+                <span>Cancellation for "${this.escapeHtml(data.book_title || '')}" was auto-approved after 48 hours without response.</span>
             </div>
         `;
     }
@@ -702,8 +794,8 @@ class ChatManager {
             }
         }
 
-        // Mark as read if chat is open
-        if (data.message.sender_id !== authManager.currentUser.id) {
+        // Mark as read if chat is open (ignore system messages)
+        if (data.message.message_type !== 'sys' && data.message.sender_id !== authManager.currentUser.id) {
             this.markMessageAsRead(data.message.id);
         }
 
@@ -1013,8 +1105,15 @@ class ChatManager {
     openCancelTransactionModal() {
         if (!this.currentChatInfo) return;
 
-        // Set hidden field
-        document.getElementById('cancel-transaction-id').value = this.currentChatInfo.transactionId;
+        // Prefer snake_case from API (transaction_id), fallback to variants
+        const txnId = this.currentChatInfo.transaction_id || this.currentChatInfo.transactionId || this.currentChatInfo.transactionid || null;
+        const hidden = document.getElementById('cancel-transaction-id');
+        if (hidden) hidden.value = txnId || '';
+
+        if (!txnId) {
+            this.showError('Unable to determine transaction ID for cancellation. Please refresh and try again.');
+            return;
+        }
 
         // Open modal
         const modal = document.getElementById('cancel-transaction-modal');
@@ -1057,7 +1156,7 @@ class ChatManager {
             document.getElementById('cancel-transaction-modal').classList.remove('active');
 
             // Show success message
-            this.showSuccess('Cancellation request sent. The other party has 72 hours to respond.');
+            this.showSuccess('Cancellation request sent. The other party has 48 hours to respond.');
 
             // Reset form
             document.getElementById('cancel-transaction-form').reset();
@@ -1068,6 +1167,47 @@ class ChatManager {
         } catch (error) {
             console.error('Error submitting cancellation:', error);
             this.showError(error.message || 'Failed to submit cancellation');
+        }
+    }
+
+    async respondToCancellation(cancellationId, consent, btnEl = null) {
+        try {
+            if (!cancellationId) return;
+            // Optimistic UI: disable buttons
+            if (btnEl) {
+                const card = btnEl.closest('.cancellation-card');
+                if (card) {
+                    card.querySelectorAll('button[data-cancel-action]').forEach(b => b.disabled = true);
+                }
+            }
+
+            const resp = await fetch(`/api/cancellations/${cancellationId}/respond`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ consent: !!consent })
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                throw new Error(data.error || 'Failed to submit response');
+            }
+
+            this.showSuccess(consent ? 'Cancellation approved' : 'Cancellation rejected');
+
+            // Reload messages to reflect system update
+            await this.loadMessages(this.currentChatId, 0);
+            this.scrollToBottom(true);
+        } catch (err) {
+            console.error('Error responding to cancellation:', err);
+            this.showError(err.message || 'Failed to respond to cancellation');
+            if (btnEl) {
+                const card = btnEl.closest('.cancellation-card');
+                if (card) {
+                    card.querySelectorAll('button[data-cancel-action]').forEach(b => b.disabled = false);
+                }
+            }
         }
     }
 
