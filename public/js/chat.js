@@ -11,11 +11,35 @@ class ChatManager {
         this.messages = [];
         this.typingTimeout = null;
         this.messageOffset = 0;
-        this.messageLimit = 50;
+        this.messageLimit = 200;
         this.hasMoreMessages = false;
         this.isLoadingMessages = false;
+        this.initialLoadComplete = false;
+        this.pendingMessages = [];
 
         this.init();
+    }
+
+    ensureSorted() {
+        try {
+            this.messages.sort((a, b) => {
+                const aid = typeof a.id === 'number' ? a.id : parseInt(a.id);
+                const bid = typeof b.id === 'number' ? b.id : parseInt(b.id);
+                if (!isNaN(aid) && !isNaN(bid)) return aid - bid;
+                const at = Date.parse(a.created) || 0;
+                const bt = Date.parse(b.created) || 0;
+                return at - bt;
+            });
+        } catch (e) {
+            // no-op on sort errors
+        }
+    }
+
+    async waitForAuth(timeoutMs = 5000) {
+        const start = Date.now();
+        while ((!window.authManager || !authManager.currentUser || !localStorage.getItem('token')) && (Date.now() - start) < timeoutMs) {
+            await new Promise(r => setTimeout(r, 100));
+        }
     }
 
     init() {
@@ -190,6 +214,8 @@ class ChatManager {
             this.currentChatId = chatId;
             this.messages = [];
             this.messageOffset = 0;
+            this.initialLoadComplete = false;
+            this.pendingMessages = [];
 
             // Show modal
             const modal = document.getElementById('chat-modal');
@@ -202,19 +228,22 @@ class ChatManager {
             // Show loading state
             this.showLoadingState();
 
-            // Load chat info
-            await this.loadChatInfo(chatId);
+            // Ensure auth is available before joining/fetching
+            await this.waitForAuth();
 
-            // Load messages
-            await this.loadMessages(chatId);
-
-            // Join socket room
+            // Join socket room early to avoid missing events post-refresh
             if (this.socket && authManager.currentUser) {
                 this.socket.emit('join_chat', {
                     chatId: chatId,
                     userId: authManager.currentUser.id
                 });
             }
+
+            // Load chat info
+            await this.loadChatInfo(chatId);
+
+            // Load messages
+            await this.loadMessages(chatId);
 
             // Focus input after modal is open
             this.focusInput();
@@ -245,7 +274,8 @@ class ChatManager {
             const response = await fetch(`/api/chats/${chatId}/info`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
+                },
+                cache: 'no-store'
             });
 
             if (!response.ok) {
@@ -265,10 +295,11 @@ class ChatManager {
         try {
             this.isLoadingMessages = true;
 
-            const response = await fetch(`/api/chats/${chatId}/messages?limit=${this.messageLimit}&offset=${offset}`, {
+            const response = await fetch(`/api/chats/${chatId}/messages?limit=${this.messageLimit}&offset=${offset}&_=${Date.now()}` , {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
+                },
+                cache: 'no-store'
             });
 
             if (!response.ok) {
@@ -286,7 +317,8 @@ class ChatManager {
 
             this.hasMoreMessages = data.has_more;
             this.messageOffset = offset + data.messages.length;
-
+            // Ensure chronological order before rendering
+            this.ensureSorted();
             this.renderMessages();
 
             // Scroll to bottom only on initial load
@@ -295,6 +327,22 @@ class ChatManager {
             }
 
             this.isLoadingMessages = false;
+
+            // After initial load, merge any pending realtime messages
+            if (offset === 0 && !this.initialLoadComplete) {
+                this.initialLoadComplete = true;
+                if (this.pendingMessages.length > 0) {
+                    for (const msg of this.pendingMessages) {
+                        if (!this.messages.find(m => m.id === msg.id)) {
+                            this.messages.push(msg);
+                        }
+                    }
+                    this.pendingMessages = [];
+                    this.ensureSorted();
+                    this.renderMessages();
+                    this.scrollToBottom(true);
+                }
+            }
 
         } catch (error) {
             console.error('Error loading messages:', error);
@@ -602,9 +650,18 @@ class ChatManager {
     }
 
     handleNewMessage(data) {
-        if (data.chatId !== this.currentChatId) {
+        if (parseInt(data.chatId) !== parseInt(this.currentChatId)) {
             // Message for different chat, show notification
             this.showNotification(data.message);
+            return;
+        }
+
+        // If initial history isn't ready yet, buffer the message
+        if (!this.initialLoadComplete) {
+            // Avoid duplicates in buffer
+            if (!this.pendingMessages.find(m => m.id === data.message.id)) {
+                this.pendingMessages.push(data.message);
+            }
             return;
         }
 
@@ -618,6 +675,7 @@ class ChatManager {
             const isNearBottom = container ?
                 (container.scrollHeight - container.scrollTop - container.clientHeight < 100) : true;
 
+            this.ensureSorted();
             this.renderMessages();
 
             // Only auto-scroll if user was near bottom or it's their own message
@@ -636,7 +694,7 @@ class ChatManager {
     }
 
     handleMessageRead(data) {
-        if (data.chatId !== this.currentChatId) return;
+        if (parseInt(data.chatId) !== parseInt(this.currentChatId)) return;
 
         // Update message read status
         const message = this.messages.find(m => m.id === data.messageId);
@@ -648,7 +706,7 @@ class ChatManager {
     }
 
     handleUserTyping(data) {
-        if (data.chatId !== this.currentChatId) return;
+        if (parseInt(data.chatId) !== parseInt(this.currentChatId)) return;
 
         const indicator = document.getElementById('typing-indicator');
         if (!indicator) return;

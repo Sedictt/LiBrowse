@@ -69,6 +69,7 @@ router.get('/', authenticateToken, async (req, res) => {
 // Get chat details by ID
 router.get('/:chatId/info', authenticateToken, async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store');
         const userId = req.user.id;
         const { chatId } = req.params;
         const connection = await getConnection();
@@ -119,6 +120,7 @@ router.get('/:chatId/info', authenticateToken, async (req, res) => {
 // Get messages for a chat with pagination
 router.get('/:chatId/messages', authenticateToken, async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store');
         const userId = req.user.id;
         const { chatId } = req.params;
         const limit = parseInt(req.query.limit) || 50;
@@ -233,6 +235,25 @@ router.post('/:chatId/messages', [
         `, [result.insertId]);
 
         connection.release();
+
+        // Broadcast to chat room so recipients get the message even if sender used HTTP fallback
+        try {
+            const io = req.app.get('socketio');
+            if (io) {
+                io.to(`chat_${chatId}`).emit('new_message', {
+                    chatId: parseInt(chatId),
+                    message: newMessage[0]
+                });
+                // Also notify clients to refresh badges/lists
+                io.emit('chat_activity', {
+                    chatId: parseInt(chatId),
+                    type: 'message',
+                    messageId: newMessage[0]?.id
+                });
+            }
+        } catch (e) {
+            console.error('HTTP send broadcast error:', e);
+        }
 
         res.status(201).json(newMessage[0]);
     } catch (error) {

@@ -40,6 +40,14 @@ function initializeSocket() {
             const p = window.app.updateChatBadge();
             if (p && typeof p.catch === 'function') p.catch(() => {});
         }
+
+        // Rejoin current chat room on initial connect if a chat is already open
+        if (window.chatManager && window.chatManager.currentChatId && authManager && authManager.currentUser) {
+            socket.emit('join_chat', {
+                chatId: window.chatManager.currentChatId,
+                userId: authManager.currentUser.id
+            });
+        }
     });
 
     // Authentication successful
@@ -114,8 +122,10 @@ function initializeSocket() {
             if (p && typeof p.catch === 'function') p.catch(() => {});
         }
 
-        if (window.requestManager && window.requestManager.currentTab === 'active-chats') {
-            const p2 = window.requestManager.loadRequests();
+        // Refresh chats so previews/unread counts update even if the tab isn't currently active
+        if (window.requestManager) {
+            const fn = window.requestManager.refreshActiveChats || window.requestManager.loadRequests;
+            const p2 = fn.call(window.requestManager);
             if (p2 && typeof p2.catch === 'function') p2.catch(() => {});
         }
     });

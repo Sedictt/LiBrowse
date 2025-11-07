@@ -323,21 +323,23 @@
 }
 
 /* Message Styles */
-.message-group {
+#chat-modal .message-group {
     display: flex;
     gap: 12px;
     margin-bottom: 12px;
     animation: messageSlideIn 0.3s ease;
     align-items: flex-end;
     min-width: 0;
+    width: 100%;
+    max-width: 100%;
 }
 
-.message-group.message-sent {
-    justify-content: flex-end;
+#chat-modal .message-group.message-sent {
+    /* justify-content: flex-end; */
     flex-direction: row-reverse;
 }
 
-.message-avatar {
+#chat-modal .message-avatar {
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -356,23 +358,24 @@
     letter-spacing: 0.5px;
 }
 
-.message-group-content {
+#chat-modal .message-group-content {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    max-width: 70%;
+    flex: 1;
+    max-width: 85%;
     min-width: 0;
 }
 
-.message-group.message-sent .message-group-content {
+#chat-modal .message-group.message-sent .message-group-content {
     align-items: flex-end;
 }
 
-.message-group.message-received .message-group-content {
+#chat-modal .message-group.message-received .message-group-content {
     align-items: flex-start;
 }
 
-.message-sender-name {
+#chat-modal .message-sender-name {
     font-size: 11px;
     color: var(--text-muted);
     font-weight: 600;
@@ -381,26 +384,32 @@
     letter-spacing: 0.3px;
 }
 
-.chat-message {
+#chat-modal .chat-message {
     padding: 10px 14px;
     border-radius: 18px;
-    word-wrap: break-word;
-    word-break: break-word;
+    display: inline-block;
+    max-width: 100%;
+    word-wrap: normal;
+    word-break: normal;
     font-size: 14px;
     line-height: 1.5;
-    max-width: 100%;
     overflow-wrap: break-word;
     transition: all 0.2s ease;
     position: relative;
     margin-bottom: 2px;
 }
+#chat-modal .message-content {
+    white-space: pre-wrap;
+    word-break: normal;
+    overflow-wrap: break-word;
+}
 
 /* Single message (default) */
-.chat-message.message-single {
+#chat-modal .chat-message.message-single {
     margin-bottom: 0;
 }
 
-.message-group.message-sent .chat-message {
+#chat-modal .message-group.message-sent .chat-message {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border-radius: 18px 18px 4px 18px;
@@ -408,24 +417,24 @@
 }
 
 /* Sent message tapering - Messenger style */
-.message-group.message-sent .chat-message.message-first {
+#chat-modal .message-group.message-sent .chat-message.message-first {
     border-radius: 18px 18px 4px 18px; /* Bottom-right tail */
 }
 
-.message-group.message-sent .chat-message.message-middle {
+#chat-modal .message-group.message-sent .chat-message.message-middle {
     border-radius: 18px 18px 18px 18px; /* Fully rounded */
 }
 
-.message-group.message-sent .chat-message.message-last {
+#chat-modal .message-group.message-sent .chat-message.message-last {
     border-radius: 18px 4px 18px 18px; /* Top-right tail */
 }
 
-.message-group.message-sent .chat-message:hover {
+#chat-modal .message-group.message-sent .chat-message:hover {
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     transform: translateY(-1px);
 }
 
-.message-group.message-received .chat-message {
+#chat-modal .message-group.message-received .chat-message {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: var(--text-primary);
@@ -435,25 +444,25 @@
 }
 
 /* Received message tapering - Messenger style */
-.message-group.message-received .chat-message.message-first {
+#chat-modal .message-group.message-received .chat-message.message-first {
     border-radius: 18px 18px 18px 4px; /* Bottom-left tail */
 }
 
-.message-group.message-received .chat-message.message-middle {
+#chat-modal .message-group.message-received .chat-message.message-middle {
     border-radius: 18px 18px 18px 18px; /* Fully rounded */
 }
 
-.message-group.message-received .chat-message.message-last {
+#chat-modal .message-group.message-received .chat-message.message-last {
     border-radius: 4px 18px 18px 18px; /* Top-left tail */
 }
 
-.message-group.message-received .chat-message:hover {
+#chat-modal .message-group.message-received .chat-message:hover {
     background: rgba(255, 255, 255, 0.11);
     border-color: rgba(255, 255, 255, 0.18);
     transform: translateX(2px);
 }
 
-.message-timestamp {
+#chat-modal .message-timestamp {
     font-size: 10px;
     color: var(--text-muted);
     margin-top: 2px;
@@ -463,11 +472,11 @@
     letter-spacing: 0.2px;
 }
 
-.message-group.message-sent .message-timestamp {
+#chat-modal .message-group.message-sent .message-timestamp {
     text-align: right;
 }
 
-.message-group:hover .message-timestamp {
+#chat-modal .message-group:hover .message-timestamp {
     opacity: 1;
 }
 

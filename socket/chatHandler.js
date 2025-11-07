@@ -263,6 +263,14 @@ module.exports = (io) => {
                     AND (t.borrower_id = ? OR t.lender_id = ?)
                 `, [chatId, userId, userId, userId]);
 
+                // Get participants for notification
+                const [participantsRows] = await connection.execute(`
+                    SELECT t.borrower_id, t.lender_id
+                    FROM chats c
+                    INNER JOIN transactions t ON c.transaction_id = t.id
+                    WHERE c.id = ?
+                `, [chatId]);
+
                 connection.release();
 
                 // Broadcast to chat
