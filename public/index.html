@@ -466,28 +466,39 @@
                     </div>
                 </div>
 
-                <!-- Saved Searches Panel -->
-                <div class="saved-searches-panel">
-                    <div class="saved-searches-header">
+                <!-- Saved Searches Panel (Collapsible) -->
+                <div class="saved-searches-panel collapsed">
+                    <div class="saved-searches-header" onclick="this.parentElement.classList.toggle('collapsed')">
                         <h3><i class="fas fa-bookmark"></i> Saved Searches</h3>
-                        <button class="btn btn-sm btn-primary" id="save-search-btn" title="Save current search">
-                            <i class="fas fa-save"></i> Save Current Search
-                        </button>
+                        <div class="panel-actions">
+                            <button class="btn btn-sm btn-primary" id="save-search-btn" title="Save current search" onclick="event.stopPropagation()">
+                                <i class="fas fa-save"></i>
+                            </button>
+                            <button class="panel-toggle" title="Toggle panel">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="saved-searches-list" id="saved-searches-list">
-                        <!-- Saved searches will be loaded here dynamically -->
-                        <p class="empty-state">No saved searches yet</p>
+                    <div class="panel-content">
+                        <div class="saved-searches-list" id="saved-searches-list">
+                            <!-- Saved searches will be loaded here dynamically -->
+                            <p class="empty-state">No saved searches yet</p>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Recently Viewed Books -->
-                <div class="recently-viewed-section" id="recently-viewed-section" style="display: none;">
-                    <div class="section-header-small">
+                <!-- Recently Viewed Books (Collapsible) -->
+                <div class="recently-viewed-section collapsed" id="recently-viewed-section" style="display: none;">
+                    <div class="section-header-small" onclick="this.parentElement.classList.toggle('collapsed')">
                         <h3><i class="fas fa-history"></i> Recently Viewed</h3>
-                        <a href="#" class="view-all-link" id="view-all-recent">View All</a>
+                        <button class="panel-toggle" title="Toggle panel">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
                     </div>
-                    <div class="recently-viewed-books" id="recently-viewed-books">
-                        <!-- Recently viewed books will be loaded here -->
+                    <div class="panel-content">
+                        <div class="recently-viewed-books" id="recently-viewed-books">
+                            <!-- Recently viewed books will be loaded here -->
+                        </div>
                     </div>
                 </div>
 

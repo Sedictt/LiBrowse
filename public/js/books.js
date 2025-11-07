@@ -210,11 +210,13 @@ class BooksManager {
                 book = response.book || response;
             }
 
-            // 🎯 ADD THIS: Track the view in backend
+            // 🎯 Track the view in backend and refresh Recently Viewed
             if (authManager && authManager.isAuthenticated) {
                 try {
                     await api.trackBookView(bookId);
                     console.log('✅ Book view tracked:', bookId);
+                    // Immediately refresh Recently Viewed list
+                    await this.loadRecentlyViewed();
                 } catch (error) {
                     console.warn('Failed to track book view:', error);
                     // Don't block modal if tracking fails
@@ -959,19 +961,30 @@ class BooksManager {
 
     renderRecentlyViewed() {
         const container = document.getElementById('recently-viewed-books');
+        const section = document.getElementById('recently-viewed-section');
         if (!container) return;
 
-        if (this.recentlyViewed.length === 0) {
+        const items = Array.isArray(this.recentlyViewed) ? this.recentlyViewed : [];
+        if (items.length === 0) {
             container.innerHTML = '<p class="empty-state">No recently viewed books</p>';
+            if (section) section.style.display = 'none';
             return;
         }
 
-        container.innerHTML = this.recentlyViewed.map(book => `
+        // Ensure section is visible when we have items
+        if (section) section.style.display = '';
+
+        container.innerHTML = items.map(book => `
     <div class="book-card-mini" data-book-id="${book.id}">
-      <img src="${book.image_url || book.cover_image || '/images/default-book.png'}" alt="${book.title}">
+      <div class="book-mini-image">
+        <img src="${book.image_url || book.cover_image || '/images/default-book.png'}" 
+             alt="${escapeHtml(book.title)}" 
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <i class="fas fa-book fallback-icon" style="display: none;"></i>
+      </div>
       <div class="book-mini-info">
-        <h5>${book.title}</h5>
-        <p>${book.author || 'Unknown Author'}</p>
+        <h5>${escapeHtml(book.title)}</h5>
+        <p>${escapeHtml(book.author || 'Unknown Author')}</p>
         <small>${this.formatTimeAgo(book.viewed_at)}</small>
       </div>
     </div>

@@ -1359,11 +1359,7 @@ class App {
     }
 
     showAuthenticatedFeatures() {
-        const recentlyViewedSection = document.getElementById('recently-viewed-section');
-
-        if (recentlyViewedSection) recentlyViewedSection.style.display = 'block';
-
-        // Load data
+        // Load data without forcing sections visible; rendering will toggle visibility as needed
         if (window.savedSearchesManager && typeof window.savedSearchesManager.loadSavedSearches === 'function') {
             window.savedSearchesManager.loadSavedSearches();
         }
