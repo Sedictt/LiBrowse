@@ -377,6 +377,9 @@ class AuthManager {
                     program: u.program || u.course || '',
                     year: u.year || 1,
                     is_verified: u.is_verified ?? false,
+                    email_verified: !!u.email_verified,
+                    verification_status: u.verification_status || 'pending',
+                    verification_method: u.verification_method || 'none',
                     credits: u.credits ?? 100,
                 };
                 this.setAuth(response.token, mappedUser);

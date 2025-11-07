@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const axios = require('axios');
+const nodemailer = require('nodemailer');
 const { getOne, executeQuery } = require('../config/database'); // Correct path to database.js
 require('dotenv').config();
 const { sendMail } = require('../services/mailer');
@@ -105,7 +106,11 @@ router.post('/login', async (req, res) => {
         email: user.email,
         student_no: user.student_no,
         fname: user.fname,
-        lname: user.lname
+        lname: user.lname,
+        is_verified: !!user.is_verified,
+        email_verified: !!user.email_verified,
+        verification_status: user.verification_status,
+        verification_method: user.verification_method
       }
     });
 
@@ -134,12 +139,29 @@ router.post('/logout', authenticateToken, async (req, res) => {
 // ============================
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
-    const dbUser = await getOne(
-      `SELECT id, email, student_no, fname, lname, course, year, 
-              is_verified, credits, verification_status, verification_method 
-       FROM users WHERE id = ?`,
-      [req.user.id]
-    );
+    let dbUser;
+    try {
+      dbUser = await getOne(
+        `SELECT id, email, student_no, fname, lname, course, year, 
+                is_verified, email_verified, credits, verification_status, verification_method 
+         FROM users WHERE id = ?`,
+        [req.user.id]
+      );
+    } catch (e) {
+      const msg = (e && (e.sqlMessage || e.message || '')).toLowerCase();
+      if (e && e.code === 'ER_BAD_FIELD_ERROR' && msg.includes('email_verified')) {
+        // Fallback for DBs without email_verified column
+        dbUser = await getOne(
+          `SELECT id, email, student_no, fname, lname, course, year, 
+                  is_verified, credits, verification_status, verification_method 
+           FROM users WHERE id = ?`,
+          [req.user.id]
+        );
+        dbUser.email_verified = 0;
+      } else {
+        throw e;
+      }
+    }
 
     if (!dbUser) {
       return res.status(404).json({ error: 'User not found' });
@@ -155,7 +177,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       program: dbUser.course,
       year: dbUser.year,
       is_verified: !!dbUser.is_verified,
-      email_verified: false,
+      email_verified: !!dbUser.email_verified,
       verification_status: dbUser.verification_status,
       verification_method: dbUser.verification_method,
       credits: dbUser.credits ?? 100,
@@ -361,10 +383,23 @@ router.post("/verify-otp", async (req, res) => {
 
     try {
       // Mark verification via OTP; fully verified only if document status is already 'verified'
-      await executeQuery(
-        "UPDATE users SET verification_method = 'otp', is_verified = CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?",
-        [email]
-      );
+      try {
+        await executeQuery(
+          "UPDATE users SET email_verified = 1, verification_method = 'otp', is_verified = CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?",
+          [email]
+        );
+      } catch (e) {
+        const msg = (e && (e.sqlMessage || e.message || '')).toLowerCase();
+        if (e && e.code === 'ER_BAD_FIELD_ERROR' && msg.includes('email_verified')) {
+          // Fallback for DBs without email_verified column
+          await executeQuery(
+            "UPDATE users SET verification_method = 'otp', is_verified = CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?",
+            [email]
+          );
+        } else {
+          throw e;
+        }
+      }
       console.log(`[OTP] verify-otp: email marked verified`, { email });
       return res.json({ message: "Email verified successfully" });
     } catch (dbErr) {
@@ -377,10 +412,7 @@ router.post("/verify-otp", async (req, res) => {
   }
 });
 
-// ============================
-// FORGOT PASSWORD & RESET PASSWORD
-// ============================
-
+// Forgot password route
 router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
@@ -416,7 +448,6 @@ router.post("/forgot-password", async (req, res) => {
 
     console.log("✅ Reset email sent successfully to:", email);
 
-
     res.json({ message: "Password reset email sent" });
   } catch (err) {
     console.error("Forgot password error:", err);
@@ -425,7 +456,6 @@ router.post("/forgot-password", async (req, res) => {
       details: err.message || err
     });
   }
-
 });
 
 router.post("/reset-password", async (req, res) => {

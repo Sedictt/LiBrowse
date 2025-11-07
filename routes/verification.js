@@ -76,11 +76,18 @@ router.post('/verify-otp', authenticateToken, async (req, res) => {
             [codes[0].id]
         );
         
-        // Update user email verification status
-        await pool.query(
-            'UPDATE users SET email_verified = TRUE WHERE id = ?',
-            [userId]
-        );
+        // Update user email verification status (fallback if column missing)
+        try {
+            await pool.query(
+                'UPDATE users SET email_verified = TRUE WHERE id = ?',
+                [userId]
+            );
+        } catch (e) {
+            if (!(e && e.code === 'ER_BAD_FIELD_ERROR')) {
+                throw e;
+            }
+            // Column missing: skip setting email_verified
+        }
         
         res.json({ message: 'Email verified successfully' });
     } catch (error) {
@@ -93,19 +100,31 @@ router.post('/verify-otp', authenticateToken, async (req, res) => {
 router.get('/status', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        
-        const [users] = await pool.query(
-            'SELECT email_verified FROM users WHERE id = ?',
-            [userId]
-        );
-        
-        if (users.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+        let emailVerified = 0;
+        try {
+            const [users] = await pool.query(
+                'SELECT email_verified FROM users WHERE id = ?',
+                [userId]
+            );
+            if (users.length === 0) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+            emailVerified = users[0].email_verified ? 1 : 0;
+        } catch (e) {
+            if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+                const [users] = await pool.query(
+                    'SELECT 1 FROM users WHERE id = ?',
+                    [userId]
+                );
+                if (users.length === 0) {
+                    return res.status(404).json({ error: 'User not found' });
+                }
+                emailVerified = 0;
+            } else {
+                throw e;
+            }
         }
-        
-        res.json({ 
-            verified: users[0].email_verified === 1
-        });
+        res.json({ verified: emailVerified === 1 });
     } catch (error) {
         console.error('Error checking verification status:', error);
         res.status(500).json({ error: 'Failed to check verification status' });
@@ -116,39 +135,51 @@ router.get('/status', authenticateToken, async (req, res) => {
 router.post('/resend', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
-        
+        let userRow = null;
+        let emailVerified = 0;
         // Check if user is already verified
-        const [users] = await pool.query(
-            'SELECT email_verified, email FROM users WHERE id = ?',
-            [userId]
-        );
-        
-        if (users.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+        try {
+            const [users] = await pool.query(
+                'SELECT email_verified, email FROM users WHERE id = ?',
+                [userId]
+            );
+            if (users.length === 0) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+            userRow = users[0];
+            emailVerified = users[0].email_verified ? 1 : 0;
+        } catch (e) {
+            if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+                const [users] = await pool.query(
+                    'SELECT email FROM users WHERE id = ?',
+                    [userId]
+                );
+                if (users.length === 0) {
+                    return res.status(404).json({ error: 'User not found' });
+                }
+                userRow = users[0];
+                emailVerified = 0;
+            } else {
+                throw e;
+            }
         }
-        
-        if (users[0].email_verified) {
+        if (emailVerified) {
             return res.status(400).json({ error: 'Email already verified' });
         }
-        
         // Generate new OTP
         const otp = generateOTP();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-        
         // Invalidate old OTPs
         await pool.query(
             'UPDATE verification_codes SET used = TRUE WHERE user_id = ? AND type = "email" AND used = FALSE',
             [userId]
         );
-        
         // Store new OTP
         await pool.query(
             'INSERT INTO verification_codes (user_id, code, type, expires_at) VALUES (?, ?, ?, ?)',
             [userId, otp, 'email', expiresAt]
         );
-        
-        console.log(`New OTP for ${users[0].email}: ${otp}`);
-        
+        console.log(`New OTP for ${userRow.email}: ${otp}`);
         res.json({ 
             message: 'Verification code resent successfully',
             otp: process.env.NODE_ENV !== 'production' ? otp : undefined
@@ -305,10 +336,23 @@ router.post('/upload-documents',
             ]);
 
             // Update user verification status
-            await executeQuery(
-                "UPDATE users SET verification_status = ?, verification_method = ?, is_verified = CASE WHEN ? AND email_verified = 1 THEN 1 ELSE 0 END, modified = NOW() WHERE id = ?",
-                [verificationStatus, 'document_upload', autoApproved ? 1 : 0, user.id]
-            );
+            try {
+                await executeQuery(
+                    "UPDATE users SET verification_status = ?, verification_method = ?, is_verified = CASE WHEN ? AND email_verified = 1 THEN 1 ELSE 0 END, modified = NOW() WHERE id = ?",
+                    [verificationStatus, 'document_upload', autoApproved ? 1 : 0, user.id]
+                );
+            } catch (e) {
+                const msg = (e && (e.sqlMessage || e.message || '')).toLowerCase();
+                if (e && e.code === 'ER_BAD_FIELD_ERROR' && msg.includes('email_verified')) {
+                    // Fallback when email_verified column is absent: base is_verified only on document auto-approval
+                    await executeQuery(
+                        "UPDATE users SET verification_status = ?, verification_method = ?, is_verified = CASE WHEN ? THEN 1 ELSE 0 END, modified = NOW() WHERE id = ?",
+                        [verificationStatus, 'document_upload', autoApproved ? 1 : 0, user.id]
+                    );
+                } else {
+                    throw e;
+                }
+            }
 
             // Generate appropriate message
             let authMessage;

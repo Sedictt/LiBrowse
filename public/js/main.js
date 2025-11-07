@@ -418,6 +418,15 @@ class App {
 
         try {
             const profileData = await api.get('/auth/profile');
+            if (profileData && profileData.user) {
+                try {
+                    const raw = localStorage.getItem('user');
+                    const prev = raw ? JSON.parse(raw) : {};
+                    const merged = { ...prev, ...profileData.user };
+                    localStorage.setItem('user', JSON.stringify(merged));
+                    if (window.authManager) authManager.currentUser = merged;
+                } catch (_) { /* noop */ }
+            }
             this.renderProfile(profileData.user, profileData.stats);
             await this.updateUserStatsAndRating();
         } catch (error) {

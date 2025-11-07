@@ -16,6 +16,7 @@ CREATE TABLE users (
     profile_pic VARCHAR(200),
     status ENUM('active','inactive','banned') DEFAULT 'active',
     is_verified BOOLEAN DEFAULT FALSE,
+    email_verified BOOLEAN DEFAULT FALSE,
     verification_status ENUM('pending','verified','pending_review','rejected') DEFAULT 'pending',
     verification_method ENUM('otp','document_upload','admin') DEFAULT NULL,
     ver_token VARCHAR(200),
