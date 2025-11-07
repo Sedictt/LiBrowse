@@ -3959,7 +3959,8 @@ body {
 
 .profile-email,
 .profile-student-id,
-.profile-program {
+.profile-program,
+.profile-bio {
     margin: var(--spacing-xs) 0;
     color: var(--text-secondary);
     font-size: 0.9rem;

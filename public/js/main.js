@@ -452,11 +452,21 @@ class App {
         const profileProgram = document.getElementById('profile-program');
         const verificationBadge = document.getElementById('verification-badge');
         const profileImg = document.getElementById('profile-image');
+        const profileBio = document.getElementById('profile-bio');
 
         if (profileName) profileName.textContent = `${userData.firstname} ${userData.lastname}`;
         if (profileEmail) profileEmail.textContent = userData.email;
         if (profileStudentId) profileStudentId.textContent = `Student ID: ${userData.student_id}`;
         if (profileProgram) profileProgram.textContent = userData.program;
+        if (profileBio) {
+            if (userData.bio && String(userData.bio).trim().length > 0) {
+                profileBio.textContent = userData.bio;
+                profileBio.style.display = '';
+            } else {
+                profileBio.textContent = '';
+                profileBio.style.display = 'none';
+            }
+        }
         if (profileImg) {
             const imgSrc = userData.profileimage || userData.avatar_url || '/assets/default-avatar.svg';
             profileImg.src = imgSrc;
@@ -2183,6 +2193,9 @@ class App {
         const user = authManager.getCurrentUser();
         console.log('Current user:', user);
 
+        const nameIdLocked = !!(user && (user.is_verified || user.verification_status === 'verified'));
+        const lockAttr = nameIdLocked ? 'disabled' : '';
+
         if (!user) {
             console.log('No user found, cannot open edit profile modal');
             return;
@@ -2207,11 +2220,11 @@ class App {
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="edit-firstname">First Name</label>
-                            <input type="text" id="edit-firstname" value="${user.firstname || ''}" required>
+                            <input type="text" id="edit-firstname" value="${user.firstname || ''}" ${lockAttr} required>
                         </div>
                         <div class="form-group">
                             <label for="edit-lastname">Last Name</label>
-                            <input type="text" id="edit-lastname" value="${user.lastname || ''}" required>
+                            <input type="text" id="edit-lastname" value="${user.lastname || ''}" ${lockAttr} required>
                         </div>
                     </div>
                     
@@ -2224,13 +2237,14 @@ class App {
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="edit-student-id">Student ID</label>
-                            <input type="text" id="edit-student-id" value="${user.studentid || user.student_id || ''}" required>
+                            <input type="text" id="edit-student-id" value="${user.studentid || user.student_id || ''}" ${lockAttr} required>
                         </div>
                         <div class="form-group">
                             <label for="edit-program">Program</label>
                             <input type="text" id="edit-program" value="${user.program || ''}" required>
                         </div>
                     </div>
+                    ${nameIdLocked ? `<div class="form-group"><small class="form-help" style="color: var(--warning);">Verified account: name and student number are locked.</small></div>` : ''}
                     
                     <div class="form-group">
                         <label for="edit-bio">Bio (Optional)</label>
@@ -2433,17 +2447,25 @@ class App {
             saveBtn.disabled = true;
             saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
 
-            const formData = {
-                firstname: document.getElementById('edit-firstname').value.trim(),
-                lastname: document.getElementById('edit-lastname').value.trim(),
-                studentid: document.getElementById('edit-student-id').value.trim(),
+            const locked = document.getElementById('edit-firstname')?.disabled === true;
+            const payload = {
                 program: document.getElementById('edit-program').value.trim(),
                 bio: document.getElementById('edit-bio').value.trim()
             };
+            if (!locked) {
+                payload.firstname = document.getElementById('edit-firstname').value.trim();
+                payload.lastname = document.getElementById('edit-lastname').value.trim();
+                payload.studentid = document.getElementById('edit-student-id').value.trim();
+            }
 
             // Validate required fields
-            if (!formData.firstname || !formData.lastname || !formData.studentid || !formData.program) {
+            if (!payload.program) {
                 throw new Error('Please fill in all required fields');
+            }
+            if (!locked) {
+                if (!payload.firstname || !payload.lastname || !payload.studentid) {
+                    throw new Error('Please fill in all required fields');
+                }
             }
 
             // Make API call
@@ -2453,7 +2475,7 @@ class App {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${authManager.getToken()}`
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
 
             const result = await response.json();

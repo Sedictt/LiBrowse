@@ -62,6 +62,20 @@ router.put('/profile', authenticateToken, async (req, res) => {
   console.log('User ID:', req.user?.id);
 
   try {
+    // Disallow identity changes for verified users
+    try {
+      const connV = await getConnection();
+      const [vr] = await connV.execute(
+        'SELECT is_verified, verification_status FROM users WHERE id = ? LIMIT 1',
+        [req.user.id]
+      );
+      connV.release();
+      const isLocked = !!(vr && vr[0] && (vr[0].is_verified === 1 || vr[0].verification_status === 'verified'));
+      if (isLocked && (req.body.firstname !== undefined || req.body.lastname !== undefined || req.body.studentid !== undefined || req.body['student_id'] !== undefined)) {
+        return res.status(403).json({ success: false, message: 'Verified users cannot change their name or student number.' });
+      }
+    } catch (_) { /* ignore verification check errors */ }
+
     // Map frontend field names to database field names
     const fieldMapping = {
       firstname: 'fname',
