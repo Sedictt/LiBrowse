@@ -118,6 +118,20 @@ class BooksManager {
         }
 
         container.innerHTML = this.books.map(book => this.createBookCard(book)).join('');
+
+        // Make the entire book card open the preview modal when clicked
+        // Ignore clicks on interactive elements inside the card (buttons, links, inputs, etc.)
+        container.querySelectorAll('.book-card').forEach(card => {
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', (e) => {
+                const interactive = e.target.closest('button, .btn, a, input, select, textarea, label');
+                if (interactive) return; // let the specific control handle it
+                const bookId = card.getAttribute('data-book-id');
+                if (bookId) {
+                    this.viewBook(bookId);
+                }
+            });
+        });
     }
 
     createBookCard(book) {
