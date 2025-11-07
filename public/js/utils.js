@@ -331,17 +331,43 @@ function showChatToast({ chatId, senderName, senderAvatar, previewText = 'New me
         const soundPref = localStorage.getItem('chatPopupSound');
         if (soundPref !== 'off') {
             try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                o.type = 'sine';
-                o.frequency.value = 880;
-                g.gain.value = 0.04;
-                o.connect(g);
-                g.connect(ctx.destination);
-                o.start();
-                setTimeout(() => { o.stop(); ctx.close(); }, 140);
-            } catch (_) {}
+                if (!window.__notifAudio) {
+                    window.__notifAudio = new Audio('/assets/notif.mp3');
+                    try { window.__notifAudio.load(); } catch (_) {}
+                }
+                window.__notifAudio.currentTime = 0;
+                window.__notifAudio.volume = 0.5;
+                const p = window.__notifAudio.play();
+                if (p && typeof p.catch === 'function') {
+                    p.catch(() => {
+                        try {
+                            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                            const o = ctx.createOscillator();
+                            const g = ctx.createGain();
+                            o.type = 'sine';
+                            o.frequency.value = 880;
+                            g.gain.value = 0.04;
+                            o.connect(g);
+                            g.connect(ctx.destination);
+                            o.start();
+                            setTimeout(() => { o.stop(); ctx.close(); }, 140);
+                        } catch (_) {}
+                    });
+                }
+            } catch (_) {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = 'sine';
+                    o.frequency.value = 880;
+                    g.gain.value = 0.04;
+                    o.connect(g);
+                    g.connect(ctx.destination);
+                    o.start();
+                    setTimeout(() => { o.stop(); ctx.close(); }, 140);
+                } catch (_) {}
+            }
         }
 
         return toast;
