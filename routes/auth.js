@@ -382,10 +382,10 @@ router.post("/verify-otp", async (req, res) => {
     }
 
     try {
-      // Mark verification via OTP; fully verified only if document status is already 'verified'
+      // Mark verification via OTP; account is considered Verified when either method is done
       try {
         await executeQuery(
-          "UPDATE users SET email_verified = 1, verification_method = 'otp', is_verified = CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?",
+          "UPDATE users SET email_verified = 1, verification_method = 'otp', is_verified = 1, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?",
           [email]
         );
       } catch (e) {
@@ -393,7 +393,7 @@ router.post("/verify-otp", async (req, res) => {
         if (e && e.code === 'ER_BAD_FIELD_ERROR' && msg.includes('email_verified')) {
           // Fallback for DBs without email_verified column
           await executeQuery(
-            "UPDATE users SET verification_method = 'otp', is_verified = CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?",
+            "UPDATE users SET verification_method = 'otp', is_verified = 1, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?",
             [email]
           );
         } else {

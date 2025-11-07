@@ -659,13 +659,16 @@ class AuthManager {
             return;
         }
 
-        try {
-            const response = await api.sendOTP(email);
-            this.showToast(response.message, "success");
-            this.showOTPModal(email);
-        } catch (err) {
-            this.showToast(err.message || "Failed to send OTP", "error");
+        // Route to Profile > Verification tab where OTP flow is handled
+        if (window.app) {
+            window.app.navigateToSection('profile');
+            setTimeout(() => {
+                if (typeof window.app.loadProfileTabContent === 'function') {
+                    window.app.loadProfileTabContent('verification');
+                }
+            }, 200);
         }
+        this.showToast('Go to Profile > Verification to send and enter your OTP.', 'info');
     }
 
     showDocumentUploadModal() {
@@ -749,30 +752,24 @@ class AuthManager {
             return;
         }
 
-        // Show loading state
         statusDiv.style.display = 'block';
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
         try {
-            // Create FormData
             const formData = new FormData();
             formData.append('frontId', frontIdInput.files[0]);
             if (backIdInput.files[0]) {
                 formData.append('backId', backIdInput.files[0]);
             }
 
-            // First, we need to login to get a token since registration doesn't return one
-            // For now, let's show a message that they need to login first
             if (!this.getToken()) {
-                // Try to login with the pending registration credentials
                 if (this.pendingRegistration) {
                     try {
                         const loginResponse = await api.login(
                             this.pendingRegistration.email,
                             this.pendingRegistration.password
                         );
-
                         if (loginResponse.token) {
                             this.setAuth(loginResponse.token, loginResponse.user);
                         }
@@ -791,55 +788,46 @@ class AuthManager {
                 }
             }
 
-            // Upload documents
             const response = await api.uploadVerificationDocuments(formData);
 
             statusDiv.style.display = 'none';
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Verify';
 
-            if (response.success) {
-                this.closeModal('document-upload-modal');
+            if (response && response.success) {
+                try {
+                    const userStr = localStorage.getItem('user');
+                    if (userStr) {
+                        const u = JSON.parse(userStr);
+                        u.verification_status = response.status || u.verification_status || 'pending_review';
+                        u.verification_method = 'document_upload';
+                        if (response.autoApproved) {
+                            u.verification_status = 'verified';
+                            u.is_verified = true;
+                        }
+                        localStorage.setItem('user', JSON.stringify(u));
+                        this.currentUser = u;
+                    }
+                } catch (_) { }
 
                 if (response.autoApproved) {
+                    this.closeModal('document-upload-modal');
                     this.showToast('✓ Document verified! Verify your PLV email to become fully verified.', 'success');
-                    // Update local user state (document verified), keep full verification gated on email
-                    try {
-                        const userStr = localStorage.getItem('user');
-                        if (userStr) {
-                            const u = JSON.parse(userStr);
-                            u.verification_status = 'verified';
-                            u.verification_method = 'document_upload';
-                            u.is_verified = !!u.email_verified; // fully verified only if email already verified
-                            localStorage.setItem('user', JSON.stringify(u));
-                            this.currentUser = u;
-                        }
-                    } catch (_) { }
-                    // Show success modal (document verified)
-                    console.log('🔔 Showing verification success modal...');
                     setTimeout(() => this.showVerificationSuccessModal({
                         title: 'Document Verified',
                         message: 'Your Student ID has been verified. Verify your PLV email to complete verification.',
                     }), 120);
-                    // Refresh section to reflect updated verification state
-                    if (window.app) {
-                        window.app.loadCurrentSection();
-                    }
                 } else {
-                    this.showToast('Documents uploaded! Admin review in progress.', 'info');
-                    // Update UI status card
+                    this.showToast(response.message || 'Documents uploaded. Admin review in progress.', 'info');
                     this.updateVerificationStatusUI('pending_review', response.message || 'Admin review in progress.');
-                    // Reload user data for pending state only
-                    if (window.app) {
-                        window.app.loadCurrentSection();
-                    }
                 }
 
-                // Note: we intentionally do not reload immediately on auto-approval
-                // to avoid hiding the success modal. Reload happens on Continue.
+                if (window.app) {
+                    window.app.loadCurrentSection();
+                }
             } else {
-                this.showToast(response.message || 'Upload failed', 'error');
-                this.updateVerificationStatusUI('error', response.message || 'Verification failed.');
+                this.showToast((response && response.message) || 'Upload failed', 'error');
+                this.updateVerificationStatusUI('error', (response && response.message) || 'Verification failed.');
             }
 
         } catch (error) {
@@ -848,81 +836,6 @@ class AuthManager {
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Verify';
             this.showToast(error.message || 'Upload failed. Please try again.', 'error');
-        }
-    }
-
-    async startOTPVerification() {
-        const email = this.pendingRegistration?.email || this.currentUser?.email;
-        if (!email) {
-            this.showToast("No email found for verification", "error");
-            return;
-        }
-
-        try {
-            const response = await api.sendOTP(email);
-            this.showToast(response.message, "success");
-            this.showOTPModal(email);
-        } catch (err) {
-            this.showToast(err.message || "Failed to send OTP", "error");
-        }
-    }
-
-    showOTPModal(email) {
-        const modal = document.createElement('div');
-        modal.innerHTML = `
-    <div class="modal active" id="otp-modal">
-      <div class="modal-content" style="max-width: 400px;">
-        <div class="modal-header">
-          <h3>Email Verification</h3>
-          <button class="modal-close" onclick="authManager.closeModal('otp-modal')"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body" style="text-align:center;">
-          <p>We’ve sent a 6-digit OTP to <b>${email}</b></p>
-          <input type="text" id="otp-input" placeholder="Enter OTP" maxlength="6" style="text-align:center; font-size:20px; letter-spacing:4px; margin-bottom:10px;">
-          <button class="btn btn-primary" onclick="authManager.verifyOTPCode('${email}')">Verify</button>
-          <p id="otp-timer" style="margin-top:10px; color:gray;">Expires in 10:00</p>
-          <button class="btn btn-link" id="resend-otp-btn" onclick="authManager.resendOTP('${email}')">Resend OTP</button>
-        </div>
-      </div>
-    </div>
-  `;
-        document.body.appendChild(modal);
-        this.startOTPTimer();
-    }
-
-    async verifyOTPCode(email) {
-        const otp = document.getElementById("otp-input").value;
-        try {
-            const response = await api.verifyOTP(email, otp);
-            this.showToast(response.message, "success");
-            this.closeModal("otp-modal");
-            // Update local user: email verified; recompute full verification based on document status
-            try {
-                const userStr = localStorage.getItem('user');
-                if (userStr) {
-                    const u = JSON.parse(userStr);
-                    u.email_verified = true;
-                    u.is_verified = (u.verification_status === 'verified');
-                    localStorage.setItem('user', JSON.stringify(u));
-                    this.currentUser = u;
-                }
-            } catch (_) { }
-            // Refresh current section to reflect changes
-            if (window.app) {
-                window.app.loadCurrentSection();
-            }
-        } catch (err) {
-            this.showToast(err.message || "Invalid or expired OTP", "error");
-        }
-    }
-
-    async resendOTP(email) {
-        try {
-            const response = await api.sendOTP(email);
-            this.showToast("New OTP sent!", "info");
-            this.startOTPTimer();
-        } catch (err) {
-            this.showToast(err.message || "Failed to resend OTP", "error");
         }
     }
 
@@ -956,26 +869,7 @@ class AuthManager {
     }
 
 }
-// Forgot Password form
-document.getElementById("forgot-password-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = document.getElementById("forgot-email").value;
-    try {
-        const response = await api.forgotPassword(email);
-        alert(response.message);
-    } catch (err) {
-        alert(err.message || "Error sending reset link");
-    }
-});
-// Forgot password link
-const forgotPasswordLink = document.getElementById('forgot-password-link');
-if (forgotPasswordLink) {
-    forgotPasswordLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.closeModal('login-modal');
-        this.openModal('forgot-password-modal');
-    });
-}
+// (Global forgot password listeners are registered inside AuthManager methods)
 
 // Create global authManager instance
 

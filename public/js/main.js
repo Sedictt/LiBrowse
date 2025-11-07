@@ -463,13 +463,16 @@ class App {
             profileImg.onerror = function () { this.onerror = null; this.src = '/assets/default-avatar.svg'; };
         }
 
-        // Update verification badge (fully verified only when BOTH methods verified)
+        // Update verification badge
         if (verificationBadge) {
-            const isVerified = !!(userData.email_verified && userData.verification_status === 'verified');
-            verificationBadge.className = `verification-badge ${isVerified ? 'verified' : 'unverified'}`;
+            const emailVerified = !!userData.email_verified;
+            const docVerified = userData.verification_status === 'verified';
+            const bothVerified = emailVerified && docVerified;
+            const eitherVerified = emailVerified || docVerified;
+            verificationBadge.className = `verification-badge ${eitherVerified ? 'verified' : 'unverified'}`;
             verificationBadge.innerHTML = `
-                <i class="fas fa-${isVerified ? 'check-circle' : 'exclamation-triangle'}"></i>
-                <span>${isVerified ? 'Verified' : 'Not Verified'}</span>
+                <i class="fas fa-${eitherVerified ? 'check-circle' : 'exclamation-triangle'}"></i>
+                <span>${bothVerified ? 'Fully Verified' : (eitherVerified ? 'Verified' : 'Not Verified')}</span>
             `;
         }
 
@@ -659,16 +662,17 @@ class App {
 
         const emailVerified = !!user.email_verified;
         const docVerified = user.verification_status === 'verified';
-        const isVerified = emailVerified && docVerified;
+        const bothVerified = emailVerified && docVerified;
+        const eitherVerified = emailVerified || docVerified;
         const verificationMethod = user.verification_method || 'none';
 
         return `
             <div class="verification-content">
                 <div class="verification-header">
                     <h3><i class="fas fa-shield-alt"></i> Account Verification</h3>
-                    <div class="verification-status ${isVerified ? 'verified' : 'unverified'}">
-                        <i class="fas ${isVerified ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
-                        <span>${isVerified ? 'Verified Account' : 'Unverified Account'}</span>
+                    <div class="verification-status ${eitherVerified ? 'verified' : 'unverified'}">
+                        <i class="fas ${eitherVerified ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+                        <span>${bothVerified ? 'Fully Verified' : (eitherVerified ? 'Verified' : 'Unverified Account')}</span>
                     </div>
                 </div>
 
@@ -680,17 +684,17 @@ class App {
                         <div class="info-content">
                             <h4>Why Verify Your Account?</h4>
                             <ul>
-                                <li>✅ Build trust with other users</li>
-                                <li>✅ Access to premium features</li>
-                                <li>✅ Higher borrowing limits</li>
-                                <li>✅ Priority in book requests</li>
-                                <li>✅ Enhanced security protection</li>
+                                <li> Build trust with other users</li>
+                                <li> Access to premium features</li>
+                                <li> Higher borrowing limits</li>
+                                <li> Priority in book requests</li>
+                                <li> Enhanced security protection</li>
                             </ul>
                         </div>
                     </div>
                 </div>
 
-                ${!isVerified ? `
+                ${!bothVerified ? `
                     <!-- Verification Method Selection -->
                     <div class="verification-methods">
                         <h4><i class="fas fa-route"></i> Choose Verification Method</h4>
