@@ -35,9 +35,9 @@ class ReminderTask {
                 WHERE t.status = 'borrowed'
                 AND DATE(t.expected_return_date) = ?
                 AND t.id NOT IN (
-                    SELECT transaction_id FROM notifications 
-                    WHERE type = 'reminder' 
-                    AND DATE(created_at) = CURDATE()
+                    SELECT related_id FROM notifications 
+                    WHERE category = 'reminder' 
+                    AND DATE(created) = CURDATE()
                 )
             `, [tomorrowStr]);
 
@@ -49,7 +49,8 @@ class ReminderTask {
                         trans.title,
                         trans.author,
                         new Date(trans.expected_return_date).toLocaleDateString(),
-                        `https://librowse.app/transactions/${trans.id}`
+                        `https://librowse.app/transactions/${trans.id}`,
+                        trans.id
                     );
                     console.log(`Reminder sent to user ${trans.borrower_id} for book ${trans.title}`);
                 } catch (err) {
@@ -76,9 +77,9 @@ class ReminderTask {
                 WHERE t.status = 'borrowed'
                 AND DATE(t.expected_return_date) < CURDATE()
                 AND t.id NOT IN (
-                    SELECT transaction_id FROM notifications 
-                    WHERE type = 'overdue' 
-                    AND DATE(created_at) = CURDATE()
+                    SELECT related_id FROM notifications 
+                    WHERE category = 'reminder' 
+                    AND DATE(created) = CURDATE()
                 )
             `, []);
 
@@ -91,7 +92,8 @@ class ReminderTask {
                         trans.author,
                         new Date(trans.expected_return_date).toLocaleDateString(),
                         trans.days_overdue,
-                        `https://librowse.app/transactions/${trans.id}`
+                        `https://librowse.app/transactions/${trans.id}`,
+                        trans.id
                     );
                     console.log(`Overdue alert sent to user ${trans.borrower_id} for book ${trans.title}`);
                 } catch (err) {
