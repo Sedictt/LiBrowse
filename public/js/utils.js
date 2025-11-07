@@ -214,3 +214,142 @@ function formatFileSize(bytes) {
 function generateId() {
     return Math.random().toString(36).substring(2) + Date.now().toString(36);
 }
+
+// In-app chat toast
+function showChatToast({ chatId, senderName, senderAvatar, previewText = 'New message', duration = 5000, clickToOpen = true }) {
+    try {
+        let container = document.getElementById('chat-toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'chat-toast-container';
+            container.className = 'chat-toast-container';
+            document.body.appendChild(container);
+        }
+
+        const existing = container.querySelector(`.chat-toast[data-chat-id="${chatId}"]`);
+        const makeInitials = (name) => {
+            if (!name) return '?';
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        };
+
+        const makeToastEl = () => {
+            const el = document.createElement('div');
+            el.className = 'chat-toast';
+            el.dataset.chatId = String(chatId);
+
+            const avatarHtml = senderAvatar ?
+                `<img class="chat-toast-avatar" src="${escapeHtml(String(senderAvatar))}" alt="${escapeHtml(String(senderName || ''))}">` :
+                `<div class="chat-toast-avatar initials">${escapeHtml(makeInitials(String(senderName || '')))}</div>`;
+
+            el.innerHTML = `
+                <button class="chat-toast-close" aria-label="Dismiss">×</button>
+                <div class="chat-toast-inner">
+                    <div class="chat-toast-media">${avatarHtml}</div>
+                    <div class="chat-toast-content">
+                        <div class="chat-toast-title">${escapeHtml(String(senderName || 'New message'))}</div>
+                        <div class="chat-toast-preview">${escapeHtml(String(previewText || ''))}</div>
+                        <div class="chat-toast-meta">Just now</div>
+                    </div>
+                </div>
+            `;
+
+            return el;
+        };
+
+        const toast = existing || makeToastEl();
+
+        if (existing) {
+            const titleEl = toast.querySelector('.chat-toast-title');
+            const previewEl = toast.querySelector('.chat-toast-preview');
+            const avatarImg = toast.querySelector('.chat-toast-avatar');
+            if (titleEl) titleEl.textContent = String(senderName || 'New message');
+            if (previewEl) previewEl.textContent = String(previewText || '');
+            if (avatarImg && avatarImg.tagName === 'IMG' && senderAvatar) {
+                avatarImg.src = String(senderAvatar);
+                avatarImg.alt = String(senderName || '');
+            }
+        } else {
+            container.appendChild(toast);
+        }
+
+        const removeToast = () => {
+            toast.classList.add('hide');
+            setTimeout(() => toast.remove(), 250);
+        };
+
+        const closeBtn = toast.querySelector('.chat-toast-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeToast();
+            }, { once: true });
+        }
+
+        if (clickToOpen) {
+            toast.addEventListener('click', () => {
+                if (window.chatManager && typeof window.chatManager.openChat === 'function') {
+                    window.chatManager.openChat(parseInt(chatId));
+                }
+                removeToast();
+            }, { once: true });
+        }
+
+        // Animate in
+        requestAnimationFrame(() => toast.classList.add('show'));
+
+        // Limit stack
+        const maxStack = 3;
+        const toasts = Array.from(container.querySelectorAll('.chat-toast'));
+        if (toasts.length > maxStack) {
+            for (let i = 0; i < toasts.length - maxStack; i++) {
+                toasts[i].remove();
+            }
+        }
+
+        // Auto dismiss with hover pause
+        let remaining = Math.max(0, duration | 0);
+        let timerId;
+        let startTime;
+        const startTimer = () => {
+            startTime = Date.now();
+            timerId = setTimeout(removeToast, remaining);
+        };
+        const pauseTimer = () => {
+            clearTimeout(timerId);
+            remaining -= Date.now() - startTime;
+            if (remaining < 0) remaining = 0;
+        };
+        const resumeTimer = () => {
+            clearTimeout(timerId);
+            if (remaining === 0) removeToast(); else startTimer();
+        };
+        toast.addEventListener('mouseenter', pauseTimer);
+        toast.addEventListener('mouseleave', resumeTimer);
+        startTimer();
+
+        // Optional sound via Web Audio (no asset required)
+        const soundPref = localStorage.getItem('chatPopupSound');
+        if (soundPref !== 'off') {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'sine';
+                o.frequency.value = 880;
+                g.gain.value = 0.04;
+                o.connect(g);
+                g.connect(ctx.destination);
+                o.start();
+                setTimeout(() => { o.stop(); ctx.close(); }, 140);
+            } catch (_) {}
+        }
+
+        return toast;
+    } catch (e) {
+        try {
+            if (typeof window.showToast === 'function') {
+                window.showToast(previewText || 'New message', 'info', 5000);
+            }
+        } catch (_) {}
+    }
+}

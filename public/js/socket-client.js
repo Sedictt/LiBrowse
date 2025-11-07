@@ -116,7 +116,7 @@ function initializeSocket() {
         }
     });
 
-    socket.on('chat_activity', () => {
+    socket.on('chat_activity', (payload) => {
         if (window.app) {
             const p = window.app.updateChatBadge();
             if (p && typeof p.catch === 'function') p.catch(() => {});
@@ -128,6 +128,13 @@ function initializeSocket() {
             const p2 = fn.call(window.requestManager);
             if (p2 && typeof p2.catch === 'function') p2.catch(() => {});
         }
+
+        // Forward payload to ChatManager so it can show Smart Toasts even if not joined to the room
+        try {
+            if (window.chatManager && typeof window.chatManager.handleChatActivity === 'function') {
+                window.chatManager.handleChatActivity(payload);
+            }
+        } catch (_) { /* noop */ }
     });
 
     return socket;

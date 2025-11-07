@@ -16,6 +16,7 @@ class ChatManager {
         this.isLoadingMessages = false;
         this.initialLoadComplete = false;
         this.pendingMessages = [];
+        this.notifiedMessageIds = new Set();
 
         this.init();
     }
@@ -66,6 +67,7 @@ class ChatManager {
         this.socket.on('user_typing', (data) => this.handleUserTyping(data));
         this.socket.on('user_online', (data) => this.handleUserOnline(data));
         this.socket.on('joined_chat', (data) => this.handleJoinedChat(data));
+        this.socket.on('chat_activity', (data) => this.handleChatActivity(data));
 
         console.log('ChatManager socket listeners registered');
     }
@@ -651,7 +653,7 @@ class ChatManager {
 
     handleNewMessage(data) {
         if (parseInt(data.chatId) !== parseInt(this.currentChatId)) {
-            // Message for different chat: refresh previews and show notification
+            // Message for different chat: refresh previews and show notification (only for messages from others)
             try {
                 if (window.requestManager) {
                     const fn = window.requestManager.refreshActiveChats || window.requestManager.loadRequests;
@@ -659,7 +661,16 @@ class ChatManager {
                     if (p && typeof p.catch === 'function') p.catch(() => {});
                 }
             } catch (_) { /* noop */ }
-            this.showNotification(data.message);
+
+            try {
+                const curUserId = (window.authManager && authManager.currentUser) ? authManager.currentUser.id : null;
+                if (!curUserId || data.message.sender_id !== curUserId) {
+                    this.showNotification(data.message);
+                    if (data.message && data.message.id) {
+                        this.notifiedMessageIds.add(data.message.id);
+                    }
+                }
+            } catch (_) { /* noop */ }
             return;
         }
 
@@ -751,6 +762,34 @@ class ChatManager {
 
     handleJoinedChat(data) {
         console.log('Joined chat:', data.chatId);
+    }
+
+    async handleChatActivity(data) {
+        try {
+            if (!data || data.type !== 'message' || !data.chatId) return;
+            if (this.currentChatId && parseInt(data.chatId) === parseInt(this.currentChatId)) return;
+
+            // Deduplicate if we've already shown a toast for this message
+            if (data.messageId && this.notifiedMessageIds.has(data.messageId)) return;
+
+            // Ensure auth
+            if (!localStorage.getItem('token')) return;
+
+            const resp = await fetch(`/api/chats/${data.chatId}/messages?limit=1&offset=0&_=${Date.now()}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                cache: 'no-store'
+            });
+            if (!resp.ok) return;
+            const payload = await resp.json();
+            const last = (payload && payload.messages && payload.messages[0]) ? payload.messages[0] : null;
+            if (!last) return;
+
+            const curUserId = (window.authManager && authManager.currentUser) ? authManager.currentUser.id : null;
+            if (!curUserId || last.sender_id !== curUserId) {
+                this.showNotification(last);
+                if (last.id) this.notifiedMessageIds.add(last.id);
+            }
+        } catch (_) { /* noop */ }
     }
 
     handleTyping() {
@@ -1033,22 +1072,22 @@ class ChatManager {
     }
 
     showNotification(message) {
+        // Derive preview text (supports photo bundles)
+        let preview = (message && message.message) ? message.message : '';
+        if (message && (message.message_type === 'img' || (typeof preview === 'string' && preview.includes('/api/chat-attachments/')))) {
+            const count = (preview || '').split('\n').filter(Boolean).length;
+            preview = count > 1 ? `${count} Photos` : 'Photo';
+        } else if (typeof preview === 'string') {
+            preview = preview.substring(0, 100);
+        }
+
         // Browser notification
         if ('Notification' in window && Notification.permission === 'granted') {
-            let bodyText = (message && message.message) ? message.message : '';
-            if (message && (message.message_type === 'img' || (typeof bodyText === 'string' && bodyText.includes('/api/chat-attachments/')))) {
-                const count = (bodyText || '').split('\n').filter(Boolean).length;
-                bodyText = count > 1 ? `${count} Photos` : 'Photo';
-            } else {
-                bodyText = bodyText.substring(0, 100);
-            }
-
             const notification = new Notification(`New message from ${message.sender_name}`, {
-                body: bodyText,
-                icon: '/images/logo.png',
+                body: preview,
+                icon: message.sender_avatar || '/images/logo.png',
                 tag: `chat-${message.chat_id}`
             });
-
             notification.onclick = () => {
                 window.focus();
                 this.openChat(message.chat_id);
@@ -1056,9 +1095,22 @@ class ChatManager {
             };
         }
 
-        // In-app toast notification
-        if (window.requestManager) {
-            requestManager.showToast(`New message from ${message.sender_name}`, 'info');
+        // In-app Smart Toast (respect user preference)
+        const popupPref = localStorage.getItem('chatPopupEnabled');
+        if (popupPref !== 'off') {
+            if (typeof window.showChatToast === 'function') {
+                window.showChatToast({
+                    chatId: message.chat_id,
+                    senderName: message.sender_name,
+                    senderAvatar: message.sender_avatar,
+                    previewText: preview,
+                    duration: 5000,
+                    clickToOpen: true
+                });
+            } else if (window.requestManager) {
+                // Fallback to existing generic toast
+                requestManager.showToast(`New message from ${message.sender_name}`, 'info');
+            }
         }
     }
 
