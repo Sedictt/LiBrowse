@@ -30,6 +30,9 @@ const io = socketIO(server, {
     }
 });
 
+const fileUpload = require('express-fileupload');
+app.use(fileUpload());
+
 // Initialize chat socket handlers
 const chatHandler = require('./socket/chatHandler');
 chatHandler(io);

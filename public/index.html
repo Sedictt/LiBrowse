@@ -649,6 +649,44 @@
             </div>
         </section>
 
+        <!-- Edit Profile Picture Modal -->
+        <div class="modal" id="edit-profile-picture-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-image"></i> Change Profile Picture</h3>
+                    <button class="modal-close" type="button" id="close-edit-picture-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="file-upload-area" id="picture-upload-area"
+                        style="border: 2px dashed #667eea; padding: 40px; text-align: center; border-radius: 8px; cursor: pointer; background: rgba(102, 126, 234, 0.05);">
+                        <i class="fas fa-cloud-upload-alt"
+                            style="font-size: 2.5rem; color: #667eea; margin-bottom: 15px; display: block;"></i>
+                        <p style="margin: 10px 0;">Click to select or drag and drop your image</p>
+                        <small style="color: #a0aec0;">JPG, PNG only. Max 5MB</small>
+                    </div>
+                    <input type="file" id="profile-picture-input" name="profilepicture" accept=".jpg,.jpeg,.png"
+                        style="display: none;">
+
+                    <div class="file-preview" id="picture-preview"
+                        style="display: none; margin: 20px 0; text-align: center;">
+                        <img id="preview-image" src="" alt="Preview"
+                            style="max-width: 200px; max-height: 200px; border-radius: 8px;">
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" id="cancel-picture-upload">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="upload-picture-btn" disabled>
+                        <i class="fas fa-upload"></i> Upload Picture
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
         <!-- Profile Section (Hidden for now) -->
         <section id="profile-section" class="section">
             <div class="container">
@@ -1272,7 +1310,7 @@
             </section>
         </div>
     </div>
-    
+
 
     <!-- Document Verification Modal -->
     <div class="modal" id="document-modal">
@@ -1623,7 +1661,8 @@
                     <button type="button" class="chat-btn-icon" id="report-chat-btn" title="Report user">
                         <i class="fas fa-flag"></i>
                     </button>
-                    <button type="button" class="chat-btn-cancel" id="cancel-transaction-btn" title="Cancel transaction" aria-label="Cancel transaction">
+                    <button type="button" class="chat-btn-cancel" id="cancel-transaction-btn" title="Cancel transaction"
+                        aria-label="Cancel transaction">
                         <!-- Cancel icon + label: keep the same id so existing JS handlers continue working -->
                         <i class="fas fa-ban" aria-hidden="true"></i>
                         <span class="chat-btn-label">Cancel Transaction</span>
@@ -2220,6 +2259,27 @@
                 observer.observe(modal, { attributes: true });
             });
         });
+    </script>
+
+    <script>
+        // Close mobile menu when modal opens
+        document.addEventListener('DOMContentLoaded', () => {
+            const modals = document.querySelectorAll('.modal');
+
+            modals.forEach(modal => {
+                const observer = new MutationObserver(mutations => {
+                    mutations.forEach(mutation => {
+                        if (mutation.attributeName === 'class') {
+                            if (modal.classList.contains('active') || modal.classList.contains('show')) {
+                                // Close mobile menu logic...
+                            }
+                        }
+                    });
+                });
+                observer.observe(modal, { attributes: true });
+            });
+        });
+
     </script>
 
 </body>

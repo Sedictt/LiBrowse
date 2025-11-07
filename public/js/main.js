@@ -458,10 +458,11 @@ class App {
         if (profileStudentId) profileStudentId.textContent = `Student ID: ${userData.student_id}`;
         if (profileProgram) profileProgram.textContent = userData.program;
         if (profileImg) {
-            const imgSrc = userData.avatar_url || userData.profile_image || '/assets/default-avatar.svg';
+            const imgSrc = userData.profileimage || userData.avatar_url || '/assets/default-avatar.svg';
             profileImg.src = imgSrc;
             profileImg.onerror = function () { this.onerror = null; this.src = '/assets/default-avatar.svg'; };
         }
+
 
         // Update verification badge
         if (verificationBadge) {
@@ -498,6 +499,8 @@ class App {
         // Setup edit profile button (with delay to ensure DOM is ready)
         setTimeout(() => {
             this.setupEditProfileButton();
+            this.setupEditProfilePictureButton();
+
         }, 100);
     }
 
@@ -729,9 +732,9 @@ class App {
                                     <p>Upload your Student ID for automatic OCR verification</p>
                                     <div class="method-status">
                                         ${docVerified ?
-                        '<span class="status-badge verified"><i class="fas fa-check"></i> Completed</span>' :
-                        '<span class="status-badge pending"><i class="fas fa-upload"></i> Ready</span>'
-                    }
+                    '<span class="status-badge verified"><i class="fas fa-check"></i> Completed</span>' :
+                    '<span class="status-badge pending"><i class="fas fa-upload"></i> Ready</span>'
+                }
                                     </div>
                                 </div>
                                 ${!docVerified ? `
@@ -1271,7 +1274,7 @@ class App {
         this._requestsBadgeTimer = setInterval(() => {
             if (document.visibilityState === 'visible') {
                 const p = this.updateRequestsBadge();
-                if (p && typeof p.catch === 'function') p.catch(() => {});
+                if (p && typeof p.catch === 'function') p.catch(() => { });
             }
         }, 30000);
     }
@@ -1320,7 +1323,7 @@ class App {
         this._chatBadgeTimer = setInterval(() => {
             if (document.visibilityState === 'visible') {
                 const p = this.updateChatBadge();
-                if (p && typeof p.catch === 'function') p.catch(() => {});
+                if (p && typeof p.catch === 'function') p.catch(() => { });
             }
         }, 30000);
     }
@@ -2026,73 +2029,271 @@ class App {
         }
     }
 
+    setupEditProfilePictureButton() {
+        const editAvatarBtn = document.getElementById('edit-avatar');
+        if (!editAvatarBtn) {
+            console.log('Edit avatar button not found');
+            return;
+        }
+
+        editAvatarBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Edit profile picture button clicked');
+            this.openEditProfilePictureModal();
+        });
+
+        console.log('Edit profile picture button setup complete');
+    }
+
+    openEditProfilePictureModal() {
+        console.log('Opening profile picture modal...');
+
+        if (!authManager.currentUser) {
+            console.error('No current user found');
+            showToast('Please log in first', 'error');
+            return;
+        }
+
+        // Use authManager's openModal method (since it's working for other modals)
+        authManager.openModal('edit-profile-picture-modal');
+
+        // Now set up the event listeners
+        setTimeout(() => {
+            const modal = document.getElementById('edit-profile-picture-modal');
+            if (modal) {
+                const closeBtn = document.getElementById('close-edit-picture-modal');
+                const cancelBtn = document.getElementById('cancel-picture-upload');
+                const uploadArea = document.getElementById('picture-upload-area');
+                const fileInput = document.getElementById('profile-picture-input');
+                const uploadBtn = document.getElementById('upload-picture-btn');
+
+                if (closeBtn) closeBtn.addEventListener('click', () => modal.remove());
+                if (cancelBtn) cancelBtn.addEventListener('click', () => modal.remove());
+
+                if (uploadArea && fileInput) {
+                    uploadArea.addEventListener('click', () => fileInput.click());
+                    fileInput.addEventListener('change', (e) => this.handleProfilePictureSelect(e, modal));
+                }
+
+                if (uploadBtn) {
+                    uploadBtn.addEventListener('click', () => this.handleProfilePictureUpload(modal));
+                }
+
+                console.log('Profile picture modal setup complete');
+            }
+        }, 100);
+    }
+
+
+
+    handleProfilePictureSelect(event, modal) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Validation
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+
+        if (file.size > maxSize) {
+            showToast('File size too large. Max 5MB', 'error');
+            return;
+        }
+
+        if (!allowedTypes.includes(file.type)) {
+            showToast('Invalid file type. Only JPG, PNG allowed', 'error');
+            return;
+        }
+
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const preview = modal.querySelector('#picture-preview');
+            const previewImage = modal.querySelector('#preview-image');
+            previewImage.src = e.target.result;
+            preview.style.display = 'block';
+
+            // Enable upload button
+            const uploadBtn = modal.querySelector('#upload-picture-btn');
+            uploadBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async handleProfilePictureUpload(modal) {
+        const fileInput = modal.querySelector('#profile-picture-input');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            showToast('Please select a picture first', 'error');
+            return;
+        }
+
+        const uploadBtn = modal.querySelector('#upload-picture-btn');
+        const originalText = uploadBtn.innerHTML;
+
+        try {
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+
+            const formData = new FormData();
+            formData.append('profilepicture', file);
+
+            const response = await fetch('/api/users/profile-picture', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authManager.getToken()}`
+                },
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Update profile image in memory
+                authManager.currentUser.profileimage = result.imageUrl;
+                authManager.currentUser.avatarurl = result.imageUrl;
+
+                // Update displayed image
+                const profileImg = document.getElementById('profile-image');
+                if (profileImg) {
+                    profileImg.src = result.imageUrl;
+                }
+
+                showToast('Profile picture updated successfully!', 'success');
+
+                // Close modal after success
+                setTimeout(() => modal.remove(), 500);
+            } else {
+                throw new Error(result.message || 'Upload failed');
+            }
+        } catch (error) {
+            console.error('Profile picture upload error:', error);
+            showToast(`Error: ${error.message}`, 'error');
+        } finally {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = originalText;
+        }
+    }
+
+
     openEditProfileModal() {
         console.log('Opening edit profile modal');
+
         const user = authManager.getCurrentUser();
         console.log('Current user:', user);
+
         if (!user) {
             console.log('No user found, cannot open edit profile modal');
             return;
         }
 
+        // Remove any existing modal
+        const existingModal = document.getElementById('edit-profile-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
         const modalHTML = `
-            <div class="modal-overlay" id="edit-profile-modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3><i class="fas fa-user-edit"></i> Edit Profile</h3>
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <form id="edit-profile-form" class="modal-body">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label for="edit-firstname">First Name</label>
-                                <input type="text" id="edit-firstname" value="${user.firstname || ''}" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="edit-lastname">Last Name</label>
-                                <input type="text" id="edit-lastname" value="${user.lastname || ''}" required>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="edit-email">Email Address</label>
-                            <input type="email" id="edit-email" value="${user.email || ''}" required>
-                        </div>
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label for="edit-student-id">Student ID</label>
-                                <input type="text" id="edit-student-id" value="${user.student_id || ''}" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="edit-program">Program</label>
-                                <input type="text" id="edit-program" value="${user.program || ''}" required>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="edit-bio">Bio (Optional)</label>
-                            <textarea id="edit-bio" rows="3" placeholder="Tell others about yourself...">${user.bio || ''}</textarea>
-                        </div>
-                    </form>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">
-                            Cancel
-                        </button>
-                        <button type="submit" form="edit-profile-form" class="btn btn-primary" id="save-profile-btn">
-                            <i class="fas fa-save"></i>
-                            Save Changes
-                        </button>
-                    </div>
+        <div class="modal-overlay" id="edit-profile-modal" style="display: flex; z-index: 10000;">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h3><i class="fas fa-user-edit"></i> Edit Profile</h3>
+                    <button class="modal-close" type="button" id="close-edit-profile-modal">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
+                <form id="edit-profile-form" class="modal-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="edit-firstname">First Name</label>
+                            <input type="text" id="edit-firstname" value="${user.firstname || ''}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-lastname">Last Name</label>
+                            <input type="text" id="edit-lastname" value="${user.lastname || ''}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-email">Email Address</label>
+                        <input type="email" id="edit-email" value="${user.email || ''}" disabled>
+                        <small class="form-help">Email cannot be changed</small>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="edit-student-id">Student ID</label>
+                            <input type="text" id="edit-student-id" value="${user.studentid || user.student_id || ''}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-program">Program</label>
+                            <input type="text" id="edit-program" value="${user.program || ''}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-bio">Bio (Optional)</label>
+                        <textarea id="edit-bio" rows="3" placeholder="Tell others about yourself...">${user.bio || ''}</textarea>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline" id="cancel-edit-profile">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="save-profile-btn">
+                            <i class="fas fa-save"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
             </div>
-        `;
+        </div>
+    `;
 
         console.log('Adding modal HTML to body');
         document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-        // Add form submit handler
+        // Get modal element
+        const modal = document.getElementById('edit-profile-modal');
+
+        // CRITICAL: Stop propagation on modal to prevent setupModals from closing it
+        modal.addEventListener('click', (e) => {
+            // Only close if clicking directly on the overlay (not the content)
+            if (e.target === modal) {
+                modal.remove();
+            }
+        }, false);
+
+        // Prevent clicks inside modal content from bubbling
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
+
+        // Setup close button
+        const closeBtn = document.getElementById('close-edit-profile-modal');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                modal.remove();
+            });
+        }
+
+        // Setup cancel button
+        const cancelBtn = document.getElementById('cancel-edit-profile');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                modal.remove();
+            });
+        }
+
+        // Setup form submit
         const form = document.getElementById('edit-profile-form');
         console.log('Edit profile form:', form);
+
         if (form) {
             form.addEventListener('submit', (e) => this.handleEditProfileSubmit(e));
             console.log('Form submit handler added');
@@ -2100,13 +2301,17 @@ class App {
             console.log('Edit profile form not found');
         }
 
-        // Show the modal
-        const modal = document.getElementById('edit-profile-modal');
-        if (modal) {
-            modal.style.display = 'flex';
-            console.log('Modal displayed');
-        }
+        // Force modal to stay visible
+        modal.style.display = 'flex';
+        modal.style.visibility = 'visible';
+        modal.style.opacity = '1';
+        modal.style.pointerEvents = 'auto';
+
+        console.log('Modal displayed');
     }
+
+
+
 
     async loadBorrowingLendingHistory() {
         try {
@@ -2218,26 +2423,24 @@ class App {
         const originalText = saveBtn.innerHTML;
 
         try {
-            // Show loading state
             saveBtn.disabled = true;
             saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
 
             const formData = {
                 firstname: document.getElementById('edit-firstname').value.trim(),
                 lastname: document.getElementById('edit-lastname').value.trim(),
-                email: document.getElementById('edit-email').value.trim(),
-                student_id: document.getElementById('edit-student-id').value.trim(),
+                studentid: document.getElementById('edit-student-id').value.trim(),
                 program: document.getElementById('edit-program').value.trim(),
                 bio: document.getElementById('edit-bio').value.trim()
             };
 
             // Validate required fields
-            if (!formData.firstname || !formData.lastname || !formData.email || !formData.student_id || !formData.program) {
+            if (!formData.firstname || !formData.lastname || !formData.studentid || !formData.program) {
                 throw new Error('Please fill in all required fields');
             }
 
-            // Make API call to update profile
-            const response = await fetch('/api/users/profile', {
+            // Make API call
+            const response = await fetch(`api/users/profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2249,29 +2452,26 @@ class App {
             const result = await response.json();
 
             if (result.success) {
-                // Update current user data
-                authManager.currentUser = { ...authManager.currentUser, ...formData };
-
                 // Close modal
-                document.getElementById('edit-profile-modal').remove();
-
-                // Refresh profile display
-                this.loadProfile();
+                const modal = document.getElementById('edit-profile-modal');
+                if (modal) modal.remove();
 
                 showToast('Profile updated successfully!', 'success');
-            } else {
-                throw new Error(result.message || 'Failed to update profile');
+
+                // Just reload the page - simplest and safest
+                setTimeout(() => window.location.reload(), 500);
             }
 
         } catch (error) {
             console.error('Profile update error:', error);
             showToast(`Error: ${error.message}`, 'error');
+
         } finally {
-            // Restore button state
             saveBtn.disabled = false;
             saveBtn.innerHTML = originalText;
         }
     }
+
 
 
 }

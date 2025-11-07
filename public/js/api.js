@@ -144,11 +144,12 @@ class ApiClient {
     }
 
     async updateProfile(profileData) {
-        return this.request('/auth/profile', {
+        return this.request('users/profile', {  // ⬅️ Changed from 'auth/profile'
             method: 'PUT',
             body: JSON.stringify(profileData)
         });
     }
+
 
     // =====================================
     // Email OTP Verification Endpoints

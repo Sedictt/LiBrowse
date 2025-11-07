@@ -5446,6 +5446,7 @@ body {
         right: 10px;
         bottom: 10px;
     }
+
     .chat-toast {
         min-width: auto;
         max-width: 100%;
@@ -9783,4 +9784,12 @@ body {
 #notification-badge.active {
     opacity: 1;
     transform: scale(1);
+}
+
+#edit-profile-modal.modal-overlay {
+    pointer-events: auto !important;
+}
+
+#edit-profile-modal .modal-content {
+    pointer-events: auto !important;
 }

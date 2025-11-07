@@ -28,7 +28,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         program: u.program,
         year_level: u.year_level,
         credits: u.credits,
-        profile_image: u.profile_image,
+        profileimage: u.profileimage,
         status: u.status,
         created_at: u.created_at
       })
@@ -41,6 +41,10 @@ router.get('/profile', authenticateToken, async (req, res) => {
 
 // PUT /api/users/profile - update profile
 router.put('/profile', authenticateToken, async (req, res) => {
+  console.log('=== PUT /users/profile called ===');
+  console.log('Request body:', req.body);
+  console.log('User ID:', req.user?.id);
+
   try {
     // Map frontend field names to database field names
     const fieldMapping = {
@@ -133,5 +137,88 @@ router.get('/stats', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to load user stats' });
   }
 });
+
+// POST /api/users/profile-picture - upload profile picture
+router.post('/profile-picture', authenticateToken, async (req, res) => {
+  console.log('=== POST /users/profile-picture called ===');
+
+  try {
+    // Check if file exists
+    if (!req.files || !req.files.profilepicture) {
+      console.log('No file uploaded');
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    const file = req.files.profilepicture;
+    console.log('File received:', file.name, 'Size:', file.size, 'Type:', file.mimetype);
+
+    // Validation
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png'];
+
+    if (file.size > maxSize) {
+      console.log('File too large:', file.size);
+      return res.status(400).json({
+        success: false,
+        message: 'File too large. Max 5MB'
+      });
+    }
+
+    if (!allowedMimes.includes(file.mimetype)) {
+      console.log('Invalid mimetype:', file.mimetype);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid file type. Only JPG, PNG allowed'
+      });
+    }
+
+    // Create uploads directory if it doesn't exist
+    const fs = require('fs');
+    const path = require('path');
+    const uploadsDir = path.join(__dirname, '../public/uploads/profiles');
+
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+      console.log('Created uploads directory:', uploadsDir);
+    }
+
+    // Save file with timestamp
+    const timestamp = Date.now();
+    const fileExtension = file.name.split('.').pop();
+    const filename = `profile_${req.user.id}_${timestamp}.${fileExtension}`;
+    const uploadPath = path.join(uploadsDir, filename);
+
+    await file.mv(uploadPath);
+    console.log('File saved to:', uploadPath);
+
+    // Update database
+    const conn = await getConnection();
+    const result = await conn.execute(
+      'UPDATE users SET profileimage = ? WHERE id = ?',
+      [`/uploads/profiles/${filename}`, req.user.id]
+    );
+    conn.release();
+
+    console.log('Database updated successfully');
+
+    return res.json({
+      success: true,
+      message: 'Profile picture updated successfully',
+      imageUrl: `/uploads/profiles/${filename}`
+    });
+
+  } catch (err) {
+    console.error('=== POST /users/profile-picture ERROR ===', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload profile picture',
+      error: err.message
+    });
+  }
+});
+
 
 module.exports = router;
