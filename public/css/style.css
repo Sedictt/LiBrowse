@@ -7299,7 +7299,7 @@ body {
     border-width: 0;
 }
 
-.modal-overlay {
+.chat-modal .modal-overlay {
     position: absolute;
     top: 0;
     left: 0;

@@ -143,7 +143,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
     try {
       dbUser = await getOne(
         `SELECT id, email, student_no, fname, lname, course, year, 
-                is_verified, email_verified, credits, verification_status, verification_method 
+                is_verified, email_verified, credits, verification_status, verification_method,
+                profile_pic, bio
          FROM users WHERE id = ?`,
         [req.user.id]
       );
@@ -153,7 +154,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
         // Fallback for DBs without email_verified column
         dbUser = await getOne(
           `SELECT id, email, student_no, fname, lname, course, year, 
-                  is_verified, credits, verification_status, verification_method 
+                  is_verified, credits, verification_status, verification_method,
+                  profile_pic, bio
            FROM users WHERE id = ?`,
           [req.user.id]
         );
@@ -181,6 +183,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
       verification_status: dbUser.verification_status,
       verification_method: dbUser.verification_method,
       credits: dbUser.credits ?? 100,
+      profileimage: dbUser.profile_pic || null,
+      bio: dbUser.bio || ''
     };
 
     // Basic stats placeholder (can be replaced with real aggregates later)

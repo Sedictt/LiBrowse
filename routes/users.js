@@ -10,7 +10,22 @@ router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const conn = await getConnection();
     const [rows] = await conn.execute(
-      'SELECT id, first_name, last_name, email, student_id, program, year_level, credits, profile_image, status, created_at FROM users WHERE id = ? LIMIT 1',
+       `SELECT 
+         id,
+         email,
+         student_no,
+         fname,
+         lname,
+         course,
+         year,
+         credits,
+         profile_pic,
+         status,
+         bio,
+         created AS created_at
+       FROM users 
+       WHERE id = ? 
+       LIMIT 1`,
       [req.user.id]
     );
     conn.release();
@@ -21,15 +36,16 @@ router.get('/profile', authenticateToken, async (req, res) => {
     return res.json({
       user: sanitizeUser({
         id: u.id,
-        firstname: u.first_name,
-        lastname: u.last_name,
         email: u.email,
-        student_id: u.student_id,
-        program: u.program,
-        year_level: u.year_level,
+        firstname: u.fname,
+        lastname: u.lname,
+        student_id: u.student_no,
+        program: u.course,
+        year: u.year,
         credits: u.credits,
-        profileimage: u.profileimage,
+        profileimage: u.profile_pic,
         status: u.status,
+        bio: u.bio,
         created_at: u.created_at
       })
     });
@@ -48,14 +64,14 @@ router.put('/profile', authenticateToken, async (req, res) => {
   try {
     // Map frontend field names to database field names
     const fieldMapping = {
-      'firstname': 'first_name',
-      'lastname': 'last_name',
-      'email': 'email',
-      'student_id': 'student_id',
-      'program': 'program',
-      'year_level': 'year_level',
-      'bio': 'bio',
-      'profile_image': 'profile_image'
+      firstname: 'fname',
+      lastname: 'lname',
+      studentid: 'student_no',
+      'student_id': 'student_no',
+      program: 'course',
+      year: 'year',
+      year_level: 'year',
+      bio: 'bio',
     };
 
     const fields = [];
@@ -63,7 +79,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
 
     // Process each field from the request
     for (const [frontendKey, dbKey] of Object.entries(fieldMapping)) {
-      if (req.body[frontendKey] !== undefined) {
+      if (Object.prototype.hasOwnProperty.call(req.body, frontendKey) && req.body[frontendKey] !== undefined) {
         fields.push(`${dbKey} = ?`);
         values.push(req.body[frontendKey]);
       }
@@ -76,10 +92,23 @@ router.put('/profile', authenticateToken, async (req, res) => {
     values.push(req.user.id);
 
     const conn = await getConnection();
-    await conn.execute(`UPDATE users SET ${fields.join(', ')}, updated_at = NOW() WHERE id = ?`, values);
+    await conn.execute(`UPDATE users SET ${fields.join(', ')}, modified = NOW() WHERE id = ?`, values);
 
     const [rows] = await conn.execute(
-      'SELECT id, first_name, last_name, email, student_id, program, year_level, credits, profile_image, status, created_at, bio FROM users WHERE id = ? LIMIT 1',
+       `SELECT 
+         id,
+         email,
+         student_no,
+         fname,
+         lname,
+         course,
+         year,
+         credits,
+         profile_pic,
+         status,
+         bio,
+         created AS created_at
+       FROM users WHERE id = ? LIMIT 1`,
       [req.user.id]
     );
     conn.release();
@@ -90,17 +119,17 @@ router.put('/profile', authenticateToken, async (req, res) => {
       message: 'Profile updated successfully',
       user: sanitizeUser({
         id: u.id,
-        firstname: u.first_name,
-        lastname: u.last_name,
         email: u.email,
-        student_id: u.student_id,
-        program: u.program,
-        year_level: u.year_level,
+        firstname: u.fname,
+        lastname: u.lname,
+        student_id: u.student_no,
+        program: u.course,
+        year: u.year,
         credits: u.credits,
-        profile_image: u.profile_image,
+        profileimage: u.profile_pic,
         status: u.status,
-        created_at: u.created_at,
-        bio: u.bio
+        bio: u.bio,
+        created_at: u.created_at
       })
     });
   } catch (err) {
@@ -196,8 +225,8 @@ router.post('/profile-picture', authenticateToken, async (req, res) => {
 
     // Update database
     const conn = await getConnection();
-    const result = await conn.execute(
-      'UPDATE users SET profileimage = ? WHERE id = ?',
+    await conn.execute(
+      'UPDATE users SET profile_pic = ?, modified = NOW() WHERE id = ?',
       [`/uploads/profiles/${filename}`, req.user.id]
     );
     conn.release();
@@ -219,6 +248,5 @@ router.post('/profile-picture', authenticateToken, async (req, res) => {
     });
   }
 });
-
 
 module.exports = router;

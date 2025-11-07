@@ -144,7 +144,7 @@ class ApiClient {
     }
 
     async updateProfile(profileData) {
-        return this.request('users/profile', {  // ⬅️ Changed from 'auth/profile'
+        return this.request('/users/profile', {  // ⬅️ Fixed leading slash
             method: 'PUT',
             body: JSON.stringify(profileData)
         });

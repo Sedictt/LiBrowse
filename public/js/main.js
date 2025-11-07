@@ -2254,11 +2254,16 @@ class App {
         // Get modal element
         const modal = document.getElementById('edit-profile-modal');
 
+        // Prevent background scroll while modal is open
+        const restoreScroll = () => { document.body.style.overflow = ''; };
+        document.body.style.overflow = 'hidden';
+
         // CRITICAL: Stop propagation on modal to prevent setupModals from closing it
         modal.addEventListener('click', (e) => {
             // Only close if clicking directly on the overlay (not the content)
             if (e.target === modal) {
                 modal.remove();
+                restoreScroll();
             }
         }, false);
 
@@ -2277,6 +2282,7 @@ class App {
                 e.preventDefault();
                 e.stopPropagation();
                 modal.remove();
+                restoreScroll();
             });
         }
 
@@ -2287,6 +2293,7 @@ class App {
                 e.preventDefault();
                 e.stopPropagation();
                 modal.remove();
+                restoreScroll();
             });
         }
 
@@ -2440,7 +2447,7 @@ class App {
             }
 
             // Make API call
-            const response = await fetch(`api/users/profile`, {
+            const response = await fetch(`/api/users/profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
