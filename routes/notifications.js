@@ -20,7 +20,7 @@ router.get('/', authenticateToken, async (req, res) => {
             query += ' AND is_read = FALSE';
         }
 
-        query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+        query += ' ORDER BY created DESC LIMIT ? OFFSET ?';
 
         const [notifications] = await connection.execute(query, [
             userId,

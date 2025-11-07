@@ -14,11 +14,12 @@ const path = require('path');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET_KEY || '';
+const RECAPTCHA_SITE_KEY = process.env.RECAPTCHA_SITE_KEY || '';
 
 async function verifyCaptcha(token) {
-  // If not configured, allow by default
-  if (!RECAPTCHA_SECRET) return true;
-  if (!token) return false;
+  // If not fully configured, allow by default (align with frontend enablement)
+  if (!RECAPTCHA_SECRET || !RECAPTCHA_SITE_KEY) return true;
+  if (!token || token === 'dev-mode-skip') return false; // frontend shouldn't send this when enabled
   try {
     const params = new URLSearchParams();
     params.append('secret', RECAPTCHA_SECRET);

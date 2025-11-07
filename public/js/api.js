@@ -40,6 +40,7 @@ class ApiClient {
                 err.status = response.status;
                 err.endpoint = endpoint;
                 err.body = data;
+                err.suppressLog = !!(options && (options.suppressErrorLog || (options.silent401 && (response.status === 401 || response.status === 403))));
 
                 // Handle token expiration - clear auth and force re-login
                 if (response.status === 401 || response.status === 403) {
@@ -70,12 +71,17 @@ class ApiClient {
                     }
                 }
 
+                if (!err.suppressLog) {
+                    console.error('API request failed:', err);
+                }
                 throw err;
             }
 
             return data;
         } catch (error) {
-            console.error('API request failed:', error);
+            if (!error || !error.suppressLog) {
+                console.error('API request failed:', error);
+            }
             throw error;
         }
     }
@@ -240,7 +246,7 @@ class ApiClient {
 
     // Stats endpoints
     async getPlatformStats() {
-        return this.request('/stats/platform');
+        return this.request('/stats/platform', { silent401: true });
     }
 
     async getUserStats() {

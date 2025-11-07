@@ -1155,9 +1155,10 @@ class App {
         if (!authManager.isAuthenticated) return;
 
         try {
-            const notifications = await api.getNotifications();
-            this.renderNotifications(notifications);
-            this.updateNotificationBadge(notifications);
+            const resp = await api.getNotifications();
+            const list = Array.isArray(resp) ? resp : (Array.isArray(resp.notifications) ? resp.notifications : []);
+            this.renderNotifications(list);
+            this.updateNotificationBadge(list);
         } catch (error) {
             console.error('Failed to load notifications:', error);
         }
@@ -1178,26 +1179,39 @@ class App {
             return;
         }
 
-        notificationsList.innerHTML = notifications.map(notification => `
-            <div class="notification-card ${notification.read ? '' : 'unread'}">
+        notificationsList.innerHTML = notifications.map(n => {
+            let msg = '';
+            try {
+                const body = typeof n.body === 'string' ? JSON.parse(n.body) : n.body;
+                if (body && typeof body === 'object' && body.message) msg = body.message;
+                else if (typeof body === 'string') msg = body;
+            } catch (_) {
+                msg = typeof n.body === 'string' ? n.body : '';
+            }
+            const time = n.created || n.created_at || '';
+            return `
+            <div class="notification-card ${n.is_read ? '' : 'unread'}">
                 <div class="notification-icon">
-                    <i class="fas fa-${this.getNotificationIcon(notification.type)}"></i>
+                    <i class="fas fa-${this.getNotificationIcon(n.category)}"></i>
                 </div>
                 <div class="notification-content">
-                    <div class="notification-title">${notification.title}</div>
-                    <div class="notification-message">${notification.message}</div>
-                    <div class="notification-time">${this.formatTime(notification.created_at)}</div>
+                    <div class="notification-title">${n.title || ''}</div>
+                    <div class="notification-message">${msg || ''}</div>
+                    <div class="notification-time">${this.formatTime ? this.formatTime(time) : time}</div>
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     }
 
     getNotificationIcon(type) {
         const icons = {
             'transaction': 'exchange-alt',
+            'reminder': 'clock',
+            'credit': 'coins',
+            'system': 'cog',
+            // legacy fallbacks
             'book': 'book',
-            'message': 'envelope',
-            'system': 'cog'
+            'message': 'envelope'
         };
         return icons[type] || 'bell';
     }
@@ -1205,7 +1219,7 @@ class App {
     updateNotificationBadge(notifications) {
         const badge = document.getElementById('notification-badge');
         if (badge) {
-            const unreadCount = notifications.filter(n => !n.read).length;
+            const unreadCount = notifications.filter(n => !n.is_read).length;
             badge.textContent = unreadCount;
             badge.style.display = unreadCount > 0 ? 'block' : 'none';
         }
@@ -1324,11 +1338,11 @@ class App {
         if (recentlyViewedSection) recentlyViewedSection.style.display = 'block';
 
         // Load data
-        if (savedSearchesManager && typeof savedSearchesManager.loadSavedSearches === 'function') {
-            savedSearchesManager.loadSavedSearches();
+        if (window.savedSearchesManager && typeof window.savedSearchesManager.loadSavedSearches === 'function') {
+            window.savedSearchesManager.loadSavedSearches();
         }
-        if (typeof booksManager !== 'undefined') {
-            booksManager.loadRecentlyViewed();
+        if (typeof window.booksManager !== 'undefined' && window.booksManager && typeof window.booksManager.loadRecentlyViewed === 'function') {
+            window.booksManager.loadRecentlyViewed();
         }
     }
 
@@ -2744,6 +2758,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             if (typeof SavedSearchesManager !== 'undefined') {
                 savedSearchesManager = new SavedSearchesManager();
+                window.savedSearchesManager = savedSearchesManager;
                 console.log('✅ SavedSearchesManager initialized:', savedSearchesManager);
 
                 // Load saved searches if user is authenticated
@@ -2769,8 +2784,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Listen for login events
     document.addEventListener('login-success', () => {
-        if (savedSearchesManager) {
-            savedSearchesManager.loadSavedSearches();
+        if (window.savedSearchesManager) {
+            window.savedSearchesManager.loadSavedSearches();
         }
     });
 
@@ -3233,15 +3248,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Wait for DOM to be ready
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize SavedSearchesManager
-    if (typeof SavedSearchesManager !== 'undefined') {
-        savedSearchesManager = new SavedSearchesManager();
+    // Initialize SavedSearchesManager once
+    if (typeof SavedSearchesManager !== 'undefined' && !window.savedSearchesManager) {
+        window.savedSearchesManager = new SavedSearchesManager();
+        savedSearchesManager = window.savedSearchesManager;
         console.log('✅ SavedSearchesManager initialized');
 
         // Load saved searches if user is logged in
         if (authManager && authManager.isAuthenticated) {
             setTimeout(() => {
-                savedSearchesManager.loadSavedSearches();
+                if (window.savedSearchesManager && typeof window.savedSearchesManager.loadSavedSearches === 'function') {
+                    window.savedSearchesManager.loadSavedSearches();
+                }
             }, 500); // Small delay to ensure everything is loaded
         }
     }
@@ -3249,14 +3267,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Listen for login events
 document.addEventListener('login-success', () => {
-    if (typeof savedSearchesManager !== 'undefined' && savedSearchesManager) {
-        savedSearchesManager.loadSavedSearches();
+    if (window.savedSearchesManager && typeof window.savedSearchesManager.loadSavedSearches === 'function') {
+        window.savedSearchesManager.loadSavedSearches();
     }
 });
 
 
-if (authManager.isAuthenticated && typeof savedSearchesManager !== 'undefined' && savedSearchesManager) {
-    savedSearchesManager.loadSavedSearches();
+if (authManager.isAuthenticated && window.savedSearchesManager && typeof window.savedSearchesManager.loadSavedSearches === 'function') {
+    window.savedSearchesManager.loadSavedSearches();
 }
 
 // Initialize app when DOM is loaded
@@ -3266,21 +3284,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Initialize features when user logs in
 document.addEventListener('user-logged-in', async () => {
-    if (savedSearchesManager && typeof savedSearchesManager.loadSavedSearches === 'function') {
-        await savedSearchesManager.loadSavedSearches();
+    if (window.savedSearchesManager && typeof window.savedSearchesManager.loadSavedSearches === 'function') {
+        await window.savedSearchesManager.loadSavedSearches();
     }
-    if (typeof booksManager !== 'undefined' && booksManager && typeof booksManager.loadRecentlyViewed === 'function') {
-        await booksManager.loadRecentlyViewed();
+    if (typeof window.booksManager !== 'undefined' && window.booksManager && typeof window.booksManager.loadRecentlyViewed === 'function') {
+        await window.booksManager.loadRecentlyViewed();
     }
 });
 
 // Load on page load if already authenticated
 if (authManager.isAuthenticated) {
-    if (savedSearchesManager && typeof savedSearchesManager.loadSavedSearches === 'function') {
-        savedSearchesManager.loadSavedSearches();
+    if (window.savedSearchesManager && typeof window.savedSearchesManager.loadSavedSearches === 'function') {
+        window.savedSearchesManager.loadSavedSearches();
     }
-    if (typeof booksManager !== 'undefined' && booksManager && typeof booksManager.loadRecentlyViewed === 'function') {
-        booksManager.loadRecentlyViewed();
+    if (typeof window.booksManager !== 'undefined' && window.booksManager && typeof window.booksManager.loadRecentlyViewed === 'function') {
+        window.booksManager.loadRecentlyViewed();
     }
 }
 
