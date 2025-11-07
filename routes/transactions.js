@@ -216,6 +216,20 @@ router.post('/request', [
             return res.status(400).json({ error: 'Cannot borrow your own book' });
         }
 
+        // Step 2.5: Check borrower verification status
+        const [vrows] = await connection.execute(
+            'SELECT verification_status FROM users WHERE id = ?', [req.user.id]
+        );
+        const rawStatus = vrows && vrows.length ? (vrows[0].verification_status || null) : null;
+        const status = (rawStatus || '').toLowerCase();
+        if (!status || (status !== 'verified' && status !== 'fully_verified')) {
+            connection.release();
+            return res.status(403).json({
+                error: 'You must complete account verification to borrow books.',
+                verification_status: rawStatus || 'none'
+            });
+        }
+
         // Step 3: Check borrower's credit points (Following SRS flowchart)
         const [borrowers] = await connection.execute('SELECT credits FROM users WHERE id = ?', [req.user.id]);
         const borrowerCredits = borrowers[0].credits;
