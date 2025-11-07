@@ -45,7 +45,7 @@ router.get('/user', authenticateToken, async (req, res) => {
         
         // Books owned
         const [ownedBooks] = await pool.execute(
-            'SELECT COUNT(*) as count FROM books WHERE user_id = ?',
+            'SELECT COUNT(*) as count FROM books WHERE owner_id = ?',
             [userId]
         );
         

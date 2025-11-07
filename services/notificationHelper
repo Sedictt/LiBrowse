@@ -8,7 +8,7 @@ class NotificationHelper {
     /**
      * Send borrow request notification
      */
-    static async notifyBorrowRequest(lenderId, borrowerName, bookTitle, bookAuthor, message, actionUrl) {
+    static async notifyBorrowRequest(lenderId, borrowerName, bookTitle, bookAuthor, message, actionUrl, relatedId = null) {
         const connection = await getConnection();
 
         // Get lender email
@@ -17,19 +17,17 @@ class NotificationHelper {
             [lenderId]
         );
 
-        // Create in-app notification
+        // Create in-app notification (schema-aligned)
         await connection.execute(`
             INSERT INTO notifications 
-            (user_id, title, message, type, related_id, body, category, is_read)
-            VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+            (user_id, title, body, category, related_id, is_read)
+            VALUES (?, ?, ?, ?, ?, FALSE)
         `, [
             lenderId,
             `New Borrow Request from ${borrowerName}`,
-            `${borrowerName} wants to borrow "${bookTitle}"`,
-            'request',
-            0,
             JSON.stringify({ borrowerName, bookTitle, message }),
-            'request'
+            'transaction',
+            relatedId || 0
         ]);
 
         // Send email
@@ -56,7 +54,7 @@ class NotificationHelper {
     /**
      * Send approval notification
      */
-    static async notifyApproval(borrowerId, lenderName, bookTitle, bookAuthor, returnDate, actionUrl) {
+    static async notifyApproval(borrowerId, lenderName, bookTitle, bookAuthor, returnDate, actionUrl, relatedId = null) {
         const connection = await getConnection();
 
         // Get borrower email
@@ -65,19 +63,17 @@ class NotificationHelper {
             [borrowerId]
         );
 
-        // Create in-app notification
+        // Create in-app notification (schema-aligned)
         await connection.execute(`
             INSERT INTO notifications 
-            (user_id, title, message, type, related_id, body, category, is_read)
-            VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+            (user_id, title, body, category, related_id, is_read)
+            VALUES (?, ?, ?, ?, ?, FALSE)
         `, [
             borrowerId,
             `Request Approved by ${lenderName}`,
-            `Your request for "${bookTitle}" has been approved!`,
-            'approval',
-            0,
             JSON.stringify({ lenderName, bookTitle, returnDate }),
-            'approval'
+            'transaction',
+            relatedId || 0
         ]);
 
         // Send email
@@ -103,7 +99,7 @@ class NotificationHelper {
     /**
      * Send return reminder (1 day before due date)
      */
-    static async notifyReturnReminder(borrowerId, bookTitle, bookAuthor, returnDate, actionUrl) {
+    static async notifyReturnReminder(borrowerId, bookTitle, bookAuthor, returnDate, actionUrl, relatedId = null) {
         const connection = await getConnection();
 
         // Get borrower email
@@ -112,19 +108,17 @@ class NotificationHelper {
             [borrowerId]
         );
 
-        // Create in-app notification
+        // Create in-app notification (schema-aligned)
         await connection.execute(`
             INSERT INTO notifications 
-            (user_id, title, message, type, related_id, body, category, is_read)
-            VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+            (user_id, title, body, category, related_id, is_read)
+            VALUES (?, ?, ?, ?, ?, FALSE)
         `, [
             borrowerId,
             `Reminder: Return "${bookTitle}"`,
-            `Your borrowed book "${bookTitle}" is due tomorrow!`,
+            JSON.stringify({ bookTitle, returnDate, kind: 'due_soon' }),
             'reminder',
-            0,
-            JSON.stringify({ bookTitle, returnDate }),
-            'reminder'
+            relatedId || 0
         ]);
 
         // Send email
@@ -149,7 +143,7 @@ class NotificationHelper {
     /**
      * Send overdue alert
      */
-    static async notifyOverdue(borrowerId, bookTitle, bookAuthor, dueDate, daysOverdue, actionUrl) {
+    static async notifyOverdue(borrowerId, bookTitle, bookAuthor, dueDate, daysOverdue, actionUrl, relatedId = null) {
         const connection = await getConnection();
 
         // Get borrower email
@@ -158,19 +152,17 @@ class NotificationHelper {
             [borrowerId]
         );
 
-        // Create in-app notification
+        // Create in-app notification (schema-aligned)
         await connection.execute(`
             INSERT INTO notifications 
-            (user_id, title, message, type, related_id, body, category, is_read)
-            VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+            (user_id, title, body, category, related_id, is_read)
+            VALUES (?, ?, ?, ?, ?, FALSE)
         `, [
             borrowerId,
             `Overdue: Return "${bookTitle}"`,
-            `"${bookTitle}" is ${daysOverdue} day(s) overdue. Please return immediately!`,
-            'overdue',
-            0,
-            JSON.stringify({ bookTitle, dueDate, daysOverdue }),
-            'overdue'
+            JSON.stringify({ bookTitle, dueDate, daysOverdue, kind: 'overdue' }),
+            'reminder',
+            relatedId || 0
         ]);
 
         // Send email

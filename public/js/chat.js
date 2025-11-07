@@ -185,6 +185,7 @@ class ChatManager {
     async openChat(chatId) {
         try {
             console.log('Opening chat:', chatId);
+            this.requestNotificationPermission();
 
             this.currentChatId = chatId;
             this.messages = [];
@@ -1159,10 +1160,5 @@ class ChatManager {
 // Initialize global ChatManager instance
 window.chatManager = new ChatManager();
 
-// Request notification permission on load
-document.addEventListener('DOMContentLoaded', () => {
-    if (window.chatManager) {
-        window.chatManager.requestNotificationPermission();
-    }
-});
+// Request notification permission is triggered within user actions (e.g., opening chat)
 

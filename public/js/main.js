@@ -6,18 +6,24 @@ class App {
     }
 
     async init() {
-        this.setupEventListeners();
-        this.setupNavigation();
-        this.setupModals();
-        this.handleInitialRoute();
-        await this.loadPlatformStats();
-        this.hideLoadingScreen();
-        if (authManager.isAuthenticated) {
-            this.showAuthenticatedFeatures();
-            await this.updateRequestsBadge();
-            this.startRequestsBadgePolling();
-            await this.updateChatBadge();
-            this.startChatBadgePolling();
+        try {
+            this.setupEventListeners();
+            this.setupNavigation();
+            this.setupModals();
+            this.handleInitialRoute();
+            await this.loadPlatformStats();
+
+            if (authManager.isAuthenticated) {
+                this.showAuthenticatedFeatures();
+                await this.updateRequestsBadge();
+                this.startRequestsBadgePolling();
+                await this.updateChatBadge();
+                this.startChatBadgePolling();
+            }
+        } catch (e) {
+            console.error('App initialization error:', e);
+        } finally {
+            this.hideLoadingScreen();
         }
     }
 
@@ -263,12 +269,12 @@ class App {
                 }
                 break;
             case 'requests':
-                if (requestManager) {
+                if (typeof requestManager !== 'undefined' && requestManager) {
                     await requestManager.loadRequests();
                 }
                 break;
             case 'monitoring':  // ⭐ ADD THIS
-                if (monitoringManager) {
+                if (typeof monitoringManager !== 'undefined' && monitoringManager) {
                     await monitoringManager.loadTransactions();
                 }
                 break;
@@ -1318,7 +1324,7 @@ class App {
         if (recentlyViewedSection) recentlyViewedSection.style.display = 'block';
 
         // Load data
-        if (typeof savedSearchesManager !== 'undefined') {
+        if (savedSearchesManager && typeof savedSearchesManager.loadSavedSearches === 'function') {
             savedSearchesManager.loadSavedSearches();
         }
         if (typeof booksManager !== 'undefined') {
@@ -3224,7 +3230,6 @@ document.addEventListener("DOMContentLoaded", () => {
 // ========================================
 // INITIALIZE SAVED SEARCHES MANAGER
 // ========================================
-let savedSearchesManager;
 
 // Wait for DOM to be ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -3244,13 +3249,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Listen for login events
 document.addEventListener('login-success', () => {
-    if (savedSearchesManager) {
+    if (typeof savedSearchesManager !== 'undefined' && savedSearchesManager) {
         savedSearchesManager.loadSavedSearches();
     }
 });
 
 
-if (authManager.isAuthenticated && savedSearchesManager) {
+if (authManager.isAuthenticated && typeof savedSearchesManager !== 'undefined' && savedSearchesManager) {
     savedSearchesManager.loadSavedSearches();
 }
 
@@ -3261,14 +3266,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Initialize features when user logs in
 document.addEventListener('user-logged-in', async () => {
-    await savedSearchesManager.loadSavedSearches();
-    await booksManager.loadRecentlyViewed();
+    if (savedSearchesManager && typeof savedSearchesManager.loadSavedSearches === 'function') {
+        await savedSearchesManager.loadSavedSearches();
+    }
+    if (typeof booksManager !== 'undefined' && booksManager && typeof booksManager.loadRecentlyViewed === 'function') {
+        await booksManager.loadRecentlyViewed();
+    }
 });
 
 // Load on page load if already authenticated
 if (authManager.isAuthenticated) {
-    savedSearchesManager.loadSavedSearches();
-    booksManager.loadRecentlyViewed();
+    if (savedSearchesManager && typeof savedSearchesManager.loadSavedSearches === 'function') {
+        savedSearchesManager.loadSavedSearches();
+    }
+    if (typeof booksManager !== 'undefined' && booksManager && typeof booksManager.loadRecentlyViewed === 'function') {
+        booksManager.loadRecentlyViewed();
+    }
 }
 
 // ========================================
