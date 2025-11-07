@@ -8015,6 +8015,45 @@ body {
     }
 }
 
+.cropper-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.crop-viewport {
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    overflow: hidden;
+    position: relative;
+    background: var(--bg-secondary);
+    border: 2px solid rgba(255,255,255,0.12);
+    box-shadow: var(--shadow-md);
+}
+
+#crop-viewport img#crop-image {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(1);
+    transform-origin: center center;
+    user-select: none;
+    -webkit-user-drag: none;
+    cursor: grab;
+}
+
+#crop-viewport.dragging img#crop-image {
+    cursor: grabbing;
+}
+
+.crop-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 /* Responsive Chat Styles */
 @media (max-width: 768px) {
     .chat-modal-content {

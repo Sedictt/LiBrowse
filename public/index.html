@@ -660,27 +660,41 @@
                 </div>
 
                 <div class="modal-body">
-                    <div class="file-upload-area" id="picture-upload-area"
-                        style="border: 2px dashed #667eea; padding: 40px; text-align: center; border-radius: 8px; cursor: pointer; background: rgba(102, 126, 234, 0.05);">
-                        <i class="fas fa-cloud-upload-alt"
-                            style="font-size: 2.5rem; color: #667eea; margin-bottom: 15px; display: block;"></i>
-                        <p style="margin: 10px 0;">Click to select or drag and drop your image</p>
-                        <small style="color: #a0aec0;">JPG, PNG only. Max 5MB</small>
+                    <!-- Step 1: Select file -->
+                    <div id="picture-step-upload">
+                        <div class="file-upload-area" id="picture-upload-area"
+                            style="border: 2px dashed #667eea; padding: 40px; text-align: center; border-radius: 8px; cursor: pointer; background: rgba(102, 126, 234, 0.05);">
+                            <i class="fas fa-cloud-upload-alt"
+                                style="font-size: 2.5rem; color: #667eea; margin-bottom: 15px; display: block;"></i>
+                            <p style="margin: 10px 0;">Click to select or drag and drop your image</p>
+                            <small style="color: #a0aec0;">JPG, PNG only. Max 5MB</small>
+                        </div>
+                        <input type="file" id="profile-picture-input" name="profilepicture" accept=".jpg,.jpeg,.png"
+                            style="display: none;">
                     </div>
-                    <input type="file" id="profile-picture-input" name="profilepicture" accept=".jpg,.jpeg,.png"
-                        style="display: none;">
 
-                    <div class="file-preview" id="picture-preview"
-                        style="display: none; margin: 20px 0; text-align: center;">
-                        <img id="preview-image" src="" alt="Preview"
-                            style="max-width: 200px; max-height: 200px; border-radius: 8px;">
+                    <!-- Step 2: Crop -->
+                    <div id="picture-step-crop" style="display:none;">
+                        <div class="cropper-wrapper">
+                            <div class="crop-viewport" id="crop-viewport">
+                                <img id="crop-image" src="" alt="Crop source">
+                            </div>
+                            <div class="crop-controls">
+                                <label for="crop-zoom" style="color:#a0aec0; font-size:0.9rem;">Zoom</label>
+                                <input type="range" id="crop-zoom" min="1" max="3" step="0.01" value="1">
+                                <button type="button" class="btn btn-outline" id="crop-reset">Reset</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline" id="cancel-picture-upload">Cancel</button>
+                    <button type="button" class="btn btn-outline" id="back-to-upload" style="display:none;">
+                        <i class="fas fa-arrow-left"></i> Choose Another
+                    </button>
                     <button type="button" class="btn btn-primary" id="upload-picture-btn" disabled>
-                        <i class="fas fa-upload"></i> Upload Picture
+                        <i class="fas fa-save"></i> Save
                     </button>
                 </div>
             </div>

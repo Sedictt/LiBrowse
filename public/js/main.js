@@ -2115,30 +2115,184 @@ class App {
             return;
         }
 
-        // Show preview
         const reader = new FileReader();
         reader.onload = (e) => {
-            const preview = modal.querySelector('#picture-preview');
-            const previewImage = modal.querySelector('#preview-image');
-            previewImage.src = e.target.result;
-            preview.style.display = 'block';
-
-            // Enable upload button
-            const uploadBtn = modal.querySelector('#upload-picture-btn');
-            uploadBtn.disabled = false;
+            this.initProfileCropper(modal, e.target.result);
         };
         reader.readAsDataURL(file);
     }
 
-    async handleProfilePictureUpload(modal) {
-        const fileInput = modal.querySelector('#profile-picture-input');
-        const file = fileInput.files[0];
+    initProfileCropper(modal, imgSrc) {
+        // Switch to crop step
+        const stepUpload = modal.querySelector('#picture-step-upload');
+        const stepCrop = modal.querySelector('#picture-step-crop');
+        const backBtn = modal.querySelector('#back-to-upload');
+        const uploadBtn = modal.querySelector('#upload-picture-btn');
+        if (stepUpload && stepCrop) {
+            stepUpload.style.display = 'none';
+            stepCrop.style.display = 'block';
+        }
+        if (backBtn) backBtn.style.display = 'inline-flex';
+        if (uploadBtn) uploadBtn.disabled = false;
 
-        if (!file) {
-            showToast('Please select a picture first', 'error');
-            return;
+        const img = modal.querySelector('#crop-image');
+        const viewport = modal.querySelector('#crop-viewport');
+        const zoom = modal.querySelector('#crop-zoom');
+        const resetBtn = modal.querySelector('#crop-reset');
+
+        if (!img || !viewport || !zoom) return;
+        img.src = imgSrc;
+
+        const state = {
+            scale: 1,
+            minScale: 1,
+            dx: 0,
+            dy: 0,
+            iw: 0,
+            ih: 0,
+            v: viewport.clientWidth
+        };
+        this._profileCropState = state;
+
+        img.onload = () => {
+            state.iw = img.naturalWidth || img.width;
+            state.ih = img.naturalHeight || img.height;
+            const scaleX = state.v / state.iw;
+            const scaleY = state.v / state.ih;
+            state.minScale = Math.max(scaleX, scaleY);
+            state.scale = state.minScale;
+            zoom.min = state.minScale.toString();
+            zoom.max = (state.minScale * 3).toString();
+            zoom.step = '0.01';
+            zoom.value = state.scale.toString();
+            this.updateProfileCropTransform(img, state);
+        };
+
+        // Dragging
+        let dragging = false;
+        let lastX = 0, lastY = 0;
+        const onDown = (e) => {
+            dragging = true;
+            viewport.classList.add('dragging');
+            lastX = (e.touches ? e.touches[0].clientX : e.clientX);
+            lastY = (e.touches ? e.touches[0].clientY : e.clientY);
+            e.preventDefault();
+        };
+        const onMove = (e) => {
+            if (!dragging) return;
+            const x = (e.touches ? e.touches[0].clientX : e.clientX);
+            const y = (e.touches ? e.touches[0].clientY : e.clientY);
+            state.dx += (x - lastX);
+            state.dy += (y - lastY);
+            lastX = x; lastY = y;
+            this.clampProfileCrop(state);
+            this.updateProfileCropTransform(img, state);
+        };
+        const onUp = () => {
+            dragging = false;
+            viewport.classList.remove('dragging');
+        };
+        viewport.addEventListener('mousedown', onDown);
+        viewport.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        viewport.addEventListener('touchstart', onDown, { passive: false });
+        viewport.addEventListener('touchmove', onMove, { passive: false });
+        window.addEventListener('touchend', onUp);
+
+        // Wheel zoom
+        viewport.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = -e.deltaY;
+            const factor = delta > 0 ? 1.05 : 0.95;
+            state.scale = Math.min(parseFloat(zoom.max), Math.max(state.minScale, state.scale * factor));
+            zoom.value = state.scale.toString();
+            this.clampProfileCrop(state);
+            this.updateProfileCropTransform(img, state);
+        }, { passive: false });
+
+        // Slider zoom
+        zoom.addEventListener('input', () => {
+            state.scale = parseFloat(zoom.value);
+            this.clampProfileCrop(state);
+            this.updateProfileCropTransform(img, state);
+        });
+
+        // Reset
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                state.scale = state.minScale;
+                state.dx = 0;
+                state.dy = 0;
+                zoom.value = state.scale.toString();
+                this.updateProfileCropTransform(img, state);
+            });
         }
 
+        // Back button
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                stepCrop.style.display = 'none';
+                stepUpload.style.display = 'block';
+                backBtn.style.display = 'none';
+                uploadBtn.disabled = true;
+                // cleanup handlers
+                viewport.removeEventListener('mousedown', onDown);
+                viewport.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+                viewport.removeEventListener('touchstart', onDown);
+                viewport.removeEventListener('touchmove', onMove);
+                window.removeEventListener('touchend', onUp);
+            }, { once: true });
+        }
+    }
+
+    clampProfileCrop(state) {
+        // Ensure the image covers viewport fully
+        const dispW = state.iw * state.scale;
+        const dispH = state.ih * state.scale;
+        const maxOffsetX = Math.max(0, (dispW - state.v) / 2);
+        const maxOffsetY = Math.max(0, (dispH - state.v) / 2);
+        state.dx = Math.max(-maxOffsetX, Math.min(maxOffsetX, state.dx));
+        state.dy = Math.max(-maxOffsetY, Math.min(maxOffsetY, state.dy));
+    }
+
+    updateProfileCropTransform(img, state) {
+        img.style.transform = `translate(-50%, -50%) translate(${state.dx}px, ${state.dy}px) scale(${state.scale})`;
+    }
+
+    async getProfileCroppedBlob(modal) {
+        const img = modal.querySelector('#crop-image');
+        const viewport = modal.querySelector('#crop-viewport');
+        const state = this._profileCropState;
+        if (!img || !viewport || !state || !state.iw) return null;
+        const v = viewport.clientWidth; // square viewport size
+
+        // Map viewport square to original image coords
+        const sx = (-state.dx - v / 2) / state.scale + state.iw / 2;
+        const sy = (-state.dy - v / 2) / state.scale + state.ih / 2;
+        const sw = v / state.scale;
+        const sh = v / state.scale;
+
+        const canvas = document.createElement('canvas');
+        const size = 512; // output size
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, size, size);
+
+        // Clamp source rect within image bounds
+        const sxc = Math.max(0, Math.min(state.iw - 1, sx));
+        const syc = Math.max(0, Math.min(state.ih - 1, sy));
+        const swc = Math.max(1, Math.min(state.iw - sxc, sw));
+        const shc = Math.max(1, Math.min(state.ih - syc, sh));
+
+        ctx.drawImage(img, sxc, syc, swc, shc, 0, 0, size, size);
+        return await new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png', 0.95));
+    }
+
+    async handleProfilePictureUpload(modal) {
         const uploadBtn = modal.querySelector('#upload-picture-btn');
         const originalText = uploadBtn.innerHTML;
 
@@ -2146,8 +2300,20 @@ class App {
             uploadBtn.disabled = true;
             uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
 
+            // Use cropped blob if available; fallback to raw file
+            let blob = await this.getProfileCroppedBlob(modal);
+            if (!blob) {
+                const fileInput = modal.querySelector('#profile-picture-input');
+                if (!fileInput || !fileInput.files[0]) {
+                    showToast('Please select a picture first', 'error');
+                    return;
+                }
+                blob = fileInput.files[0];
+            }
+
             const formData = new FormData();
-            formData.append('profilepicture', file);
+            const filename = blob.name || 'profile.png';
+            formData.append('profilepicture', blob, filename);
 
             const response = await fetch('/api/users/profile-picture', {
                 method: 'POST',
