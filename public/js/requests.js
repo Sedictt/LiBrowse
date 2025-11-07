@@ -137,7 +137,7 @@ class RequestManager {
                 this.renderRequests();
             } else if (this.currentTab === 'active-chats') {
                 try {
-                    const chats = await api.get('/chats');
+                    const chats = await api.get(`/chats?_=${Date.now()}`);
                     this.currentChats = chats || [];
                     this.renderChats();
                 } catch (chatError) {
@@ -149,6 +149,17 @@ class RequestManager {
         } catch (error) {
             console.error('Failed to load requests:', error);
             this.showToast('Failed to load requests', 'error');
+        }
+    }
+
+    async refreshActiveChats() {
+        try {
+            if (!authManager || !authManager.isAuthenticated) return;
+            const chats = await api.get(`/chats?_=${Date.now()}`);
+            this.currentChats = chats || [];
+            this.renderChats();
+        } catch (error) {
+            console.error('Failed to refresh active chats:', error);
         }
     }
 

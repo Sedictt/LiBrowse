@@ -1291,7 +1291,7 @@ class App {
                 return totalActive;
             }
 
-            const chats = await api.get('/chats');
+            const chats = await api.get(`/chats?_=${Date.now()}`);
             const list = Array.isArray(chats) ? chats : [];
             const totalActive = list.length;
             this.setChatBadge(totalActive);

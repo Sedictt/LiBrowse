@@ -21,10 +21,9 @@ class ApiClient {
         };
 
         try {
-            const response = await fetch(url, {
-                ...options,
-                headers
-            });
+            const fetchOptions = { ...options, headers };
+            if (!('cache' in fetchOptions)) fetchOptions.cache = 'no-store';
+            const response = await fetch(url, fetchOptions);
             let data = null;
             try {
                 data = await response.json();

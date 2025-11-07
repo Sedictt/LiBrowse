@@ -7,6 +7,7 @@ const { body, validationResult } = require('express-validator');
 // Get all active chats for the authenticated user
 router.get('/', authenticateToken, async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store');
         const userId = req.user.id;
         const connection = await getConnection();
 
@@ -37,13 +38,13 @@ router.get('/', authenticateToken, async (req, res) => {
                 END as other_user_avatar,
                 (SELECT message FROM chat_messages 
                  WHERE chat_id = c.id 
-                 ORDER BY created DESC LIMIT 1) as last_message,
+                 ORDER BY id DESC LIMIT 1) as last_message,
                 (SELECT created FROM chat_messages 
                  WHERE chat_id = c.id 
-                 ORDER BY created DESC LIMIT 1) as last_message_time,
+                 ORDER BY id DESC LIMIT 1) as last_message_time,
                 (SELECT message_type FROM chat_messages 
                  WHERE chat_id = c.id 
-                 ORDER BY created DESC LIMIT 1) as last_message_type,
+                 ORDER BY id DESC LIMIT 1) as last_message_type,
                 (SELECT COUNT(*) FROM chat_messages 
                  WHERE chat_id = c.id 
                  AND sender_id != ? 

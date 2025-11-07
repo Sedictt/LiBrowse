@@ -651,7 +651,14 @@ class ChatManager {
 
     handleNewMessage(data) {
         if (parseInt(data.chatId) !== parseInt(this.currentChatId)) {
-            // Message for different chat, show notification
+            // Message for different chat: refresh previews and show notification
+            try {
+                if (window.requestManager) {
+                    const fn = window.requestManager.refreshActiveChats || window.requestManager.loadRequests;
+                    const p = fn.call(window.requestManager);
+                    if (p && typeof p.catch === 'function') p.catch(() => {});
+                }
+            } catch (_) { /* noop */ }
             this.showNotification(data.message);
             return;
         }
