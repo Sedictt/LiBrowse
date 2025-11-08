@@ -2826,56 +2826,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    // Perform book search
+    // Perform book search (delegate to BooksManager so pagination & Load More work)
     async function performSearch() {
-        const filters = {
-            query: searchInput.value.trim(),
-            program: programFilter.value,
-            condition: conditionFilter.value,
-            availability: availabilityFilter.value,
-            sort: sortFilter ? sortFilter.value : ''
+        const query = (searchInput?.value || '').trim();
+        const extra = {
+            program: programFilter?.value || '',
+            condition: conditionFilter?.value || '',
+            availability: availabilityFilter?.value || '',
+            sort: sortFilter ? (sortFilter.value || '') : ''
         };
 
-
-        try {
-            const data = await api.searchBooks(filters);
-            renderBooks(data.books);
-            api.saveSearch(filters);
-        } catch (error) {
-            console.error("Search failed:", error);
+        if (window.booksManager) {
+            await window.booksManager.searchBooks(query, extra);
+        } else {
+            // Fallback: initial implementation if BooksManager isn't available
+            try {
+                const data = await api.searchBooks({ query, ...extra });
+                const booksGrid = document.getElementById('books-grid');
+                if (booksGrid) {
+                    booksGrid.innerHTML = (data.books || []).map(() => '').join('');
+                }
+            } catch (error) {
+                console.error('Search failed:', error);
+            }
         }
     }
 
-    // Render search results in books grid
-    function renderBooks(books) {
-        booksGrid.innerHTML = "";
-
-        if (!books || !books.length) {
-            booksGrid.innerHTML = "<p>No books found matching your search.</p>";
-            return;
-        }
-
-        books.forEach(book => {
-            const title = book.title ?? "Untitled";
-            const author = book.author ?? "Unknown";
-            const program = book.owner_program ?? book.program ?? "N/A";
-            const condition = book.condition_rating ?? "N/A";
-            const status = book.status ?? (book.is_available ? "Available" : "Borrowed");
-
-            const card = document.createElement("div");
-            card.className = "book-card";
-            card.innerHTML = `
-            <img src="${book.image_url || '/images/default-book.png'}" alt="${title}">
-            <h4>${title}</h4>
-            <p><strong>Author:</strong> ${author}</p>
-            <p><strong>Program:</strong> ${program}</p>
-            <p><strong>Condition:</strong> ${condition}</p>
-            <p><strong>Status:</strong> ${status}</p>
-        `;
-            card.addEventListener("click", () => openBookDetails(book.id));
-            booksGrid.appendChild(card);
-        });
-    }
+    // Note: Rendering is handled by BooksManager.renderBooks
 
 
     // Open detailed view of a single book

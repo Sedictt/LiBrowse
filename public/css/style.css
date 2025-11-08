@@ -8221,6 +8221,11 @@ body {
     }
 }
 
+/* Ensure Font Awesome .fa-spin rotates even if FA CSS is unavailable or overridden */
+.fa-spin {
+    animation: spin 1s linear infinite !important;
+}
+
 /* Animations */
 @keyframes fadeIn {
     from {

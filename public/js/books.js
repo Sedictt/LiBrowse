@@ -22,8 +22,9 @@ class BooksManager {
         this.totalBooks = 0;
         this.hasMore = false;
         this.isLoading = false;
-        // Lazy-loaded server config for loans/closures
         this.libraryConfig = null;
+        this._searchQuery = '';
+        this._searchFilters = {};
     }
 
     async loadBooks(filters = {}, reset = true) {
@@ -33,9 +34,10 @@ class BooksManager {
             this.isLoading = true;
             this.filters = { ...this.filters, ...filters };
 
-            // Ensure grid is not in search-mode when doing a normal load
             const grid = document.getElementById('books-grid');
             if (grid) grid.classList.remove('search-mode', 'single');
+            this._searchQuery = '';
+            this._searchFilters = {};
 
             // Refresh user profile to get up-to-date credits before rendering gating UI
             if (typeof authManager !== 'undefined' && authManager?.isAuthenticated) {
@@ -75,6 +77,8 @@ class BooksManager {
             showToast('Failed to load books', 'error');
         } finally {
             this.isLoading = false;
+            // Ensure the Load More button reflects the final state after loading completes
+            this.updateLoadMoreButton();
         }
     }
 
@@ -862,23 +866,29 @@ class BooksManager {
     updateLoadMoreButton() {
         const loadMoreBtn = document.getElementById('load-more-books');
         if (!loadMoreBtn) return;
+        const container = loadMoreBtn.closest('.load-more-container');
 
         if (this.hasMore && this.books.length > 0) {
-            loadMoreBtn.style.display = 'block';
+            if (container) container.style.display = '';
+            loadMoreBtn.style.display = '';
             loadMoreBtn.disabled = this.isLoading;
             loadMoreBtn.innerHTML = this.isLoading
                 ? '<i class="fas fa-spinner fa-spin"></i> Loading...'
                 : '<i class="fas fa-chevron-down"></i> Load More Books';
         } else {
+            if (container) container.style.display = 'none';
             loadMoreBtn.style.display = 'none';
+            loadMoreBtn.disabled = true;
         }
     }
 
-    async searchBooks(query) {
+    async searchBooks(query, extra = {}) {
         const grid = document.getElementById('books-grid');
         if (!query.trim()) {
             if (grid) grid.classList.remove('search-mode', 'single');
-            this.loadBooks();
+            this._searchQuery = '';
+            this._searchFilters = {};
+            await this.loadBooks({ ...extra }, true);
             return;
         }
 
@@ -886,15 +896,25 @@ class BooksManager {
             this.isLoading = true;
             this.updateLoadMoreButton();
 
-            const response = await api.get(`/books/search?q=${encodeURIComponent(query)}`);
+            this._searchQuery = query;
+            this._searchFilters = { ...extra };
+
+            const params = new URLSearchParams({
+                query: query,
+                page: '1',
+                limit: String(this.booksPerPage),
+                ...(extra || {})
+            }).toString();
+
+            const response = await api.get(`/books/search?${params}`);
             this.books = response.books || [];
             this.totalBooks = response.pagination?.total || 0;
             this.hasMore = response.pagination?.hasMore || false;
+            this.currentPage = 1;
 
             this.renderBooks();
             this.updateLoadMoreButton();
 
-            // Mark grid as search-mode and handle single-result case
             if (grid) {
                 grid.classList.add('search-mode');
                 if (this.books.length === 1) grid.classList.add('single'); else grid.classList.remove('single');
@@ -914,9 +934,27 @@ class BooksManager {
             this.isLoading = true;
             this.updateLoadMoreButton();
 
-            const currentPage = Math.floor(this.books.length / 12) + 1;
-            const response = await api.get(`/books?page=${currentPage}&limit=12`);
+            const nextPage = (this.currentPage || 1) + 1;
 
+            let response;
+            if (this._searchQuery && this._searchQuery.trim()) {
+                const params = new URLSearchParams({
+                    query: this._searchQuery,
+                    page: String(nextPage),
+                    limit: String(this.booksPerPage),
+                    ...(this._searchFilters || {})
+                }).toString();
+                response = await api.get(`/books/search?${params}`);
+            } else {
+                const queryParams = {
+                    page: nextPage,
+                    limit: this.booksPerPage,
+                    ...this.filters
+                };
+                response = await api.getBooks(queryParams);
+            }
+
+            this.currentPage = nextPage;
             this.books = [...this.books, ...(response.books || [])];
             this.totalBooks = response.pagination?.total || 0;
             this.hasMore = response.pagination?.hasMore || false;
@@ -928,6 +966,8 @@ class BooksManager {
             showToast('Failed to load more books', 'error');
         } finally {
             this.isLoading = false;
+            // Final update to reflect whether there are more pages and reset button label
+            this.updateLoadMoreButton();
         }
     }
 
