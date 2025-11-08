@@ -228,8 +228,13 @@ class ApiClient {
     }
 
     // Notifications endpoints
-    async getNotifications() {
-        return this.request('/notifications');
+    async getNotifications(unreadOnly = false, limit = 20, offset = 0) {
+        const q = new URLSearchParams({
+            unreadOnly: String(!!unreadOnly),
+            limit: String(limit),
+            offset: String(offset)
+        }).toString();
+        return this.request(`/notifications?${q}`);
     }
 
     async markNotificationRead(notificationId) {
@@ -238,9 +243,27 @@ class ApiClient {
         });
     }
 
-    async markAllNotificationsRead() {
-        return this.request('/notifications/read-all', {
+    async markNotificationAsRead(notificationId) {
+        return this.request(`/notifications/${notificationId}/read`, {
             method: 'PUT'
+        });
+    }
+
+    async markAllNotificationsRead() {
+        return this.request('/notifications/mark-all-read', {
+            method: 'PUT'
+        });
+    }
+
+    async markAllNotificationsAsRead() {
+        return this.request('/notifications/mark-all-read', {
+            method: 'PUT'
+        });
+    }
+
+    async deleteNotification(notificationId) {
+        return this.request(`/notifications/${notificationId}`, {
+            method: 'DELETE'
         });
     }
 

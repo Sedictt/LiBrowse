@@ -145,6 +145,39 @@ class App {
             });
         }
 
+        const markAllReadBtn = document.getElementById('mark-all-read');
+        if (markAllReadBtn) {
+            markAllReadBtn.addEventListener('click', async () => {
+                try {
+                    await api.markAllNotificationsAsRead();
+                    await this.loadNotifications();
+                } catch (e) {
+                    console.error('Failed to mark all as read:', e);
+                }
+            });
+        }
+
+        const notificationsListEl = document.getElementById('notifications-list');
+        if (notificationsListEl) {
+            notificationsListEl.addEventListener('click', async (e) => {
+                const item = e.target.closest('.notification-card[data-id]');
+                if (!item) return;
+                const idStr = item.getAttribute('data-id');
+                const nid = idStr ? parseInt(idStr) : null;
+                if (!nid) return;
+                try { await api.markNotificationAsRead(nid); } catch (_) {}
+                const category = item.getAttribute('data-category') || '';
+                if (category === 'transaction' || category === 'reminder' || category === 'system') {
+                    this.navigateToSection('monitoring');
+                } else if (category === 'credit') {
+                    this.navigateToSection('profile');
+                } else {
+                    this.navigateToSection('notifications');
+                }
+                await this.loadNotifications();
+            });
+        }
+
         // Window resize handler
         window.addEventListener('resize', this.handleResize.bind(this));
 
@@ -218,27 +251,30 @@ class App {
     }
 
     navigateToSection(sectionName) {
-        // Check authentication for protected sections
         const protectedSections = ['requests', 'transactions', 'profile', 'notifications'];
         if (protectedSections.includes(sectionName) && !authManager.requireAuth()) {
             return;
         }
 
-        // Hide all sections (remove active and ensure inline display none)
+        let targetSection = document.getElementById(`${sectionName}-section`);
+        if (!targetSection) {
+            const fallbacks = ['notifications', 'requests', 'books', this.currentSection].filter(Boolean);
+            for (const fb of fallbacks) {
+                const el = document.getElementById(`${fb}-section`);
+                if (el) { sectionName = fb; targetSection = el; break; }
+            }
+            if (!targetSection) return;
+        }
+
         document.querySelectorAll('.section').forEach(section => {
             section.classList.remove('active');
             section.style.display = 'none';
         });
 
-        // Show target section (add active and ensure inline display block)
-        const targetSection = document.getElementById(`${sectionName}-section`);
-        if (targetSection) {
-            targetSection.classList.add('active');
-            targetSection.style.display = 'block';
-            this.currentSection = sectionName;
-        }
+        targetSection.classList.add('active');
+        targetSection.style.display = 'block';
+        this.currentSection = sectionName;
 
-        // Update navigation
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
         });
@@ -248,13 +284,9 @@ class App {
             navLink.classList.add('active');
         }
 
-        // Update URL hash
         window.location.hash = sectionName;
-
-        // Load section-specific data
         this.loadSectionData(sectionName);
 
-        // Close mobile menu if open
         const navMenu = document.getElementById('nav-menu');
         if (navMenu) {
             navMenu.classList.remove('active');
@@ -1181,8 +1213,8 @@ class App {
         if (!authManager.isAuthenticated) return;
 
         try {
-            const resp = await api.getNotifications();
-            const list = Array.isArray(resp) ? resp : (Array.isArray(resp.notifications) ? resp.notifications : []);
+            const resp = await api.getNotifications(false, 20, 0);
+            const list = Array.isArray(resp?.notifications) ? resp.notifications : (Array.isArray(resp) ? resp : []);
             this.renderNotifications(list);
             this.updateNotificationBadge(list);
         } catch (error) {
@@ -1212,17 +1244,19 @@ class App {
                 if (body && typeof body === 'object' && body.message) msg = body.message;
                 else if (typeof body === 'string') msg = body;
             } catch (_) {
-                msg = typeof n.body === 'string' ? n.body : '';
+                msg = typeof n.body === 'string' ? n.body : (n.message || '');
             }
             const time = n.created || n.created_at || '';
+            const cat = n.category || n.type || '';
+            const title = n.title || '';
             return `
-            <div class="notification-card ${n.is_read ? '' : 'unread'}">
+            <div class="notification-card ${n.is_read ? '' : 'unread'}" data-id="${n.id}" data-category="${cat}">
                 <div class="notification-icon">
-                    <i class="fas fa-${this.getNotificationIcon(n.category)}"></i>
+                    <i class="fas fa-${this.getNotificationIcon(cat)}"></i>
                 </div>
                 <div class="notification-content">
-                    <div class="notification-title">${n.title || ''}</div>
-                    <div class="notification-message">${msg || ''}</div>
+                    <div class="notification-title">${title}</div>
+                    <div class="notification-message">${msg}</div>
                     <div class="notification-time">${this.formatTime ? this.formatTime(time) : time}</div>
                 </div>
             </div>`;
@@ -3372,7 +3406,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Tab switching
             document.querySelectorAll('.notification-tab').forEach(tab => {
-                tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
+                tab.addEventListener('click', (e) => this.switchTab(tab.dataset.tab, e));
             });
 
             // Close dropdown when clicking outside
@@ -3404,14 +3438,19 @@ document.addEventListener("DOMContentLoaded", () => {
             this.notificationDropdown.classList.remove('active');
         }
 
-        switchTab(tab) {
+        switchTab(tab, evt) {
             this.currentTab = tab;
 
             // Update UI
             document.querySelectorAll('.notification-tab').forEach(t => {
                 t.classList.remove('active');
             });
-            event.target.classList.add('active');
+            if (evt && evt.target) {
+                evt.target.classList.add('active');
+            } else {
+                const el = document.querySelector(`.notification-tab[data-tab="${tab}"]`);
+                if (el) el.classList.add('active');
+            }
 
             // Render notifications
             this.renderNotifications();
@@ -3449,21 +3488,34 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            this.notificationList.innerHTML = this.notifications.map(notif => `
-            <div class="notification-item ${!notif.is_read ? 'unread' : ''}" 
-                 onclick="notificationManager.handleNotificationClick(${notif.id}, '${notif.type}')">
-                <div class="notification-content">
-                    <div class="notification-icon ${this.getNotificationClass(notif.type)}">
-                        ${this.getNotificationIcon(notif.type)}
+            this.notificationList.innerHTML = this.notifications.map(n => {
+                let msg = '';
+                try {
+                    const body = typeof n.body === 'string' ? JSON.parse(n.body) : n.body;
+                    if (body && typeof body === 'object' && body.message) msg = body.message;
+                    else if (typeof body === 'string') msg = body;
+                } catch (_) {
+                    msg = typeof n.body === 'string' ? n.body : (n.message || '');
+                }
+                const cat = n.category || n.type || '';
+                const created = n.created || n.created_at;
+                const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(n.title || '') : (n.title || '');
+                const safeMsg = typeof escapeHtml === 'function' ? escapeHtml(msg) : msg;
+                return `
+                <div class="notification-item ${!n.is_read ? 'unread' : ''}" 
+                     onclick="notificationManager.handleNotificationClick(${n.id}, '${cat}')">
+                    <div class="notification-content">
+                        <div class="notification-icon ${this.getNotificationClass(cat)}">
+                            ${this.getNotificationIcon(cat)}
+                        </div>
+                        <div class="notification-text">
+                            <div class="notification-title">${safeTitle}</div>
+                            <div class="notification-message">${safeMsg}</div>
+                            <div class="notification-time">${this.formatTime(created)}</div>
+                        </div>
                     </div>
-                    <div class="notification-text">
-                        <div class="notification-title">${escapeHtml(notif.title)}</div>
-                        <div class="notification-message">${escapeHtml(notif.message)}</div>
-                        <div class="notification-time">${this.formatTime(notif.created_at)}</div>
-                    </div>
-                </div>
-            </div>
-        `).join('');
+                </div>`;
+            }).join('');
         }
 
         getNotificationIcon(type) {
@@ -3534,15 +3586,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     case 'request':
                     case 'approval':
                     case 'rejection':
-                        app.switchSection('transactions');
+                        if (window.app && typeof window.app.navigateToSection === 'function') window.app.navigateToSection('requests');
                         break;
                     case 'feedback':
-                        app.switchSection('profile');
+                        if (window.app && typeof window.app.navigateToSection === 'function') window.app.navigateToSection('profile');
                         break;
                     case 'reminder':
                     case 'overdue':
-                        app.switchSection('transactions');
+                        if (window.app && typeof window.app.navigateToSection === 'function') window.app.navigateToSection('monitoring');
                         break;
+                    default:
+                        if (window.app && typeof window.app.navigateToSection === 'function') window.app.navigateToSection('notifications');
                 }
 
                 // Reload notifications
