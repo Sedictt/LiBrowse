@@ -48,12 +48,12 @@ const upload = multer({
 // Get all books with filtering and pagination
 router.get('/', [
     optionalAuth,
-    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-    query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50'),
-    query('program').optional().isString(),
-    query('condition').optional().isIn(['excellent', 'good', 'fair']).withMessage('Invalid condition'),
-    query('availability').optional().isIn(['available', 'borrowed']).withMessage('Invalid availability'),
-    query('sort').optional().isString() // ADD THIS LINE
+    query('page').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    query('limit').optional({ checkFalsy: true }).isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50'),
+    query('program').optional({ checkFalsy: true }).isString(),
+    query('condition').optional({ checkFalsy: true }).isIn(['excellent', 'good', 'fair', 'poor']).withMessage('Invalid condition'),
+    query('availability').optional({ checkFalsy: true }).isIn(['available', 'borrowed']).withMessage('Invalid availability'),
+    query('sort').optional({ checkFalsy: true }).isString() // allow empty sort
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -90,12 +90,6 @@ router.get('/', [
             } else if (req.query.availability === 'borrowed') {
                 whereConditions.push('b.is_available = FALSE');
             }
-        }
-
-        // If user is authenticated, they can see their own books regardless of status
-        if (req.user) {
-            whereConditions = [`(${whereConditions.join(' AND ')}) OR b.owner_id = ?`];
-            queryParams.push(req.user.id);
         }
 
         const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
@@ -244,7 +238,7 @@ router.get('/search', [
         const queryParams = Array(4).fill(`%${searchQuery}%`);
 
         if (program) {
-            whereClause += ' AND u.program = ?';
+            whereClause += ' AND u.course = ?';
             queryParams.push(program);
         }
         if (condition) {
