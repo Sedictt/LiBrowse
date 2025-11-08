@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { pool, executeQuery } = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, optionalAuth } = require('../middleware/auth');
 
-// Get platform statistics (admin only)
-router.get('/platform', authenticateToken, async (req, res) => {
+// Get platform statistics (public)
+router.get('/platform', optionalAuth, async (req, res) => {
     try {
         // Total users
         const [userCount] = await pool.execute('SELECT COUNT(*) as count FROM users');
@@ -25,12 +25,25 @@ router.get('/platform', authenticateToken, async (req, res) => {
             'SELECT AVG(rating) as average FROM feedback WHERE rating IS NOT NULL'
         );
         
+        const avg = avgRating && avgRating[0] && avgRating[0].average != null
+            ? Number.parseFloat(Number(avgRating[0].average).toFixed(1))
+            : 0;
+
+        // Return both snake_case (current frontend) and camelCase (legacy/presentation) keys
         res.json({
+            // Preferred keys used by current frontend
+            total_users: userCount[0].count,
+            total_books: bookCount[0].count,
+            total_transactions: transactionCount[0].count,
+            average_rating: avg,
+            active_transactions: activeTransactions[0].count,
+            
+            // Legacy/camelCase for compatibility
             users: userCount[0].count,
             books: bookCount[0].count,
             transactions: transactionCount[0].count,
             activeTransactions: activeTransactions[0].count,
-            averageRating: avgRating[0].average || 0
+            averageRating: avg
         });
     } catch (error) {
         console.error('Error fetching platform stats:', error);
