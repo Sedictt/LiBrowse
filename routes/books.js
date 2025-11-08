@@ -217,14 +217,22 @@ router.get('/autocomplete', async (req, res) => {
 
 
 // Search books
-// Search books (update this existing route)
+// Search books (improved: multi-field + fuzzy)
 router.get('/search', [
     optionalAuth,
-    query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 50 })
+    query('page').optional({ checkFalsy: true }).isInt({ min: 1 }),
+    query('limit').optional({ checkFalsy: true }).isInt({ min: 1, max: 50 }),
+    query('query').optional({ checkFalsy: true }).isString(),
+    query('program').optional({ checkFalsy: true }).isString(),
+    query('condition').optional({ checkFalsy: true }).isIn(['excellent', 'good', 'fair', 'poor']),
+    query('availability').optional({ checkFalsy: true }).isIn(['available', 'borrowed']),
+    query('minCredits').optional({ checkFalsy: true }).isInt({ min: 0 }),
+    query('maxCredits').optional({ checkFalsy: true }).isInt({ min: 0 }),
+    query('sort').optional({ checkFalsy: true }).isString()
 ], async (req, res) => {
     try {
-        const searchQuery = req.query.query || '';
+        const rawQuery = (req.query.query || '').trim();
+        const likeQuery = `%${rawQuery}%`;
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 12;
         const offset = (page - 1) * limit;
@@ -232,57 +240,143 @@ router.get('/search', [
         const { program, condition, availability, minCredits, maxCredits, sort } = req.query;
 
         const connection = await getConnection();
+        // Build WHERE conditions (multi-field and fuzzy)
+        const whereParts = [];
+        const whereParams = [];
 
-        // Search conditions
-        let whereClause = `WHERE (b.title LIKE ? OR b.author LIKE ? OR b.isbn LIKE ? OR b.description LIKE ?)`;
-        const queryParams = Array(4).fill(`%${searchQuery}%`);
+        if (rawQuery) {
+            const searchParts = [
+                'b.title LIKE ?',
+                'b.author LIKE ?',
+                'b.isbn LIKE ?',
+                'b.description LIKE ?',
+                'b.subject LIKE ?',
+                'b.course_code LIKE ?',
+                'u.course LIKE ?',
+                "CONCAT(u.fname, ' ', u.lname) LIKE ?",
+                'u.email LIKE ?'
+            ];
+            const searchParams = [likeQuery, likeQuery, likeQuery, likeQuery, likeQuery, likeQuery, likeQuery, likeQuery, likeQuery];
+
+            // Basic phonetic fuzzy matching for typos (only if query has 3+ chars)
+            if (rawQuery.length >= 3) {
+                searchParts.push(
+                    'SOUNDEX(b.title) = SOUNDEX(?)',
+                    'SOUNDEX(b.author) = SOUNDEX(?)',
+                    "SOUNDEX(CONCAT(u.fname, ' ', u.lname)) = SOUNDEX(?)",
+                    'SOUNDEX(b.course_code) = SOUNDEX(?)',
+                    'SOUNDEX(u.course) = SOUNDEX(?)'
+                );
+                searchParams.push(rawQuery, rawQuery, rawQuery, rawQuery, rawQuery);
+
+                // Character-gap LIKE for typos (e.g., %a%b%c%) ignoring spaces
+                const gapped = `%${rawQuery.replace(/\s+/g, '').split('').join('%')}%`;
+                searchParts.push(
+                    "REPLACE(b.title, ' ', '') LIKE ?",
+                    "REPLACE(b.author, ' ', '') LIKE ?",
+                    "REPLACE(CONCAT(u.fname, ' ', u.lname), ' ', '') LIKE ?",
+                    "REPLACE(b.course_code, ' ', '') LIKE ?"
+                );
+                searchParams.push(gapped, gapped, gapped, gapped);
+            }
+
+            whereParts.push(`(${searchParts.join(' OR ')})`);
+            whereParams.push(...searchParams);
+        }
 
         if (program) {
-            whereClause += ' AND u.course = ?';
-            queryParams.push(program);
+            whereParts.push('u.course = ?');
+            whereParams.push(program);
         }
         if (condition) {
-            whereClause += ' AND b.condition_rating = ?';
-            queryParams.push(condition);
+            whereParts.push('b.condition_rating = ?');
+            whereParams.push(condition);
         }
         if (availability) {
-            whereClause += availability === 'available'
-                ? ' AND b.is_available = TRUE'
-                : ' AND b.is_available = FALSE';
+            whereParts.push(availability === 'available' ? 'b.is_available = TRUE' : 'b.is_available = FALSE');
         }
         if (minCredits) {
-            whereClause += ' AND b.minimum_credits >= ?';
-            queryParams.push(parseInt(minCredits));
+            whereParts.push('b.minimum_credits >= ?');
+            whereParams.push(parseInt(minCredits));
         }
         if (maxCredits) {
-            whereClause += ' AND b.minimum_credits <= ?';
-            queryParams.push(parseInt(maxCredits));
+            whereParts.push('b.minimum_credits <= ?');
+            whereParams.push(parseInt(maxCredits));
         }
 
-        // Sorting
-        let orderBy = 'b.created_at DESC';
-        if (sort === 'title_asc') orderBy = 'b.title ASC';
-        else if (sort === 'title_desc') orderBy = 'b.title DESC';
-        else if (sort === 'credits_low') orderBy = 'b.minimum_credits ASC';
-        else if (sort === 'credits_high') orderBy = 'b.minimum_credits DESC';
+        const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+
+        // Relevance-based ordering when searching; otherwise, use selected sort
+        let relevanceExpr = '0';
+        let relevanceParams = [];
+        if (rawQuery) {
+            relevanceExpr = `
+                (CASE WHEN b.title = ? THEN 12 ELSE 0 END) +
+                (CASE WHEN b.author = ? THEN 10 ELSE 0 END) +
+                (CASE WHEN b.course_code = ? THEN 9 ELSE 0 END) +
+                (CASE WHEN u.course = ? THEN 8 ELSE 0 END) +
+                (CASE WHEN CONCAT(u.fname, ' ', u.lname) = ? THEN 8 ELSE 0 END) +
+                (CASE WHEN b.title LIKE ? THEN 6 ELSE 0 END) +
+                (CASE WHEN b.author LIKE ? THEN 5 ELSE 0 END) +
+                (CASE WHEN b.course_code LIKE ? THEN 5 ELSE 0 END) +
+                (CASE WHEN u.course LIKE ? THEN 4 ELSE 0 END) +
+                (CASE WHEN CONCAT(u.fname, ' ', u.lname) LIKE ? THEN 4 ELSE 0 END)`;
+            relevanceParams = [
+                rawQuery, rawQuery, rawQuery, rawQuery, rawQuery,
+                likeQuery, likeQuery, likeQuery, likeQuery, likeQuery
+            ];
+            if (rawQuery.length >= 3) {
+                // Add phonetic boosts
+                relevanceExpr += `
+                    + (CASE WHEN SOUNDEX(b.title) = SOUNDEX(?) THEN 3 ELSE 0 END)
+                    + (CASE WHEN SOUNDEX(b.author) = SOUNDEX(?) THEN 2 ELSE 0 END)
+                    + (CASE WHEN SOUNDEX(CONCAT(u.fname, ' ', u.lname)) = SOUNDEX(?) THEN 2 ELSE 0 END)
+                    + (CASE WHEN SOUNDEX(b.course_code) = SOUNDEX(?) THEN 2 ELSE 0 END)
+                    + (CASE WHEN SOUNDEX(u.course) = SOUNDEX(?) THEN 1 ELSE 0 END)`;
+                relevanceParams.push(rawQuery, rawQuery, rawQuery, rawQuery, rawQuery);
+
+                // Add character-gap LIKE boosts (ignoring spaces)
+                const gappedBoost = `%${rawQuery.replace(/\s+/g, '').split('').join('%')}%`;
+                relevanceExpr += `
+                    + (CASE WHEN REPLACE(b.title, ' ', '') LIKE ? THEN 3 ELSE 0 END)
+                    + (CASE WHEN REPLACE(b.author, ' ', '') LIKE ? THEN 2 ELSE 0 END)
+                    + (CASE WHEN REPLACE(CONCAT(u.fname, ' ', u.lname), ' ', '') LIKE ? THEN 2 ELSE 0 END)`;
+                relevanceParams.push(gappedBoost, gappedBoost, gappedBoost);
+            }
+        }
+
+        let orderBy;
+        if (rawQuery) {
+            orderBy = 'relevance DESC, b.created_at DESC';
+        } else {
+            orderBy = 'b.created_at DESC';
+            if (sort === 'title_asc') orderBy = 'b.title ASC';
+            else if (sort === 'title_desc') orderBy = 'b.title DESC';
+            else if (sort === 'credits_low') orderBy = 'b.minimum_credits ASC';
+            else if (sort === 'credits_high') orderBy = 'b.minimum_credits DESC';
+            else if (sort === 'oldest') orderBy = 'b.created_at ASC';
+        }
 
         const [books] = await connection.execute(`
             SELECT
-                b.*, CONCAT(u.fname, ' ', u.lname) AS owner_name,
-                u.email AS owner_email, u.course AS owner_program
+                b.*,
+                CONCAT(u.fname, ' ', u.lname) AS owner_name,
+                u.email AS owner_email,
+                u.course AS owner_program,
+                ${relevanceExpr} AS relevance
             FROM books b
             JOIN users u ON b.owner_id = u.id
             ${whereClause}
             ORDER BY ${orderBy}
             LIMIT ? OFFSET ?
-        `, [...queryParams, limit, offset]);
+        `, [...relevanceParams, ...whereParams, limit, offset]);
 
         const [countResult] = await connection.execute(`
             SELECT COUNT(*) AS total
             FROM books b
             JOIN users u ON b.owner_id = u.id
             ${whereClause}
-        `, queryParams);
+        `, whereParams);
 
         connection.release();
 
@@ -300,7 +394,7 @@ router.get('/search', [
                 totalPages: Math.ceil(countResult[0].total / limit),
                 hasMore: offset + limit < countResult[0].total
             },
-            query: searchQuery
+            query: rawQuery
         });
     } catch (error) {
         console.error('Advanced search error:', error);
