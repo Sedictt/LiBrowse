@@ -32,10 +32,11 @@ class RequestManager {
             });
         });
 
-        // Filter inputs
+        // Filter inputs (support both input and change for cross-browser reliability)
         const filterInputs = document.querySelectorAll('.filter-input');
         filterInputs.forEach(input => {
             input.addEventListener('input', () => this.applyFilters());
+            input.addEventListener('change', () => this.applyFilters());
         });
 
         // Bulk action buttons
@@ -209,13 +210,13 @@ class RequestManager {
 
             // Date range filter
             if (this.filters.dateFrom) {
-                const requestDate = new Date(request.date_req);
+                const requestDate = new Date(request.request_date);
                 const filterDate = new Date(this.filters.dateFrom);
                 if (requestDate < filterDate) return false;
             }
 
             if (this.filters.dateTo) {
-                const requestDate = new Date(request.date_req);
+                const requestDate = new Date(request.request_date);
                 const filterDate = new Date(this.filters.dateTo);
                 if (requestDate > filterDate) return false;
             }
@@ -420,7 +421,7 @@ class RequestManager {
         const badges = this.getBorrowerBadges(userInfo);
 
         // Checkbox for incoming requests
-        const checkboxHtml = isIncoming && request.status === 'waiting' ? `
+        const checkboxHtml = isIncoming && request.status === 'pending' ? `
             <div class="request-select">
                 <input type="checkbox" class="request-checkbox" data-request-id="${request.id}" ${this.selectedRequests.has(request.id) ? 'checked' : ''}>
             </div>
@@ -928,6 +929,16 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing RequestManager...');
     requestManager = new RequestManager();
     window.requestManager = requestManager;
+
+    // If user opened the page with #requests or the section is already active, load immediately
+    try {
+        const hash = (window.location.hash || '').replace('#', '');
+        const requestsSection = document.getElementById('requests-section');
+        const isActive = (hash === 'requests') || (requestsSection && requestsSection.classList.contains('active'));
+        if (isActive && typeof requestManager.loadRequests === 'function') {
+            requestManager.loadRequests();
+        }
+    } catch (_) { /* noop */ }
 
     // Show filter bar for incoming tab by default
     const filterBar = document.getElementById('requests-filter-bar');

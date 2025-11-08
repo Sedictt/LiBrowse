@@ -2869,7 +2869,7 @@ body {
     align-items: flex-start;
     margin-bottom: var(--spacing-lg);
     padding-bottom: var(--spacing-md);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    /* border-bottom: 1px solid rgba(255, 255, 255, 0.1); */
 }
 
 .request-info h4,
@@ -6993,7 +6993,7 @@ body {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-left: 4px solid var(--success);
+    /* border-left: 4px solid var(--success); */
     position: relative;
     overflow: hidden;
 }
@@ -7005,7 +7005,7 @@ body {
     left: 0;
     width: 4px;
     height: 100%;
-    background: var(--success-gradient);
+    /* background: var(--success-gradient); */
 }
 
 .request-message i {
