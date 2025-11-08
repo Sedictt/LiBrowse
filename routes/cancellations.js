@@ -351,7 +351,7 @@ router.post('/:cancellationId/respond', authenticateToken, async (req, res) => {
 
             res.json({
                 success: true,
-                message: 'Cancellation approved. Transaction has been cancelled and refund processed.'
+                message: 'Cancellation approved. Transaction has been cancelled.'
             });
             
         } else {
@@ -463,50 +463,7 @@ async function processCancellation(connection, cancel) {
         WHERE id = ?
     `, [cancel.transaction_id]);
     
-    // Process refund
-    if (cancel.refund_type !== 'none' && cancel.refund_amount > 0) {
-        // Get borrower's current credits
-        const [borrower] = await connection.query(
-            'SELECT credits FROM users WHERE id = ?',
-            [cancel.borrower_id]
-        );
-        
-        if (borrower.length > 0) {
-            const oldBalance = borrower[0].credits;
-            const newBalance = oldBalance + cancel.refund_amount;
-            
-            // Refund credits to borrower
-            await connection.query(
-                'UPDATE users SET credits = ? WHERE id = ?',
-                [newBalance, cancel.borrower_id]
-            );
-            
-            // Log credit change
-            await connection.query(`
-                INSERT INTO credit_history 
-                (user_id, transaction_id, credit_change, reason, old_balance, new_balance, remark)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `, [
-                cancel.borrower_id,
-                cancel.transaction_id,
-                cancel.refund_amount,
-                'Cancellation refund',
-                oldBalance,
-                newBalance,
-                `${cancel.refund_type} refund for cancelled transaction`
-            ]);
-            
-            // Notify borrower
-            await connection.query(`
-                INSERT INTO notifications (user_id, title, body, category, type)
-                VALUES (?, ?, ?, 'credit', 'credit')
-            `, [
-                cancel.borrower_id,
-                'Refund Processed',
-                `You have been refunded ${cancel.refund_amount} credits from the cancelled transaction.`
-            ]);
-        }
-    }
+    
     
     // Make book available again
     await connection.query(`
