@@ -33,6 +33,10 @@ class BooksManager {
             this.isLoading = true;
             this.filters = { ...this.filters, ...filters };
 
+            // Ensure grid is not in search-mode when doing a normal load
+            const grid = document.getElementById('books-grid');
+            if (grid) grid.classList.remove('search-mode', 'single');
+
             // Refresh user profile to get up-to-date credits before rendering gating UI
             if (typeof authManager !== 'undefined' && authManager?.isAuthenticated) {
                 try {
@@ -871,7 +875,9 @@ class BooksManager {
     }
 
     async searchBooks(query) {
+        const grid = document.getElementById('books-grid');
         if (!query.trim()) {
+            if (grid) grid.classList.remove('search-mode', 'single');
             this.loadBooks();
             return;
         }
@@ -887,6 +893,12 @@ class BooksManager {
 
             this.renderBooks();
             this.updateLoadMoreButton();
+
+            // Mark grid as search-mode and handle single-result case
+            if (grid) {
+                grid.classList.add('search-mode');
+                if (this.books.length === 1) grid.classList.add('single'); else grid.classList.remove('single');
+            }
         } catch (error) {
             console.error('Search failed:', error);
             showToast('Search failed', 'error');
