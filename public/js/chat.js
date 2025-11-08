@@ -17,6 +17,7 @@ class ChatManager {
         this.initialLoadComplete = false;
         this.pendingMessages = [];
         this.notifiedMessageIds = new Set();
+        this.cancellationStatusOverrides = new Map();
 
         this.init();
     }
@@ -230,6 +231,7 @@ class ChatManager {
             this.messageOffset = 0;
             this.initialLoadComplete = false;
             this.pendingMessages = [];
+            this.cancellationStatusOverrides = new Map();
 
             // Show modal
             const modal = document.getElementById('chat-modal');
@@ -590,37 +592,77 @@ class ChatManager {
         const cur = viewerId != null ? Number(viewerId) : null;
         const other = data && data.other_party_id != null ? Number(data.other_party_id) : null;
         const initiator = data && data.initiator_id != null ? Number(data.initiator_id) : null;
+        
         // Primary check: payload-provided other_party_id
         let isResponder = cur != null && other != null && cur === other;
-        // Fallback: if user is not the initiator, treat as responder (chat access already restricts to the two parties)
+        // Fallback: if user is not the initiator, treat as responder
         if (!isResponder) {
             const isInitiator = initiator != null && cur === initiator;
             if (!isInitiator) {
                 isResponder = true;
             }
         }
+        
         const isExpired = data.expires_at ? (new Date(data.expires_at) < new Date()) : false;
-
-        const actions = isResponder && !isExpired ? `
-            <div class="cancel-actions">
-                <button class="btn btn-success btn-sm" data-cancel-action="approve" data-cancellation-id="${data.cancellation_id}">
-                    Approve Cancellation
-                </button>
-                <button class="btn btn-error btn-sm" data-cancel-action="reject" data-cancellation-id="${data.cancellation_id}">
-                    Reject
-                </button>
-            </div>
-        ` : `<div class="cancel-actions"><em>${isExpired ? 'Expired' : 'Awaiting response'}</em></div>`;
-
-        const expiresHtml = data.expires_at ? `<div class="cancel-expires">Respond by ${new Date(data.expires_at).toLocaleString()}</div>` : '';
-        const refundHtml = (data.refund_type && data.refund_type !== 'none') ? `<div class="cancel-refund">Proposed refund: ${data.refund_type}${data.refund_amount != null ? ` (${data.refund_amount} credits)` : ''}</div>` : '<div class="cancel-refund">No refund proposed</div>';
-
+        const cid = data.cancellation_id;
+        let status = data.status || 'pending';
+        let resolved = null;
+        try {
+            for (const m of this.messages) {
+                if (m && m.message_type === 'sys') {
+                    const p = typeof m.message === 'string' ? JSON.parse(m.message) : m.message;
+                    if (p && p.type === 'cancellation_response' && Number(p.cancellation_id) === Number(cid)) {
+                        resolved = p.status || null;
+                        if (resolved) break;
+                    }
+                }
+            }
+        } catch (_) { /* noop */ }
+        const override = (this.cancellationStatusOverrides && typeof this.cancellationStatusOverrides.get === 'function')
+            ? this.cancellationStatusOverrides.get(cid)
+            : null;
+        if (override) status = override; else if (resolved) status = resolved;
+        
+        // Action buttons or status message
+        let actions = '';
+        if (status === 'approved' || status === 'rejected') {
+            // Show status badge only - no buttons
+            const statusIcon = status === 'approved' ? 'fa-check-circle' : 'fa-times-circle';
+            const statusText = status === 'approved' ? 'Approved' : 'Rejected';
+            const statusClass = status === 'approved' ? 'status-approved' : 'status-rejected';
+            actions = `<div class="cancel-status-badge ${statusClass}"><i class="fas ${statusIcon}"></i> ${statusText}</div>`;
+        } else if (isResponder && !isExpired) {
+            // Show action buttons for responder
+            actions = `
+                <div class="cancel-actions">
+                    <button class="btn btn-success btn-sm" data-cancel-action="approve" data-cancellation-id="${data.cancellation_id}">
+                        <i class="fas fa-check"></i> Approve Cancellation
+                    </button>
+                    <button class="btn btn-error btn-sm" data-cancel-action="reject" data-cancellation-id="${data.cancellation_id}">
+                        <i class="fas fa-times"></i> Reject
+                    </button>
+                </div>
+            `;
+        } else {
+            // Show waiting/expired message
+            actions = `<div class="cancel-actions"><em><i class="fas ${isExpired ? 'fa-clock' : 'fa-hourglass-half'}"></i> ${isExpired ? 'Expired' : 'Awaiting response'}</em></div>`;
+        }
+        
+        // Format expiration date
+        const expiresHtml = data.expires_at && status === 'pending' ? 
+            `<div class="cancel-expires"><i class="fas fa-clock"></i> Respond by ${new Date(data.expires_at).toLocaleString()}</div>` : '';
+        
+        // Icon changes based on status
+        const iconClass = status === 'approved' ? 'fa-check-circle' : status === 'rejected' ? 'fa-times-circle' : 'fa-ban';
+        
         return `
             <div class="chat-message message-system">
-                <div class="cancellation-card" data-cancellation-id="${data.cancellation_id}">
-                    <div class="cancel-title"><i class="fas fa-ban"></i> Cancellation request for "${this.escapeHtml(data.book_title || '')}"</div>
-                    <div class="cancel-reason">Reason: ${this.escapeHtml(data.reason || 'not specified')}</div>
-                    ${refundHtml}
+                <div class="cancellation-card" data-cancellation-id="${data.cancellation_id}" data-status="${status}">
+                    <div class="cancel-title">
+                        <i class="fas ${iconClass}"></i> 
+                        Cancellation request for "${this.escapeHtml(data.book_title || '')}"
+                    </div>
+                    <div class="cancel-reason"><i class="fas fa-comment-dots"></i> ${this.escapeHtml(data.reason || 'not specified')}</div>
                     ${expiresHtml}
                     ${actions}
                 </div>
@@ -1173,11 +1215,18 @@ class ChatManager {
     async respondToCancellation(cancellationId, consent, btnEl = null) {
         try {
             if (!cancellationId) return;
-            // Optimistic UI: disable buttons
+            
+            // Optimistic UI: disable buttons and show loading state
             if (btnEl) {
                 const card = btnEl.closest('.cancellation-card');
                 if (card) {
-                    card.querySelectorAll('button[data-cancel-action]').forEach(b => b.disabled = true);
+                    const allButtons = card.querySelectorAll('button[data-cancel-action]');
+                    allButtons.forEach(b => {
+                        b.disabled = true;
+                        if (b === btnEl) {
+                            b.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                        }
+                    });
                 }
             }
 
@@ -1194,18 +1243,66 @@ class ChatManager {
                 throw new Error(data.error || 'Failed to submit response');
             }
 
-            this.showSuccess(consent ? 'Cancellation approved' : 'Cancellation rejected');
+            if (this.cancellationStatusOverrides && typeof this.cancellationStatusOverrides.set === 'function') {
+                this.cancellationStatusOverrides.set(cancellationId, consent ? 'approved' : 'rejected');
+            }
 
-            // Reload messages to reflect system update
-            await this.loadMessages(this.currentChatId, 0);
-            this.scrollToBottom(true);
-        } catch (err) {
-            console.error('Error responding to cancellation:', err);
-            this.showError(err.message || 'Failed to respond to cancellation');
+            // Update the card UI immediately with the new status
             if (btnEl) {
                 const card = btnEl.closest('.cancellation-card');
                 if (card) {
-                    card.querySelectorAll('button[data-cancel-action]').forEach(b => b.disabled = false);
+                    const status = consent ? 'approved' : 'rejected';
+                    card.setAttribute('data-status', status);
+                    
+                    // Update icon in title
+                    const titleIcon = card.querySelector('.cancel-title i');
+                    if (titleIcon) {
+                        titleIcon.className = `fas ${consent ? 'fa-check-circle' : 'fa-times-circle'}`;
+                    }
+                    
+                    // Replace entire actions div with status badge (no wrapping container)
+                    const actionsDiv = card.querySelector('.cancel-actions');
+                    if (actionsDiv) {
+                        actionsDiv.outerHTML = `
+                            <div class="cancel-status-badge status-${status}">
+                                <i class="fas ${consent ? 'fa-check-circle' : 'fa-times-circle'}"></i> 
+                                ${consent ? 'Approved' : 'Rejected'}
+                            </div>
+                        `;
+                    }
+                    
+                    // Remove expiration message
+                    const expiresDiv = card.querySelector('.cancel-expires');
+                    if (expiresDiv) {
+                        expiresDiv.remove();
+                    }
+                }
+            }
+
+            this.showSuccess(consent ? 'Cancellation approved' : 'Cancellation rejected');
+
+            // Reload messages to ensure consistency with server state
+            setTimeout(() => {
+                this.loadMessages(this.currentChatId, 0);
+                this.scrollToBottom(true);
+            }, 1000);
+            
+        } catch (err) {
+            console.error('Error responding to cancellation:', err);
+            this.showError(err.message || 'Failed to respond to cancellation');
+            
+            // Restore buttons on error
+            if (btnEl) {
+                const card = btnEl.closest('.cancellation-card');
+                if (card) {
+                    const allButtons = card.querySelectorAll('button[data-cancel-action]');
+                    allButtons.forEach(b => {
+                        b.disabled = false;
+                        const action = b.getAttribute('data-cancel-action');
+                        b.innerHTML = action === 'approve' ? 
+                            '<i class="fas fa-check"></i> Approve Cancellation' : 
+                            '<i class="fas fa-times"></i> Reject';
+                    });
                 }
             }
         }

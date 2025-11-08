@@ -765,6 +765,287 @@
     }
 }
 
+/* Cancellation Card Styles */
+.cancellation-card {
+    background: linear-gradient(135deg, rgba(255, 107, 107, 0.12) 0%, rgba(239, 68, 68, 0.08) 100%);
+    border: 2px solid rgba(255, 107, 107, 0.3);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 16px rgba(255, 107, 107, 0.15);
+}
+
+.cancellation-card:hover {
+    border-color: rgba(255, 107, 107, 0.45);
+    box-shadow: 0 6px 24px rgba(255, 107, 107, 0.2);
+    transform: translateY(-2px);
+}
+
+.cancellation-card[data-status="approved"] {
+    background: linear-gradient(135deg, rgba(52, 211, 153, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%);
+    border-color: rgba(52, 211, 153, 0.4);
+    box-shadow: 0 4px 16px rgba(52, 211, 153, 0.15);
+}
+
+.cancellation-card[data-status="rejected"] {
+    background: linear-gradient(135deg, rgba(148, 163, 184, 0.12) 0%, rgba(100, 116, 139, 0.08) 100%);
+    border-color: rgba(148, 163, 184, 0.4);
+    box-shadow: 0 4px 16px rgba(148, 163, 184, 0.15);
+}
+
+.cancel-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.cancel-title i {
+    font-size: 18px;
+    color: #ff6b6b;
+    flex-shrink: 0;
+    filter: drop-shadow(0 2px 4px rgba(255, 107, 107, 0.3));
+}
+
+.cancellation-card[data-status="approved"] .cancel-title i {
+    color: #34d399;
+    filter: drop-shadow(0 2px 4px rgba(52, 211, 153, 0.3));
+}
+
+.cancellation-card[data-status="rejected"] .cancel-title i {
+    color: #94a3b8;
+    filter: drop-shadow(0 2px 4px rgba(148, 163, 184, 0.3));
+}
+
+.cancel-reason,
+.cancel-refund,
+.cancel-expires {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cancel-reason {
+    background: rgba(255, 107, 107, 0.08);
+    border-color: rgba(255, 107, 107, 0.2);
+}
+
+.cancel-refund {
+    background: rgba(77, 171, 254, 0.08);
+    border-color: rgba(77, 171, 254, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cancel-refund i {
+    color: #4dabfe;
+    font-size: 12px;
+}
+
+.cancel-expires {
+    background: rgba(251, 191, 36, 0.08);
+    border-color: rgba(251, 191, 36, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+}
+
+.cancel-expires i {
+    color: #fbbf24;
+    font-size: 12px;
+}
+
+.cancel-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.cancel-actions button {
+    flex: 1;
+    min-width: 120px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.cancel-actions button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.cancel-actions button:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+.cancel-actions .btn-success {
+    background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+    color: white;
+}
+
+.cancel-actions .btn-success:hover {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(52, 211, 153, 0.4);
+}
+
+.cancel-actions .btn-error {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+}
+
+.cancel-actions .btn-error:hover {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+}
+
+.cancel-actions button:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.cancel-actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.cancel-actions em {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: italic;
+    font-weight: 500;
+    padding: 8px 12px;
+    background: rgba(148, 163, 184, 0.1);
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cancel-actions em i {
+    font-size: 12px;
+}
+
+.cancel-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 4px;
+    width: 100%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+}
+
+.cancel-status-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.cancel-status-badge.status-approved {
+    background: linear-gradient(135deg, rgba(52, 211, 153, 0.25) 0%, rgba(16, 185, 129, 0.2) 100%);
+    color: #34d399;
+    border: 2px solid rgba(52, 211, 153, 0.5);
+}
+
+.cancel-status-badge.status-rejected {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(220, 38, 38, 0.2) 100%);
+    color: #ef4444;
+    border: 2px solid rgba(239, 68, 68, 0.5);
+}
+
+.cancel-status-badge i {
+    font-size: 16px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* Animation for status change */
+@keyframes statusUpdate {
+    0% {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.cancel-status-badge {
+    animation: statusUpdate 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .cancellation-card {
+        padding: 16px;
+        gap: 12px;
+    }
+
+    .cancel-title {
+        font-size: 14px;
+    }
+
+    .cancel-reason,
+    .cancel-refund,
+    .cancel-expires {
+        font-size: 12px;
+        padding: 8px 10px;
+    }
+
+    .cancel-actions {
+        flex-direction: column;
+    }
+
+    .cancel-actions button {
+        width: 100%;
+        min-width: unset;
+    }
+}
+
 /* Light theme support (optional) */
 @media (prefers-color-scheme: light) {
     .chat-modal-container {
