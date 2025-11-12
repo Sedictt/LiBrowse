@@ -44,12 +44,16 @@ class ApiClient {
                 // Handle token expiration - clear auth and force re-login
                 if (response.status === 401 || response.status === 403) {
                     // Check if it's a token expiration error
-                    const isTokenExpired = message.toLowerCase().includes('token') &&
-                        (message.toLowerCase().includes('expired') ||
-                            message.toLowerCase().includes('invalid'));
+                    const isTokenExpired = message.toLowerCase().includes('token') ||
+                        message.toLowerCase().includes('expired') ||
+                        message.toLowerCase().includes('invalid');
+
+                    // Check if it's a verification error (user IS logged in, just not verified)
+                    const isVerificationError = message.toLowerCase().includes('verification') ||
+                        message.toLowerCase().includes('verify');
 
                     if (isTokenExpired) {
-                        console.warn('🔒 Token expired, clearing authentication...');
+                        console.warn('⏰ Token expired, clearing authentication...');
                         // Clear expired token
                         localStorage.removeItem('token');
                         localStorage.removeItem('user');
@@ -59,16 +63,20 @@ class ApiClient {
                             window.dispatchEvent(new CustomEvent('auth:token-expired', {
                                 detail: { status: response.status, endpoint, message }
                             }));
-                        } catch (_) { /* noop for non-browser */ }
-                    } else {
+                        } catch { /* noop for non-browser */ }
+                    } else if (!isVerificationError) {
+                        // Only show "login required" if it's NOT a verification error
                         // Generic unauthorized error
                         try {
                             window.dispatchEvent(new CustomEvent('auth:unauthorized', {
                                 detail: { status: response.status, endpoint }
                             }));
-                        } catch (_) { /* noop for non-browser */ }
+                        } catch { /* noop for non-browser */ }
                     }
+                    // If it's a verification error, don't trigger any auth events
+                    // Let the calling code handle it (like your books.js verification modal)
                 }
+
 
                 if (!err.suppressLog) {
                     console.error('API request failed:', err);
@@ -202,11 +210,17 @@ class ApiClient {
     // Transactions endpoints
     // Borrow request endpoint (aligned to backend contract)
     async createBorrowRequest(payload) {
+        const token = localStorage.getItem('token');
         return this.request('/transactions/request', {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify(payload)
         });
     }
+
 
     async getTransactions(filters = {}) {
         const queryString = new URLSearchParams(filters).toString();

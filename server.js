@@ -30,8 +30,9 @@ const io = socketIO(server, {
     }
 });
 
-const fileUpload = require('express-fileupload');
-app.use(fileUpload());
+// ❌ REMOVE THESE LINES - you're using multer instead
+// const fileUpload = require('express-fileupload');
+// app.use(fileUpload());
 
 // Initialize chat socket handlers
 const chatHandler = require('./socket/chatHandler');
@@ -81,7 +82,7 @@ app.use(cors({
 // Body Parsing
 // =======================
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+//app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // =======================
 // Static Files

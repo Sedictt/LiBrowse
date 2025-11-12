@@ -17,26 +17,26 @@ router.post('/send-otp', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const { email } = req.body;
-        
+
         if (!email) {
             return res.status(400).json({ error: 'Email is required' });
         }
-        
+
         // Generate OTP
         const otp = generateOTP();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-        
+
         // Store OTP in database
         await pool.query(
             'INSERT INTO verification_codes (user_id, code, type, expires_at) VALUES (?, ?, ?, ?)',
             [userId, otp, 'email', expiresAt]
         );
-        
+
         // In production, send email with OTP
         // For now, just log it
         console.log(`OTP for ${email}: ${otp}`);
-        
-        res.json({ 
+
+        res.json({
             message: 'OTP sent successfully',
             // For development only - remove in production
             otp: process.env.NODE_ENV !== 'production' ? otp : undefined
@@ -52,11 +52,11 @@ router.post('/verify-otp', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const { otp } = req.body;
-        
+
         if (!otp) {
             return res.status(400).json({ error: 'OTP is required' });
         }
-        
+
         // Check if OTP is valid
         const [codes] = await pool.query(
             `SELECT * FROM verification_codes 
@@ -65,31 +65,48 @@ router.post('/verify-otp', authenticateToken, async (req, res) => {
              ORDER BY created_at DESC LIMIT 1`,
             [userId, otp]
         );
-        
+
         if (codes.length === 0) {
             return res.status(400).json({ error: 'Invalid or expired OTP' });
         }
-        
+
         // Mark OTP as used
         await pool.query(
             'UPDATE verification_codes SET used = TRUE WHERE id = ?',
             [codes[0].id]
         );
-        
-        // Update user email verification status (fallback if column missing)
+
+        // Update user email verification status AND verification_status
         try {
             await pool.query(
-                'UPDATE users SET email_verified = TRUE WHERE id = ?',
+                `UPDATE users 
+         SET email_verified = TRUE, 
+             verification_status = 'verified',
+             verification_method = 'email',
+             is_verified = 1,
+             modified = NOW()
+         WHERE id = ?`,
                 [userId]
             );
         } catch (e) {
-            if (!(e && e.code === 'ER_BAD_FIELD_ERROR')) {
+            if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+                // Fallback if email_verified column is missing
+                await pool.query(
+                    `UPDATE users 
+             SET verification_status = 'verified',
+                 verification_method = 'email',
+                 is_verified = 1,
+                 modified = NOW()
+             WHERE id = ?`,
+                    [userId]
+                );
+            } else {
                 throw e;
             }
-            // Column missing: skip setting email_verified
         }
-        
+
         res.json({ message: 'Email verified successfully' });
+
     } catch (error) {
         console.error('Error verifying OTP:', error);
         res.status(500).json({ error: 'Failed to verify OTP' });
@@ -180,7 +197,7 @@ router.post('/resend', authenticateToken, async (req, res) => {
             [userId, otp, 'email', expiresAt]
         );
         console.log(`New OTP for ${userRow.email}: ${otp}`);
-        res.json({ 
+        res.json({
             message: 'Verification code resent successfully',
             otp: process.env.NODE_ENV !== 'production' ? otp : undefined
         });

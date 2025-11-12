@@ -30,20 +30,22 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB limit
+        fileSize: 8 * 1024 * 1024,  // 8MB limit
+        fieldSize: 10 * 1024 * 1024  // 10MB for total form data
     },
     fileFilter: (req, file, cb) => {
-        const allowedTypes = /jpeg|jpg|png|gif|webp/;
+        const allowedTypes = /jpeg|jpg|png/;
         const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
         const mimetype = allowedTypes.test(file.mimetype);
 
         if (mimetype && extname) {
             return cb(null, true);
         } else {
-            cb(new Error('Only image files are allowed'));
+            cb(new Error('Only JPEG and PNG images are allowed!'));
         }
     }
 });
+
 
 // Get all books with filtering and pagination
 router.get('/', [
@@ -802,19 +804,119 @@ router.get('/:id', optionalAuth, async (req, res) => {
 });
 
 // Add new book (with optional image upload)
-router.post('/', [
+router.post('/',
     authenticateToken,
-    upload.single('image'),
-    body('title').trim().isLength({ min: 1 }).withMessage('Title is required'),
-    body('author').trim().isLength({ min: 1 }).withMessage('Author is required'),
-    body('course_code').trim().notEmpty().withMessage('Course code is required'),
-    body('condition').isIn(['excellent', 'good', 'fair', 'poor']).withMessage('Invalid condition'),
-    body('minimum_credits').optional().isInt({ min: 50, max: 500 }).withMessage('Minimum credits must be between 50-500')
-], async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            // Clean up uploaded file if validation fails
+    (req, res, next) => {
+        upload.single('image')(req, res, (err) => {
+            if (err) {
+                console.error('Multer error:', err);
+
+                if (err.code === 'LIMIT_FILE_SIZE') {
+                    return res.status(400).json({
+                        error: 'Image file is too large. Maximum size is 8MB.',
+                        details: [{ msg: 'Image file is too large. Maximum size is 8MB.' }]
+                    });
+                } else if (err.message) {
+                    return res.status(400).json({
+                        error: err.message,
+                        details: [{ msg: err.message }]
+                    });
+                }
+
+                return res.status(400).json({
+                    error: 'File upload error',
+                    details: [{ msg: err.message || 'Unknown file upload error' }]
+                });
+            }
+            next();
+        });
+    },
+    [
+        body('title').trim().isLength({ min: 1 }).withMessage('Title is required'),
+        body('author').trim().isLength({ min: 1 }).withMessage('Author is required'),
+        body('course_code').trim().notEmpty().withMessage('Course code is required'),
+        body('condition').isIn(['excellent', 'good', 'fair', 'poor']).withMessage('Invalid condition'),
+        body('minimum_credits').optional().isInt({ min: 50, max: 500 }).withMessage('Minimum credits must be between 50-500')
+    ],
+    async (req, res) => {
+        try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                // Clean up uploaded file if validation fails
+                if (req.file) {
+                    try {
+                        await fs.unlink(req.file.path);
+                    } catch (unlinkError) {
+                        console.error('Failed to delete uploaded file:', unlinkError);
+                    }
+                }
+                return res.status(400).json({
+                    error: 'Validation failed',
+                    details: errors.array()
+                });
+            }
+
+            const {
+                title,
+                author,
+                isbn,
+                edition,
+                course_code,
+                subject,
+                condition,
+                minimum_credits = 100,
+                description,
+                publisher,
+                publication_year
+            } = req.body;
+
+            const connection = await getConnection();
+
+            const [result] = await connection.execute(`
+                INSERT INTO books (
+                    title, author, isbn, course_code, subject, edition, publisher, publication_year,
+                    condition_rating, description, owner_id, is_available, minimum_credits,
+                    cover_image, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?, NOW())
+            `, [
+                title,
+                author,
+                isbn || null,
+                course_code,
+                (subject && subject.trim()) ? subject : 'General',
+                edition || null,
+                publisher || null,
+                publication_year || null,
+                condition,
+                description || null,
+                req.user.id,
+                minimum_credits,
+                req.file ? req.file.path : null
+            ]);
+
+            // Get the created book
+            const [books] = await connection.execute(`
+                SELECT
+                    b.*,
+                    CONCAT(u.fname, ' ', u.lname) as owner_name
+                FROM books b
+                JOIN users u ON b.owner_id = u.id
+                WHERE b.id = ?
+            `, [result.insertId]);
+
+            connection.release();
+
+            const book = books[0];
+            book.image_url = book.cover_image ? `/uploads/books/${path.basename(book.cover_image)}` : null;
+
+            res.status(201).json({
+                message: 'Book added successfully',
+                book
+            });
+
+        } catch (error) {
+            console.error('Add book error:', error);
+            // Clean up uploaded file on error
             if (req.file) {
                 try {
                     await fs.unlink(req.file.path);
@@ -822,83 +924,11 @@ router.post('/', [
                     console.error('Failed to delete uploaded file:', unlinkError);
                 }
             }
-            return res.status(400).json({
-                error: 'Validation failed',
-                details: errors.array()
-            });
+            res.status(500).json({ error: 'Failed to add book' });
         }
-
-        const {
-            title,
-            author,
-            isbn,
-            edition,
-            course_code,
-            subject,
-            condition,
-            minimum_credits = 100,
-            description,
-            publisher,
-            publication_year
-        } = req.body;
-
-        const connection = await getConnection();
-
-        const [result] = await connection.execute(`
-            INSERT INTO books (
-                title, author, isbn, course_code, subject, edition, publisher, publication_year,
-                condition_rating, description, owner_id, is_available, minimum_credits,
-                cover_image, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?, NOW())
-        `, [
-            title,
-            author,
-            isbn || null,
-            course_code,
-            (subject && subject.trim()) ? subject : 'General',
-            edition || null,
-            publisher || null,
-            publication_year || null,
-            condition,
-            description || null,
-            req.user.id,
-            minimum_credits,
-            req.file ? req.file.path : null
-        ]);
-
-        // Get the created book
-        const [books] = await connection.execute(`
-            SELECT
-                b.*,
-                CONCAT(u.fname, ' ', u.lname) as owner_name
-            FROM books b
-            JOIN users u ON b.owner_id = u.id
-            WHERE b.id = ?
-        `, [result.insertId]);
-
-        connection.release();
-
-        const book = books[0];
-        book.image_url = book.cover_image ? `/uploads/books/${path.basename(book.cover_image)}` : null;
-
-        res.status(201).json({
-            message: 'Book added successfully',
-            book
-        });
-
-    } catch (error) {
-        console.error('Add book error:', error);
-        // Clean up uploaded file on error
-        if (req.file) {
-            try {
-                await fs.unlink(req.file.path);
-            } catch (unlinkError) {
-                console.error('Failed to delete uploaded file:', unlinkError);
-            }
-        }
-        res.status(500).json({ error: 'Failed to add book' });
     }
-});
+);
+
 
 // Update book
 router.put('/:id', [

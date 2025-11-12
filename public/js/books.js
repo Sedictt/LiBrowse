@@ -468,7 +468,7 @@ class BooksManager {
         setVal('request-message', '');
         setVal('expected-return-date', '—');
 
-        
+
         const startInput = q('#borrow-start-date');
         if (startInput) {
             const today = new Date();
@@ -495,7 +495,7 @@ class BooksManager {
         if (durSelect) {
             durSelect.onchange = () => this.updateExpectedReturnDate(modal);
         }
-        
+
         const pickupInput = q('#preferred-pickup-time');
         if (pickupInput && window.flatpickr) {
             try {
@@ -505,7 +505,7 @@ class BooksManager {
                     altInput: true,
                     altFormat: 'M j, Y h:i K',
                     dateFormat: 'Y-m-d\\TH:i',
-                    
+
                     minuteIncrement: 15,
                     disableMobile: true
                 });
@@ -513,7 +513,7 @@ class BooksManager {
         }
 
         // Clear inline errors
-        ['pickup-method','pickup-location','borrow-start-date','borrow-duration','preferred-pickup-time','request-contact','request-message']
+        ['pickup-method', 'pickup-location', 'borrow-start-date', 'borrow-duration', 'preferred-pickup-time', 'request-contact', 'request-message']
             .forEach(k => setErr(k, ''));
 
         // Preload config (closures, limits) then recalc
@@ -762,8 +762,26 @@ class BooksManager {
                 }
             }
             else if (err?.status === 403) {
-                showToast('Insufficient credits or request limit reached', 'error');
+                // Check if it's a verification error
+                const errorMessage = err.message || err?.body?.error || '';
+                if (errorMessage.includes('verification') || errorMessage.includes('verify')) {
+                    // Refresh user profile to check latest verification status
+                    const freshUser = await this.refreshUserProfile();
+
+                    // Check if user is actually verified now
+                    const verificationStatus = freshUser?.verification_status || freshUser?.verificationstatus;
+                    if (verificationStatus === 'verified') {
+                        // User is verified, maybe show different message or retry
+                        showToast('Please try again', 'info');
+                    } else {
+                        // Still unverified, show verification modal
+                        this.showVerificationRequiredModal();
+                    }
+                } else {
+                    showToast('Insufficient credits or request limit reached', 'error');
+                }
             }
+
             else {
                 showToast(err.message || 'Failed to send request', 'error');
             }
@@ -771,6 +789,85 @@ class BooksManager {
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = prevHtml; }
         }
     }
+
+    showVerificationRequiredModal() {
+        // Check if modal already exists
+        let modal = document.getElementById('verification-required-modal');
+
+        // Create modal if it doesn't exist
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'verification-required-modal';
+            modal.className = 'modal';
+            modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>
+                        <i class="fas fa-shield-alt" style="color: var(--warning);"></i>
+                        Account Verification Required
+                    </h2>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom: 16px;">
+                        To borrow or lend books on LiBrowse, you need to verify your account first.
+                    </p>
+                    <p style="margin-bottom: 16px;">
+                        <strong>Why verify?</strong>
+                    </p>
+                    <ul style="margin-left: 20px; margin-bottom: 16px;">
+                        <li>Ensures account security</li>
+                        <li>Builds trust in the community</li>
+                        <li>Unlocks borrowing and lending features</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" onclick="document.getElementById('verification-required-modal').classList.remove('active'); document.body.style.overflow = '';">
+                        Cancel
+                    </button>
+                    <button class="btn btn-primary" id="go-to-verification-btn">
+                        <i class="fas fa-check-circle"></i>
+                        Verify Account
+                    </button>
+                </div>
+            </div>
+        `;
+            document.body.appendChild(modal);
+
+            // Add click handler for verify button
+            const verifyBtn = modal.querySelector('#go-to-verification-btn');
+            verifyBtn.addEventListener('click', () => {
+                // Close all open modals
+                document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+                document.body.style.overflow = '';
+
+                // Navigate to profile verification tab
+                if (window.app) {
+                    window.app.navigateToSection('profile');
+                }
+
+                // Switch to verification tab after a small delay
+                setTimeout(() => {
+                    const verificationTab = document.querySelector('[data-tab="verification"]');
+                    if (verificationTab) {
+                        verificationTab.click();
+                    }
+                }, 100);
+            });
+
+            // Close modal on background click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
+        }
+
+        // Show modal
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
 
     closeBookModal() {
         const modal = document.getElementById('book-details-modal');
@@ -1098,6 +1195,30 @@ class BooksManager {
         if (diffHours < 24) return `${diffHours}h ago`;
         if (diffDays < 7) return `${diffDays}d ago`;
         return date.toLocaleDateString();
+    }
+
+    // Fetch fresh user profile data from server
+    async refreshUserProfile() {
+        try {
+            const response = await fetch('/api/users/profile', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.user) {
+                    // Update authManager with fresh data
+                    authManager.currentUser = data.user;
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    return data.user;
+                }
+            }
+        } catch (err) {
+            console.warn('Could not fetch fresh user data:', err);
+        }
+        return null;
     }
 
 }

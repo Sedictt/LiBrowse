@@ -16,8 +16,16 @@ class BookManagement {
         // Add book button
         const addBookBtn = document.getElementById('add-book-btn');
         if (addBookBtn) {
-            addBookBtn.addEventListener('click', () => this.showAddBookModal());
+            addBookBtn.addEventListener('click', async () => {
+                // Check if user is verified before allowing book addition
+                if (await this.isUserVerified()) {
+                    this.showAddBookModal();
+                } else {
+                    this.showVerificationRequiredModal();
+                }
+            });
         }
+
 
         // Profile tab - My Books
         const booksTab = document.querySelector('[data-tab="books"]');
@@ -30,7 +38,7 @@ class BookManagement {
         } else {
             console.warn('⚠️ Books tab not found in DOM');
         }
-        
+
         // Also listen for tab changes via custom event or hash
         document.addEventListener('profile-tab-changed', (e) => {
             if (e.detail && e.detail.tab === 'books') {
@@ -49,13 +57,140 @@ class BookManagement {
         });
     }
 
+    // Check if current user is verified (fetches fresh data from server)
+    async isUserVerified() {
+        if (!authManager || !authManager.currentUser) {
+            console.log('❌ No authManager or currentUser');
+            return false;
+        }
+
+        // Fetch fresh verification status from server
+        try {
+            const response = await fetch('/api/users/profile', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('🔍 Profile API Response:', data);
+
+                if (data.user) {
+                    // Update authManager with fresh data
+                    authManager.currentUser = data.user;
+                    localStorage.setItem('user', JSON.stringify(data.user));
+
+                    const verificationStatus = data.user.verification_status ||
+                        data.user.verificationstatus;
+
+                    console.log('✅ Verification status from profile:', verificationStatus);
+                    return verificationStatus === 'verified';
+                }
+            } else {
+                console.log('❌ Profile API failed:', response.status);
+            }
+        } catch (err) {
+            console.warn('Could not fetch fresh user data, using cached:', err);
+        }
+
+        // Fallback to cached data if fetch fails
+        const verificationStatus = authManager.currentUser.verification_status ||
+            authManager.currentUser.verificationstatus;
+
+        console.log('📦 Using cached verification status:', verificationStatus);
+        return verificationStatus === 'verified';
+    }
+
+
+
+    // Show verification required modal (reuse from booksManager or create new)
+    showVerificationRequiredModal() {
+        // Check if modal already exists
+        let modal = document.getElementById('verification-required-modal');
+
+        // Create modal if it doesn't exist
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'verification-required-modal';
+            modal.className = 'modal';
+            modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>
+                        <i class="fas fa-shield-alt" style="color: var(--warning);"></i>
+                        Account Verification Required
+                    </h2>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom: 16px;">
+                        To add books to LiBrowse, you need to verify your account first.
+                    </p>
+                    <p style="margin-bottom: 16px;">
+                        <strong>Why verify?</strong>
+                    </p>
+                    <ul style="margin-left: 20px; margin-bottom: 16px;">
+                        <li>Ensures account security</li>
+                        <li>Builds trust in the community</li>
+                        <li>Unlocks book listing features</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" onclick="document.getElementById('verification-required-modal').classList.remove('active'); document.body.style.overflow = '';">
+                        Cancel
+                    </button>
+                    <button class="btn btn-primary" id="go-to-verification-btn-bookmanagement">
+                        <i class="fas fa-check-circle"></i>
+                        Verify Account
+                    </button>
+                </div>
+            </div>
+        `;
+            document.body.appendChild(modal);
+
+            // Add click handler for verify button
+            const verifyBtn = modal.querySelector('#go-to-verification-btn-bookmanagement');
+            verifyBtn.addEventListener('click', () => {
+                // Close all open modals
+                document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+                document.body.style.overflow = '';
+
+                // Navigate to profile verification tab
+                if (window.app) {
+                    window.app.navigateToSection('profile');
+                }
+
+                // Switch to verification tab after a small delay
+                setTimeout(() => {
+                    const verificationTab = document.querySelector('[data-tab="verification"]');
+                    if (verificationTab) {
+                        verificationTab.click();
+                    }
+                }, 100);
+            });
+
+            // Close modal on background click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
+        }
+
+        // Show modal
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+
     showAddBookModal() {
         // Remove any existing add-book-modal first
         const existingModal = document.getElementById('add-book-modal');
         if (existingModal) {
             existingModal.remove();
         }
-        
+
         const modal = this.createBookFormModal();
         document.body.appendChild(modal);
         modal.classList.add('active');
@@ -311,13 +446,13 @@ class BookManagement {
         const reader = new FileReader();
         reader.onload = (e) => {
             console.log('✅ FileReader loaded successfully');
-            
+
             // Create image element to ensure it loads
             const img = new Image();
             img.onload = () => {
                 console.log('✅ Image element loaded successfully');
                 console.log('📐 Image dimensions:', img.width, 'x', img.height);
-                
+
                 // Update preview with image
                 preview.innerHTML = `
                     <img src="${e.target.result}" alt="Book cover preview">
@@ -326,12 +461,12 @@ class BookManagement {
                     </div>
                 `;
                 this.imagePreview = file;
-                
+
                 // Detailed debugging
                 console.log('📸 Preview HTML updated');
                 console.log('📸 Preview element:', preview);
                 console.log('📸 Preview innerHTML:', preview.innerHTML);
-                
+
                 const imgElement = preview.querySelector('img');
                 console.log('📸 Image element found:', imgElement);
                 if (imgElement) {
@@ -339,11 +474,11 @@ class BookManagement {
                     console.log('📸 Image computed style:', window.getComputedStyle(imgElement).display);
                     console.log('📸 Image dimensions:', imgElement.offsetWidth, 'x', imgElement.offsetHeight);
                 }
-                
+
                 console.log('📸 Preview computed style:', window.getComputedStyle(preview).display);
                 console.log('📸 Preview dimensions:', preview.offsetWidth, 'x', preview.offsetHeight);
             };
-            
+
             img.onerror = () => {
                 console.error('❌ Failed to load image element');
                 showToast('Failed to load image preview', 'error');
@@ -355,9 +490,9 @@ class BookManagement {
                     </div>
                 `;
             };
-            
+
             img.src = e.target.result;
-            
+
             // Update file name display - try multiple methods
             let fileNameDisplay = document.getElementById('selected-file-name');
             if (!fileNameDisplay) {
@@ -366,7 +501,7 @@ class BookManagement {
                     fileNameDisplay = activeModal.querySelector('#selected-file-name');
                 }
             }
-            
+
             if (fileNameDisplay) {
                 const fileSize = (file.size / 1024).toFixed(1);
                 fileNameDisplay.innerHTML = `<i class="fas fa-check-circle" style="color: #10B981;"></i> ${file.name} (${fileSize} KB)`;
@@ -375,12 +510,12 @@ class BookManagement {
             } else {
                 console.warn('⚠️ File name display element not found');
             }
-            
+
             // Show success feedback
             const fileSize = (file.size / 1024).toFixed(1);
             showToast(`✓ Image selected: ${file.name} (${fileSize} KB)`, 'success');
         };
-        
+
         reader.onerror = () => {
             showToast('Failed to load image preview', 'error');
             preview.innerHTML = `
@@ -391,7 +526,7 @@ class BookManagement {
                 </div>
             `;
         };
-        
+
         reader.readAsDataURL(file);
     }
 
@@ -406,10 +541,11 @@ class BookManagement {
                 <small>Max size: 5MB (JPG, PNG, GIF, WebP)</small>
             </div>
         `;
-        const imageInput = activeModal ? activeModal.querySelector('#book-image-input') : document.getElementById('book-image-input');
+        const imageInput = activeModal ? activeModal.querySelector('#book-image') : document.getElementById('book-image');
+
         if (imageInput) imageInput.value = '';
         this.imagePreview = null;
-        
+
         // Clear file name display
         const fileNameDisplay = activeModal ? activeModal.querySelector('#selected-file-name') : document.getElementById('selected-file-name');
         if (fileNameDisplay) {
@@ -419,78 +555,80 @@ class BookManagement {
         if (preview.classList && preview.classList.contains('file-preview')) {
             preview.classList.remove('active');
         }
-        
+
         showToast('Image removed', 'info');
     }
 
-clearFormErrors() {
-    const activeModal = document.querySelector('.modal.active');
-    const ids = ['title-error', 'author-error', 'course-code-error', 'condition-error', 'credits-error'];
-    ids.forEach(id => {
-        const el = activeModal ? activeModal.querySelector('#' + id) : document.getElementById(id);
-        if (el) el.textContent = '';
-    });
-}
-
-displayValidationErrors(details) {
-    if (!Array.isArray(details)) return;
-    const activeModal = document.querySelector('.modal.active');
-    const map = {
-        title: { errorId: 'title-error', fieldSel: '#book-title' },
-        author: { errorId: 'author-error', fieldSel: '#book-author' },
-        course_code: { errorId: 'course-code-error', fieldSel: '#book-course-code' },
-        condition: { errorId: 'condition-error', fieldSel: '#book-condition' },
-        minimum_credits: { errorId: 'credits-error', fieldSel: '#book-credits' }
-    };
-    let firstField = null;
-    details.forEach(err => {
-        const cfg = map[err.param];
-        if (!cfg) return;
-        const errEl = activeModal ? activeModal.querySelector('#' + cfg.errorId) : document.getElementById(cfg.errorId);
-        if (errEl) errEl.textContent = err.msg;
-        if (!firstField) {
-            const field = activeModal ? activeModal.querySelector(cfg.fieldSel) : document.querySelector(cfg.fieldSel);
-            if (field) firstField = field;
-        }
-    });
-    if (firstField && typeof firstField.focus === 'function') {
-        firstField.focus();
+    clearFormErrors() {
+        const activeModal = document.querySelector('.modal.active');
+        const ids = ['title-error', 'author-error', 'course-code-error', 'condition-error', 'credits-error'];
+        ids.forEach(id => {
+            const el = activeModal ? activeModal.querySelector('#' + id) : document.getElementById(id);
+            if (el) el.textContent = '';
+        });
     }
-}
+
+    displayValidationErrors(details) {
+        if (!Array.isArray(details)) return;
+        const activeModal = document.querySelector('.modal.active');
+        const map = {
+            title: { errorId: 'title-error', fieldSel: '#book-title' },
+            author: { errorId: 'author-error', fieldSel: '#book-author' },
+            course_code: { errorId: 'course-code-error', fieldSel: '#book-course-code' },
+            condition: { errorId: 'condition-error', fieldSel: '#book-condition' },
+            minimum_credits: { errorId: 'credits-error', fieldSel: '#book-credits' }
+        };
+        let firstField = null;
+        details.forEach(err => {
+            const cfg = map[err.param];
+            if (!cfg) return;
+            const errEl = activeModal ? activeModal.querySelector('#' + cfg.errorId) : document.getElementById(cfg.errorId);
+            if (errEl) errEl.textContent = err.msg;
+            if (!firstField) {
+                const field = activeModal ? activeModal.querySelector(cfg.fieldSel) : document.querySelector(cfg.fieldSel);
+                if (field) firstField = field;
+            }
+        });
+        if (firstField && typeof firstField.focus === 'function') {
+            firstField.focus();
+        }
+    }
 
     async addBook() {
         const activeModal = document.querySelector('.modal.active');
         const submitBtn = activeModal ? activeModal.querySelector('#add-book-form button[type="submit"]') : document.querySelector('#add-book-form button[type="submit"]');
         const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
-        
+
         try {
             // Show loading state
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
             }
-            
+
             const form = activeModal ? activeModal.querySelector('#add-book-form') : document.getElementById('add-book-form');
             this.clearFormErrors();
-            const formData = new FormData(form);
+
+            // Build FormData manually
+            const formData = new FormData();
+
             const titleInput = activeModal ? activeModal.querySelector('#book-title') : document.getElementById('book-title');
             console.log('Submitting book. Title field value:', titleInput ? titleInput.value : '(not found)');
-            // Sanitize and normalize fields
-            const trimKeys = ['title', 'author', 'course_code', 'condition'];
-            trimKeys.forEach(k => {
-                const v = formData.get(k);
-                if (typeof v === 'string') formData.set(k, v.trim());
-            });
-            // Explicitly set critical fields from the active modal controls
+
+            // ADD FIELDS FIRST, THEN TRIM
             const authorInput = activeModal ? activeModal.querySelector('#book-author') : document.getElementById('book-author');
             const courseInput = activeModal ? activeModal.querySelector('#book-course-code') : document.getElementById('book-course-code');
             const conditionSelect = activeModal ? activeModal.querySelector('#book-condition') : document.getElementById('book-condition');
+            const creditsInput = activeModal ? activeModal.querySelector('#book-minimum-credits') : document.getElementById('book-minimum-credits');
+
+            // Add and trim fields
             if (titleInput) formData.set('title', titleInput.value.trim());
             if (authorInput) formData.set('author', authorInput.value.trim());
             if (courseInput) formData.set('course_code', courseInput.value.trim());
             if (conditionSelect) formData.set('condition', (conditionSelect.value || '').trim());
-            const mcRaw = formData.get('minimum_credits');
-            let mc = parseInt(typeof mcRaw === 'string' ? mcRaw.trim() : mcRaw, 10);
+
+            // Handle minimum credits with validation
+            let mc = parseInt(creditsInput ? creditsInput.value : '100', 10);
             if (Number.isNaN(mc)) mc = 100;
             if (mc < 50) mc = 50;
             if (mc > 500) mc = 500;
@@ -518,13 +656,43 @@ displayValidationErrors(details) {
             }
 
             // Add image if selected
-            const imageInput = activeModal ? activeModal.querySelector('#book-image-input') : document.getElementById('book-image-input');
-            if (imageInput.files[0]) {
-                formData.append('image', imageInput.files[0]);
+            // Add image validation
+            const imageInput = activeModal ? activeModal.querySelector('#book-image') : document.getElementById('book-image');
+
+
+            // Validate image size BEFORE uploading
+            if (imageInput && imageInput.files[0]) {
+                const file = imageInput.files[0];
+                const maxSize = 8 * 1024 * 1024; // 8MB
+
+                // Check file size
+                if (file.size > maxSize) {
+                    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+                    showToast(`❌ Image too large! Please use an image under 8MB (current: ${fileSizeMB}MB)`, 'error');
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnText;
+                    }
+                    return;
+                }
+
+                // Check file type - ONLY JPEG and PNG
+                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+                if (!allowedTypes.includes(file.type)) {
+                    showToast('❌ Invalid file type! Please upload a JPEG or PNG image only.', 'error');
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnText;
+                    }
+                    return;
+                }
+
+                formData.append('image', file);
                 showToast('Uploading book with cover image...', 'info');
             } else {
                 showToast('Uploading book...', 'info');
             }
+
 
             const response = await fetch('/api/books', {
                 method: 'POST',
@@ -545,20 +713,20 @@ displayValidationErrors(details) {
             }
 
             console.log('✅ Book added successfully, closing modal and refreshing lists...');
-            
+
             // Reset form
             if (form && typeof form.reset === 'function') {
                 form.reset();
             }
-            
+
             // Show success message BEFORE closing modal so user sees it
             showToast('✓ Book added successfully!', 'success');
-            
+
             // Close modal with slight delay to ensure toast is visible
             setTimeout(() => {
                 this.closeModal('add-book-modal');
             }, 100);
-            
+
             // Refresh books list if on books section
             if (window.location.hash === '#books') {
                 console.log('Refreshing books section...');
@@ -566,7 +734,7 @@ displayValidationErrors(details) {
                     booksManager.loadBooks();
                 }
             }
-            
+
             // Refresh my books if on profile
             console.log('Refreshing my books...');
             this.loadMyBooks();
@@ -574,7 +742,7 @@ displayValidationErrors(details) {
         } catch (error) {
             console.error('Add book error:', error);
             showToast(error.message || 'Failed to add book', 'error');
-            
+
             // Restore button state
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -583,21 +751,22 @@ displayValidationErrors(details) {
         }
     }
 
+
     async updateBook(bookId) {
         const activeModal = document.querySelector('.modal.active');
         const submitBtn = activeModal ? activeModal.querySelector('#edit-book-form button[type="submit"]') : document.querySelector('#edit-book-form button[type="submit"]');
         const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
-        
+
         try {
             // Show loading state
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
             }
-            
+
             const form = activeModal ? activeModal.querySelector('#edit-book-form') : document.getElementById('edit-book-form');
             this.clearFormErrors();
-            
+
             // Get form data as JSON (not FormData since we're not uploading image here)
             const titleInput = activeModal ? activeModal.querySelector('#book-title') : document.getElementById('book-title');
             const authorInput = activeModal ? activeModal.querySelector('#book-author') : document.getElementById('book-author');
@@ -610,7 +779,7 @@ displayValidationErrors(details) {
             const descriptionInput = activeModal ? activeModal.querySelector('#book-description') : document.getElementById('book-description');
             const publisherInput = activeModal ? activeModal.querySelector('#book-publisher') : document.getElementById('book-publisher');
             const yearInput = activeModal ? activeModal.querySelector('#book-year') : document.getElementById('book-year');
-            
+
             const bookData = {
                 title: titleInput ? titleInput.value.trim() : '',
                 author: authorInput ? authorInput.value.trim() : '',
@@ -624,14 +793,14 @@ displayValidationErrors(details) {
                 publisher: publisherInput ? publisherInput.value.trim() : '',
                 publication_year: yearInput ? yearInput.value : null
             };
-            
+
             // Clamp minimum_credits
             if (isNaN(bookData.minimum_credits)) bookData.minimum_credits = 100;
             if (bookData.minimum_credits < 50) bookData.minimum_credits = 50;
             if (bookData.minimum_credits > 500) bookData.minimum_credits = 500;
-            
+
             console.log('Updating book:', bookId, bookData);
-            
+
             const token = localStorage.getItem('token');
             if (!token) {
                 showToast('Please login to update book', 'error');
@@ -641,7 +810,7 @@ displayValidationErrors(details) {
                 }
                 return;
             }
-            
+
             const response = await fetch(`/api/books/${bookId}`, {
                 method: 'PUT',
                 headers: {
@@ -650,9 +819,9 @@ displayValidationErrors(details) {
                 },
                 body: JSON.stringify(bookData)
             });
-            
+
             const data = await response.json();
-            
+
             if (!response.ok) {
                 if (data && Array.isArray(data.details)) {
                     this.displayValidationErrors(data.details);
@@ -660,38 +829,39 @@ displayValidationErrors(details) {
                 const firstDetailMsg = Array.isArray(data?.details) && data.details.length ? data.details[0].msg : null;
                 throw new Error(firstDetailMsg || data.error || 'Failed to update book');
             }
-            
+
             console.log('✅ Book updated successfully');
-            
+
             // Handle image upload separately if changed
-            const imageInput = activeModal ? activeModal.querySelector('#book-image-input') : document.getElementById('book-image-input');
+            const imageInput = activeModal ? activeModal.querySelector('#book-image') : document.getElementById('book-image');
+
             if (imageInput && imageInput.files && imageInput.files[0]) {
                 console.log('Uploading new image...');
                 await this.uploadBookImage(bookId, imageInput.files[0]);
             }
-            
+
             // Show success message
             showToast('✓ Book updated successfully!', 'success');
-            
+
             // Close modal with slight delay
             setTimeout(() => {
                 this.closeModal('edit-book-modal');
             }, 100);
-            
+
             // Refresh books list
             if (window.location.hash === '#books') {
                 if (typeof booksManager !== 'undefined' && booksManager.loadBooks) {
                     booksManager.loadBooks();
                 }
             }
-            
+
             // Refresh my books
             this.loadMyBooks();
-            
+
         } catch (error) {
             console.error('Update book error:', error);
             showToast(error.message || 'Failed to update book', 'error');
-            
+
             // Restore button state
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -726,7 +896,7 @@ displayValidationErrors(details) {
                 showToast('Please login to view your books', 'error');
                 return;
             }
-            
+
             const response = await fetch('/api/books/my-books', {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -844,7 +1014,7 @@ displayValidationErrors(details) {
             if (existingModal) {
                 existingModal.remove();
             }
-            
+
             const response = await fetch(`/api/books/${bookId}`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`

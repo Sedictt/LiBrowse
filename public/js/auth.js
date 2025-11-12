@@ -31,7 +31,7 @@ class AuthManager {
                     const payload = JSON.parse(atob(tokenParts[1]));
                     const expirationTime = payload.exp * 1000; // Convert to milliseconds
                     const currentTime = Date.now();
-                    
+
                     // Check if token is expired
                     if (currentTime >= expirationTime) {
                         console.warn('🔒 Token expired on page load, clearing...');
@@ -40,7 +40,7 @@ class AuthManager {
                         this.updateUIForAuthState(false);
                         return;
                     }
-                    
+
                     // Token is valid
                     this.isAuthenticated = true;
                     this.currentUser = JSON.parse(user);
@@ -143,21 +143,21 @@ class AuthManager {
         // Listen for token expiration and handle logout
         window.addEventListener('auth:token-expired', (e) => {
             console.warn('🔒 Session expired', e.detail);
-            
+
             // Only show message if user was actually logged in
             if (this.isAuthenticated) {
                 this.showToast('Your session has expired. Please login again.', 'warning');
-                
+
                 // Clear auth state
                 this.isAuthenticated = false;
                 this.currentUser = null;
                 this.updateUIForAuthState(false);
-                
+
                 // Redirect to home and show login modal
                 if (window.app) {
                     window.app.navigateToSection('home');
                 }
-                
+
                 // Show login modal after a brief delay
                 setTimeout(() => {
                     this.openModal('login-modal');
@@ -622,31 +622,18 @@ class AuthManager {
     }
 
     showVerificationChoice() {
-        // Create a simple verification choice UI
-        const message = `
-            <div style="text-align: center; padding: 20px;">
-                <h3 style="margin-bottom: 20px;">Choose Verification Method</h3>
-                <p style="margin-bottom: 30px; color: var(--text-muted);">
-                    To complete your registration, please verify your account using one of the methods below:
-                </p>
-                <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-                    <button onclick="authManager.startDocumentVerification()" 
-                            style="padding: 15px 30px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
-                        <i class="fas fa-id-card"></i> Upload Student ID
-                    </button>
-                    <button onclick="authManager.startOTPVerification()" 
-                            style="padding: 15px 30px; background: var(--secondary); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
-                        <i class="fas fa-envelope"></i> Email Verification
-                    </button>
-                </div>
-                <p style="margin-top: 20px; font-size: 14px; color: var(--text-muted);">
-                    You can verify later from your profile page
-                </p>
-            </div>
-        `;
+        // Close the registration modal
+        this.closeModal('register-modal');
 
-        this.showToast(message, 'info', 10000);
+        // Show success message
+        this.showToast('Registration successful! Please log in with your new account.', 'success', 5000);
+
+        // Open the login modal after a short delay
+        setTimeout(() => {
+            this.openModal('login-modal');
+        }, 500);
     }
+
 
     startDocumentVerification() {
         this.showDocumentUploadModal();

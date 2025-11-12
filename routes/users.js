@@ -10,7 +10,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const conn = await getConnection();
     const [rows] = await conn.execute(
-       `SELECT 
+      `SELECT 
          id,
          email,
          student_no,
@@ -22,6 +22,9 @@ router.get('/profile', authenticateToken, async (req, res) => {
          profile_pic,
          status,
          bio,
+         verification_status,
+         verification_method,
+         is_verified,
          created AS created_at
        FROM users 
        WHERE id = ? 
@@ -46,6 +49,9 @@ router.get('/profile', authenticateToken, async (req, res) => {
         profileimage: u.profile_pic,
         status: u.status,
         bio: u.bio,
+        verification_status: u.verification_status,
+        verification_method: u.verification_method,
+        is_verified: u.is_verified,
         created_at: u.created_at
       })
     });
@@ -54,6 +60,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to load profile' });
   }
 });
+
 
 // PUT /api/users/profile - update profile
 router.put('/profile', authenticateToken, async (req, res) => {
@@ -109,7 +116,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
     await conn.execute(`UPDATE users SET ${fields.join(', ')}, modified = NOW() WHERE id = ?`, values);
 
     const [rows] = await conn.execute(
-       `SELECT 
+      `SELECT 
          id,
          email,
          student_no,

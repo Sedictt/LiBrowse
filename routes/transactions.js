@@ -217,18 +217,30 @@ router.post('/request', [
         }
 
         // Step 2.5: Check borrower verification status
-        const [vrows] = await connection.execute(
-            'SELECT verification_status FROM users WHERE id = ?', [req.user.id]
+        const vrows = await connection.execute(
+            `SELECT verification_status FROM users WHERE id = ?`,
+            [req.user.id]
         );
-        const rawStatus = vrows && vrows.length ? (vrows[0].verification_status || null) : null;
+
+        // Fix: connection.execute returns [rows, fields], so vrows[0] is the rows array
+        const rows = vrows[0];
+        const rawStatus = rows && rows.length ? rows[0].verification_status : null;
+
+        // DEBUG: Log what we're reading from the database
+        console.log('🔍 DEBUG - User ID:', req.user.id, '| Raw Status:', rawStatus, '| Type:', typeof rawStatus);
+
         const status = (rawStatus || '').toLowerCase();
         if (!status || (status !== 'verified' && status !== 'fully_verified')) {
+            console.log('❌ VERIFICATION FAILED - Status:', status);
             connection.release();
             return res.status(403).json({
                 error: 'You must complete account verification to borrow books.',
                 verification_status: rawStatus || 'none'
             });
         }
+
+        console.log('✅ VERIFICATION PASSED - User', req.user.id, 'is verified with status:', rawStatus);
+
 
         // Step 3: Check borrower's credit points (Following SRS flowchart)
         const [borrowers] = await connection.execute('SELECT credits FROM users WHERE id = ?', [req.user.id]);
