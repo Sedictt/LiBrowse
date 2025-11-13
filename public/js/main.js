@@ -1445,6 +1445,22 @@ class App {
     }
 
     handleInitialRoute() {
+        try {
+            const params = new URLSearchParams(window.location.search || '');
+            const verified = params.get('verified');
+            const verr = params.get('verify_error');
+            if (verified === '1') {
+                if (typeof window.showToast === 'function') window.showToast('Email verified successfully', 'success', 5000);
+                const newUrl = window.location.pathname + (window.location.hash || '#profile');
+                window.history.replaceState({}, '', newUrl);
+            } else if (verr) {
+                const map = { missing: 'Verification link is incomplete', invalid: 'Invalid verification link', expired: 'Verification link expired', not_found: 'User not found', server: 'Verification failed due to a server error' };
+                const msg = map[verr] || 'Verification failed';
+                if (typeof window.showToast === 'function') window.showToast(msg, 'error', 6000);
+                const newUrl = window.location.pathname + window.location.hash;
+                window.history.replaceState({}, '', newUrl);
+            }
+        } catch (_) {}
         const hash = window.location.hash.slice(1);
         if (hash) {
             this.navigateToSection(hash);

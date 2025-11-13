@@ -299,6 +299,24 @@ function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// Generate random verification link token
+function generateVerificationToken() {
+  return require('crypto').randomBytes(32).toString('hex');
+}
+
+// Derive a 6-digit OTP from the verification token (no extra DB column needed)
+function deriveOtpFromToken(token, email) {
+  try {
+    const base = `${token}|${email || ''}`;
+    const hash = crypto.createHash('sha256').update(base).digest('hex');
+    const num = parseInt(hash.slice(0, 8), 16); // use first 4 bytes
+    return (num % 1000000).toString().padStart(6, '0');
+  } catch (_) {
+    // Fallback in case of unexpected input
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+}
+
 // Send OTP via PLV email
 router.post("/send-otp", async (req, res) => {
   try {
@@ -318,32 +336,121 @@ router.post("/send-otp", async (req, res) => {
     }
     console.log(`[OTP] send-otp: user found`, { id: user.id, verified: !!user.is_verified });
 
-    const otp = generateOTP();
+    const verificationToken = generateVerificationToken();
+    const otp = deriveOtpFromToken(verificationToken, email);
     const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-    console.log(`[OTP] send-otp: OTP generated`, {
+    console.log(`[OTP] send-otp: OTP and verification token generated`, {
       otp: process.env.NODE_ENV === 'production' ? '******' : otp,
+      token: process.env.NODE_ENV === 'production' ? '******' : verificationToken.substring(0, 8) + '...',
       expiresAt: expiry.toISOString()
     });
 
     try {
-      await executeQuery("UPDATE users SET ver_token = ?, ver_token_expiry = ? WHERE email = ?", [otp, expiry, email]);
-      console.log(`[OTP] send-otp: DB updated with token+expiry`);
+      await executeQuery("UPDATE users SET ver_token = ?, ver_token_expiry = ? WHERE email = ?", [verificationToken, expiry, email]);
+      console.log(`[OTP] send-otp: DB updated with verification token+expiry`);
     } catch (dbErr) {
       console.error(`[OTP] send-otp: failed to update DB`, { error: dbErr.message });
       throw dbErr;
     }
 
-    // Build message
-    const subject = "Your LiBrowse OTP Code";
+    // Build verification link
+    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+    const verificationLink = `${baseUrl}/api/auth/verify-link?token=${verificationToken}&email=${encodeURIComponent(email)}`;
+
+    // Build message with modern design
+    const subject = "Verify Your LiBrowse Account";
     const html = `
-      <div style="font-family: Arial, sans-serif; line-height:1.6">
-        <h2>Your OTP Code</h2>
-        <p>Your one-time password is <b style="font-size:20px;">${otp}</b>.</p>
-        <p>This code expires in 10 minutes.</p>
-        <p style="color:#6b7280;font-size:12px">If you didn't request this, you can safely ignore this email.</p>
-      </div>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif; line-height: 1.6; color: #1f2937; background-color: #f9fafb; }
+          .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07); }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center; }
+          .header-logo { font-size: 28px; font-weight: 800; color: white; margin: 0; letter-spacing: -0.5px; }
+          .header-subtitle { font-size: 14px; color: rgba(255, 255, 255, 0.9); margin: 8px 0 0 0; }
+          .content { padding: 40px 30px; }
+          .greeting { font-size: 20px; font-weight: 700; color: #1f2937; margin: 0 0 16px 0; }
+          .message { font-size: 15px; color: #4b5563; margin: 0 0 24px 0; line-height: 1.7; }
+          .cta-button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; margin: 24px 0; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+          .cta-button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102, 126, 234, 0.6); }
+          .backup-section { background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 28px 0; border-left: 4px solid #667eea; }
+          .backup-label { font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 8px 0; }
+          .backup-code { font-size: 24px; font-weight: 700; color: #1f2937; font-family: 'Monaco', 'Courier New', monospace; letter-spacing: 2px; margin: 0; }
+          .backup-hint { font-size: 13px; color: #6b7280; margin: 12px 0 0 0; }
+          .divider { height: 1px; background-color: #e5e7eb; margin: 28px 0; }
+          .footer { background-color: #f9fafb; padding: 24px 30px; border-top: 1px solid #e5e7eb; text-align: center; }
+          .footer-text { font-size: 12px; color: #6b7280; margin: 0; line-height: 1.6; }
+          .footer-link { color: #667eea; text-decoration: none; font-weight: 600; }
+          .expiry-badge { display: inline-block; background-color: #fef3c7; color: #92400e; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; margin: 16px 0; }
+          .security-note { font-size: 12px; color: #6b7280; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <!-- Header -->
+          <div class="header">
+            <h1 class="header-logo">📚 LiBrowse</h1>
+            <p class="header-subtitle">Smart Academic Book Exchange for PLV</p>
+          </div>
+
+          <!-- Content -->
+          <div class="content">
+            <h2 class="greeting">Welcome to LiBrowse! 🎓</h2>
+            <p class="message">
+              Thank you for joining our community of PLV students! To get started and unlock all features, please verify your email address by clicking the button below.
+            </p>
+
+            <!-- CTA Button -->
+            <div style="text-align: center;">
+              <a href="${verificationLink}" class="cta-button">✓ Verify My Email</a>
+              <div class="expiry-badge">⏱️ Expires in 10 minutes</div>
+            </div>
+
+            <p class="message" style="margin-top: 28px; font-size: 14px; color: #6b7280;">
+              If the button above doesn't work, you can also use the backup code below:
+            </p>
+
+            <!-- Backup Code Section -->
+            <div class="backup-section">
+              <p class="backup-label">Backup Verification Code</p>
+              <p class="backup-code">${otp}</p>
+              <p class="backup-hint">Enter this code in the app if the link doesn't work</p>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Why Verify -->
+            <div style="background-color: #f0f9ff; padding: 16px; border-radius: 8px; margin: 20px 0;">
+              <p style="font-size: 13px; color: #0c4a6e; margin: 0; font-weight: 600;">✨ What you get after verification:</p>
+              <ul style="font-size: 13px; color: #0c4a6e; margin: 8px 0 0 0; padding-left: 20px;">
+                <li>Browse and search academic books</li>
+                <li>Request books from other students</li>
+                <li>Build your reputation with ratings</li>
+                <li>Access exclusive student community</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="footer">
+            <p class="footer-text">
+              Questions? <a href="mailto:support@librowse.com" class="footer-link">Contact our support team</a>
+            </p>
+            <p class="footer-text">
+              If you didn't create this account, you can safely ignore this email.
+            </p>
+            <p class="footer-text" style="margin-top: 16px; font-size: 11px; color: #9ca3af;">
+              © 2025 LiBrowse. All rights reserved. | For PLV Students Only
+            </p>
+          </div>
+        </div>
+      </body>
+      </html>
     `;
-    const text = `Your LiBrowse OTP is ${otp}. It expires in 10 minutes.`;
+    const text = `Welcome to LiBrowse!\n\nVerify your email: ${verificationLink}\n\nBackup code: ${otp}\n\nBoth expire in 10 minutes.\n\nQuestions? Contact support@librowse.com`;
 
     const mailResult = await sendMail({
       to: email,
@@ -375,7 +482,11 @@ router.post("/verify-otp", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    if (user.ver_token !== otp) {
+    // Accept either: (a) derived OTP from hex token, or (b) legacy direct OTP stored in ver_token
+    const verToken = user.ver_token || '';
+    const isHexToken = /^[a-f0-9]{64}$/i.test(String(verToken));
+    const expectedOtp = isHexToken ? deriveOtpFromToken(verToken, email) : String(verToken);
+    if (String(otp) !== String(expectedOtp)) {
       console.warn(`[OTP] verify-otp: invalid otp`, { email });
       return res.status(400).json({ error: "Invalid OTP" });
     }
@@ -413,6 +524,64 @@ router.post("/verify-otp", async (req, res) => {
   } catch (err) {
     console.error("[OTP] verify-otp: error", err);
     return res.status(500).json({ error: "Failed to verify OTP" });
+  }
+});
+
+// Verify email via link (primary method)
+router.get("/verify-link", async (req, res) => {
+  try {
+    const { token, email } = req.query;
+    console.log(`[OTP] verify-link: request received`, { email, token: process.env.NODE_ENV === 'production' ? '******' : token?.substring(0, 8) + '...' });
+
+    if (!token || !email) {
+      console.warn(`[OTP] verify-link: missing token or email`, { token: !!token, email: !!email });
+      return res.redirect(302, '/?verify_error=missing');
+    }
+
+    const user = await getOne("SELECT * FROM users WHERE email = ?", [email]);
+    if (!user) {
+      console.warn(`[OTP] verify-link: user not found`, { email });
+      return res.redirect(302, '/?verify_error=not_found');
+    }
+
+    if (user.ver_token !== token) {
+      console.warn(`[OTP] verify-link: invalid token`, { email });
+      return res.redirect(302, '/?verify_error=invalid');
+    }
+
+    if (new Date() > new Date(user.ver_token_expiry)) {
+      console.warn(`[OTP] verify-link: expired token`, { email, expiry: user.ver_token_expiry });
+      return res.redirect(302, '/?verify_error=expired');
+    }
+
+    try {
+      // Mark verification via link; account is considered Verified when either method is done
+      try {
+        await executeQuery(
+          "UPDATE users SET email_verified = 1, verification_method = 'link', is_verified = 1, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?",
+          [email]
+        );
+      } catch (e) {
+        const msg = (e && (e.sqlMessage || e.message || '')).toLowerCase();
+        if (e && e.code === 'ER_BAD_FIELD_ERROR' && msg.includes('email_verified')) {
+          // Fallback for DBs without email_verified column
+          await executeQuery(
+            "UPDATE users SET verification_method = 'link', is_verified = 1, ver_token = NULL, ver_token_expiry = NULL WHERE email = ?",
+            [email]
+          );
+        } else {
+          throw e;
+        }
+      }
+      console.log(`[OTP] verify-link: email marked verified`, { email });
+      return res.redirect(302, '/?verified=1#profile');
+    } catch (dbErr) {
+      console.error(`[OTP] verify-link: failed to update user verification`, { error: dbErr.message });
+      throw dbErr;
+    }
+  } catch (err) {
+    console.error("[OTP] verify-link: error", err);
+    return res.redirect(302, '/?verify_error=server');
   }
 });
 
