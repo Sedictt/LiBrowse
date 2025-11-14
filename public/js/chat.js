@@ -1076,9 +1076,22 @@ class ChatManager {
     openReportModal() {
         if (!this.currentChatInfo) return;
 
+        // Resolve the "other user" ID from chat info.
+        // Backend returns snake_case (other_user_id), but be defensive
+        // in case of future shape changes.
+        const otherUserId = this.currentChatInfo.other_user_id ||
+            this.currentChatInfo.otherUserId ||
+            this.currentChatInfo.otheruserid || null;
+
+        if (!otherUserId) {
+            console.error('openReportModal: other user id missing in currentChatInfo', this.currentChatInfo);
+            this.showError('Unable to determine who you are reporting. Please close the chat and try again.');
+            return;
+        }
+
         // Set hidden fields
         document.getElementById('report-chat-id').value = this.currentChatId;
-        document.getElementById('report-user-id').value = this.currentChatInfo.otherUserId;
+        document.getElementById('report-user-id').value = otherUserId;
 
         // Open modal
         const modal = document.getElementById('report-modal');
@@ -1132,7 +1145,7 @@ class ChatManager {
             if (result.autoResolved) {
                 this.showSuccess(`Report submitted and resolved. ${result.penaltyApplied} credits penalty applied.`);
             } else {
-                this.showSuccess('Report submitted for manual review.');
+                this.showSuccess('Report submitted for review.');
             }
 
             // Reset form

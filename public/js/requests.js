@@ -18,6 +18,8 @@ class RequestManager {
     init() {
         console.log('RequestManager initialized');
         this.setupEventListeners();
+        // Ensure status filter options exist (in case HTML was outdated)
+        this.ensureStatusOptions();
         // Don't load requests on init - wait for section to be navigated to
         // this.loadRequests();
     }
@@ -85,6 +87,11 @@ class RequestManager {
         const filterBar = document.getElementById('requests-filter-bar');
         if (filterBar) {
             filterBar.style.display = tab === 'incoming' ? 'block' : 'none';
+        }
+
+        // When switching to incoming, ensure status options exist
+        if (tab === 'incoming') {
+            this.ensureStatusOptions();
         }
 
         this.currentTab = tab;
@@ -204,8 +211,10 @@ class RequestManager {
     getFilteredRequests() {
         return this.currentRequests.filter(request => {
             // Status filter
-            if (this.filters.status && request.status !== this.filters.status) {
-                return false;
+            if (this.filters.status) {
+                const reqStatus = this.normalizeStatus(request.status);
+                const filterStatus = this.normalizeStatus(this.filters.status);
+                if (reqStatus !== filterStatus) return false;
             }
 
             // Date range filter
@@ -863,6 +872,50 @@ class RequestManager {
     }
 
     // Utility methods
+    ensureStatusOptions() {
+        try {
+            const select = document.getElementById('filter-status');
+            if (!select) return;
+
+            const desired = [
+                { value: '', label: 'All Statuses' },
+                { value: 'pending', label: 'Pending' },
+                { value: 'approved', label: 'Approved' },
+                { value: 'rejected', label: 'Rejected' },
+                { value: 'cancelled', label: 'Cancelled' },
+                { value: 'borrowed', label: 'Borrowed' },
+                { value: 'returned', label: 'Returned' },
+                { value: 'completed', label: 'Completed' }
+            ];
+
+            const existingValues = Array.from(select.options).map(o => String(o.value));
+            const needsPopulate = existingValues.length <= 1 || desired.some(d => !existingValues.includes(d.value));
+            if (!needsPopulate) return;
+
+            const currentValue = select.value;
+            select.innerHTML = '';
+            for (const opt of desired) {
+                const o = document.createElement('option');
+                o.value = opt.value;
+                o.textContent = opt.label;
+                select.appendChild(o);
+            }
+            // Preserve previous selection if still valid
+            if (desired.some(d => d.value === currentValue)) {
+                select.value = currentValue;
+            }
+        } catch (_) { /* noop */ }
+    }
+    normalizeStatus(status) {
+        const s = String(status || '').toLowerCase().trim();
+        const map = {
+            done: 'completed',
+            ongoing: 'borrowed',
+            in_progress: 'approved',
+            canceled: 'cancelled' // US spelling -> UK spelling
+        };
+        return map[s] || s;
+    }
     getStatusIcon(status) {
         const icons = {
             'pending': '⏳',
@@ -872,7 +925,8 @@ class RequestManager {
             'borrowed': '📖',
             'returned': '📚'
         };
-        return icons[status] || '📋';
+        const s = this.normalizeStatus(status);
+        return icons[s] || '📋';
     }
 
     formatStatus(status) {
@@ -882,9 +936,11 @@ class RequestManager {
             'rejected': 'Rejected',
             'cancelled': 'Cancelled',
             'borrowed': 'Borrowed',
-            'returned': 'Returned'
+            'returned': 'Returned',
+            'completed': 'Completed'
         };
-        return statuses[status] || status;
+        const s = this.normalizeStatus(status);
+        return statuses[s] || status;
     }
 
     formatPickupMethod(method) {

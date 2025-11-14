@@ -39,14 +39,46 @@ const CONFIG = {
     }
 };
 
-// Harmful keyword patterns
-const HARMFUL_KEYWORDS = [
-    /scam|fraud|fake/i,
-    /send\s+money|payment|wire\s+transfer/i,
-    /personal\s+information|password|credit\s+card/i,
-    /harassment|threat|harm/i,
-    /spam|advertisement|promotion/i
-];
+// Harmful keyword patterns grouped by category for better explainability
+// NOTE: These are treated as "signals", not automatic guilt. They feed into
+// the confidence score alongside reporter trust and other signals.
+const HARMFUL_KEYWORD_GROUPS = {
+    // (A) Sexual / exploitative / abuse
+    sexual: [
+        /\b(rape|molest|grooming|underage|minor|nudes?|naked|porn(?:ography)?|onlyfans|sext(?:ing)?|sexual|explicit)\b/i
+    ],
+
+    // (B) Threats / violence / self-harm
+    threats: [
+        /\b(kill you|kill yourself|kys|die|choke|hang yourself|burn|stab|shoot|beat up|doxx(?:ing)?)\b/i,
+        /\b(i['’]m going to hurt you|i['’]ll find you)\b/i
+    ],
+
+    // (C) Fraud / scam / financial manipulation
+    fraud: [
+        /\b(scam|fraud|fake|crypto|bitcoin|investment|return guarantee|lottery|sweepstakes|prize|winner)\b/i,
+        /\b(wire transfer|western union|bank account|verification code|one[-\s]?time password|otp)\b/i,
+        /\b(get rich quick|double your money)\b/i
+    ],
+
+    // (D) Phishing / impersonation
+    phishing: [
+        /\b(verify your account|account suspended|reset your password)\b/i,
+        /\b(official support|admin team|customer support|it support)\b/i
+    ],
+
+    // (E) External contact push (often used in scams / grooming / spam)
+    external_contact: [
+        /\b(telegram|whatsapp|discord|instagram|snapchat|facebook|fb|wechat)\b/i,
+        /\b(dm me on|message me off (this|the) app)\b/i
+    ],
+
+    // (F) Spam / ads / promotions
+    spam: [
+        /\b(promo|promotion|discount|coupon|sale)\b/i,
+        /\b(advertisement|advertising|sponsored)\b/i
+    ]
+};
 
 // Initialize or get reporter trust score
 async function getReporterTrust(connection, userId) {
@@ -107,28 +139,41 @@ async function analyzeMessage(connection, messageId) {
     
     if (messages.length === 0) return signals;
     
-    const messageText = messages[0].message;
-    
-    // Keyword matching
-    let keywordMatches = 0;
-    for (const pattern of HARMFUL_KEYWORDS) {
-        if (pattern.test(messageText)) {
-            keywordMatches++;
+    const messageText = messages[0].message || '';
+
+    // Keyword matching by category
+    let totalMatches = 0;
+    const categoriesMatched = [];
+
+    for (const [category, patterns] of Object.entries(HARMFUL_KEYWORD_GROUPS)) {
+        let categoryMatches = 0;
+        for (const pattern of patterns) {
+            if (pattern.test(messageText)) {
+                categoryMatches++;
+            }
+        }
+        if (categoryMatches > 0) {
+            totalMatches += categoryMatches;
+            categoriesMatched.push({ category, count: categoryMatches });
         }
     }
-    
-    if (keywordMatches > 0) {
+
+    if (totalMatches > 0) {
         signals.push({
             type: 'keyword_match',
-            weight: Math.min(CONFIG.SIGNAL_WEIGHTS.keyword_match * keywordMatches, 40),
-            data: { matches: keywordMatches }
+            weight: Math.min(CONFIG.SIGNAL_WEIGHTS.keyword_match * totalMatches, 40),
+            data: { totalMatches, categories: categoriesMatched }
         });
     }
     
     // Pattern detection (excessive caps, special chars, URLs)
-    const capsRatio = (messageText.match(/[A-Z]/g) || []).length / messageText.length;
+    const capsRatio = messageText.length
+        ? (messageText.match(/[A-Z]/g) || []).length / messageText.length
+        : 0;
     const hasUrls = /https?:\/\//.test(messageText);
-    const specialCharRatio = (messageText.match(/[!@#$%^&*]/g) || []).length / messageText.length;
+    const specialCharRatio = messageText.length
+        ? (messageText.match(/[!@#$%^&*]/g) || []).length / messageText.length
+        : 0;
     
     if (capsRatio > 0.7 || specialCharRatio > 0.3 || (hasUrls && messageText.length < 50)) {
         signals.push({
