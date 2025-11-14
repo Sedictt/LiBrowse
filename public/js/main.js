@@ -1465,17 +1465,20 @@ class App {
                 return 0;
             }
 
+            // If Active Chats tab is already loaded, use its data to avoid an extra request
             if (window.requestManager && window.requestManager.currentTab === 'active-chats' && Array.isArray(window.requestManager.currentChats)) {
-                const totalActive = window.requestManager.currentChats.length;
-                this.setChatBadge(totalActive);
-                return totalActive;
+                const list = window.requestManager.currentChats;
+                const unreadTotal = list.reduce((sum, chat) => sum + (chat.unread_count || 0), 0);
+                this.setChatBadge(unreadTotal);
+                return unreadTotal;
             }
 
+            // Fallback: fetch chats and compute unread messages from API data
             const chats = await api.get(`/chats?_=${Date.now()}`);
             const list = Array.isArray(chats) ? chats : [];
-            const totalActive = list.length;
-            this.setChatBadge(totalActive);
-            return totalActive;
+            const unreadTotal = list.reduce((sum, chat) => sum + (chat.unread_count || 0), 0);
+            this.setChatBadge(unreadTotal);
+            return unreadTotal;
         } catch (error) {
             console.error('Failed to update chat badge:', error);
             return 0;

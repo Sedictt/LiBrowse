@@ -831,7 +831,10 @@ class RequestManager {
 
         const toolbarHtml = `
             <div class="chats-toolbar">
-                <button class="btn btn-ghost btn-sm" id="mark-all-chats-read-btn" ${hasUnread ? '' : 'disabled'}>
+                <button class="btn btn-ghost btn-sm"
+                        id="mark-all-chats-read-btn"
+                        ${hasUnread ? '' : 'disabled'}
+                        onclick="window.requestManager && window.requestManager.markAllChatsAsRead && window.requestManager.markAllChatsAsRead()">
                     <i class="fas fa-check-double"></i>
                     Mark all as read
                 </button>
@@ -841,12 +844,6 @@ class RequestManager {
         const listHtml = this.currentChats.map(chat => this.createChatCard(chat)).join('');
         container.innerHTML = toolbarHtml + listHtml;
 
-        // Attach handler for Mark all as read button
-        const markAllBtn = document.getElementById('mark-all-chats-read-btn');
-        if (markAllBtn && hasUnread) {
-            markAllBtn.addEventListener('click', () => this.markAllChatsAsRead());
-        }
-
         // Update badge count
         const badge = document.getElementById('chat-count');
         if (badge) badge.textContent = this.currentChats.length;
@@ -854,23 +851,28 @@ class RequestManager {
 
     async markAllChatsAsRead() {
         try {
-            if (!window.authManager || !authManager.currentUser) return;
+            // Basic UI feedback so we know the handler is firing
+            this.showToast('Marking all chats as read...', 'info');
 
             const chats = this.currentChats || [];
             const unreadChats = chats.filter(c => c.unread_count > 0);
             if (unreadChats.length === 0) return;
 
+            const userId = (window.authManager && authManager.currentUser)
+                ? authManager.currentUser.id
+                : null;
+
             let usedSocket = false;
 
             try {
-                if (typeof getSocket === 'function' && typeof isConnected === 'function') {
+                if (userId && typeof getSocket === 'function' && typeof isConnected === 'function') {
                     const socket = getSocket();
                     if (socket && isConnected()) {
                         usedSocket = true;
                         unreadChats.forEach(chat => {
                             socket.emit('mark_all_read', {
                                 chatId: chat.id,
-                                userId: authManager.currentUser.id
+                                userId: userId
                             });
                         });
                     }
