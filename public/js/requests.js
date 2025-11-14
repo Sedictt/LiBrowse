@@ -58,8 +58,9 @@ class RequestManager {
             selectAllCheckbox.addEventListener('change', (e) => this.toggleSelectAll(e.target.checked));
         }
 
-        // Note: Chat-related event listeners are set up when chat modal is opened
-        // since those elements are dynamically created
+        // Note: Chat-related event listeners in the Active Chats tab are attached
+        // after rendering, since those elements are dynamic.
+        // See renderChats() where we bind the Mark All as Read button.
     }
 
     switchTab(tab) {
@@ -826,11 +827,98 @@ class RequestManager {
             return;
         }
 
-        container.innerHTML = this.currentChats.map(chat => this.createChatCard(chat)).join('');
+        const hasUnread = this.currentChats.some(c => c.unread_count > 0);
+
+        const toolbarHtml = `
+            <div class="chats-toolbar">
+                <button class="btn btn-ghost btn-sm" id="mark-all-chats-read-btn" ${hasUnread ? '' : 'disabled'}>
+                    <i class="fas fa-check-double"></i>
+                    Mark all as read
+                </button>
+            </div>
+        `;
+
+        const listHtml = this.currentChats.map(chat => this.createChatCard(chat)).join('');
+        container.innerHTML = toolbarHtml + listHtml;
+
+        // Attach handler for Mark all as read button
+        const markAllBtn = document.getElementById('mark-all-chats-read-btn');
+        if (markAllBtn && hasUnread) {
+            markAllBtn.addEventListener('click', () => this.markAllChatsAsRead());
+        }
 
         // Update badge count
         const badge = document.getElementById('chat-count');
         if (badge) badge.textContent = this.currentChats.length;
+    }
+
+    async markAllChatsAsRead() {
+        try {
+            if (!window.authManager || !authManager.currentUser) return;
+
+            const chats = this.currentChats || [];
+            const unreadChats = chats.filter(c => c.unread_count > 0);
+            if (unreadChats.length === 0) return;
+
+            let usedSocket = false;
+
+            try {
+                if (typeof getSocket === 'function' && typeof isConnected === 'function') {
+                    const socket = getSocket();
+                    if (socket && isConnected()) {
+                        usedSocket = true;
+                        unreadChats.forEach(chat => {
+                            socket.emit('mark_all_read', {
+                                chatId: chat.id,
+                                userId: authManager.currentUser.id
+                            });
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error('Socket mark_all_read failed, falling back to HTTP:', e);
+            }
+
+            if (!usedSocket) {
+                // HTTP fallback: hitting the messages endpoint marks all as read on the server
+                const token = localStorage.getItem('token');
+                if (token) {
+                    unreadChats.forEach(chat => {
+                        fetch(`/api/chats/${chat.id}/messages?limit=1&offset=0&_=${Date.now()}`, {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            },
+                            cache: 'no-store'
+                        }).catch(() => { /* noop */ });
+                    });
+                }
+            }
+
+            // Optimistically update UI counts
+            unreadChats.forEach(chat => {
+                chat.unread_count = 0;
+            });
+            this.renderChats();
+
+            // Also refresh from server to ensure counts match DB state
+            try {
+                if (typeof this.refreshActiveChats === 'function') {
+                    const pRefresh = this.refreshActiveChats();
+                    if (pRefresh && typeof pRefresh.catch === 'function') pRefresh.catch(() => { });
+                }
+            } catch (_) { /* noop */ }
+
+            // Refresh chat badge in navbar if available
+            try {
+                if (window.app && typeof window.app.updateChatBadge === 'function') {
+                    const p = window.app.updateChatBadge();
+                    if (p && typeof p.catch === 'function') p.catch(() => { });
+                }
+            } catch (_) { /* noop */ }
+        } catch (error) {
+            console.error('Failed to mark all chats as read:', error);
+            this.showToast('Failed to mark all chats as read', 'error');
+        }
     }
 
     createChatCard(chat) {
@@ -846,9 +934,10 @@ class RequestManager {
         const timeFormatted = chat.last_message_time ? this.formatTimeAgo(chat.last_message_time) : '';
 
         const previewText = this.getChatPreviewText(chat);
+        const hasUnread = chat.unread_count > 0;
 
         return `
-            <div class="chat-card" data-chat-id="${chat.id}" onclick="requestManager.openChatById(${chat.id})">
+            <div class="chat-card ${hasUnread ? 'unread' : ''}" data-chat-id="${chat.id}" onclick="requestManager.openChatById(${chat.id})">
                 <div class="chat-avatar">${initials}</div>
                 <div class="chat-header">
                     <div class="chat-content">
@@ -857,7 +946,7 @@ class RequestManager {
                     </div>
                     <div class="chat-meta">
                         ${timeFormatted ? `<span class="chat-time">${timeFormatted}</span>` : ''}
-                        ${chat.unread_count > 0 ? `<div class="unread-badge">${chat.unread_count}</div>` : ''}
+                        ${hasUnread ? `<div class="unread-badge">${chat.unread_count}</div>` : ''}
                     </div>
                 </div>
             </div>

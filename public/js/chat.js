@@ -65,6 +65,7 @@ class ChatManager {
         // Listen for chat events
         this.socket.on('new_message', (data) => this.handleNewMessage(data));
         this.socket.on('message_read', (data) => this.handleMessageRead(data));
+        this.socket.on('all_messages_read', (data) => this.handleAllMessagesRead(data));
         this.socket.on('user_typing', (data) => this.handleUserTyping(data));
         this.socket.on('user_online', (data) => this.handleUserOnline(data));
         this.socket.on('joined_chat', (data) => this.handleJoinedChat(data));
@@ -323,6 +324,15 @@ class ChatManager {
             }
 
             const data = await response.json();
+
+            // Server marks incoming messages as read when this endpoint is hit.
+            // Ensure the Active Chats list reflects this even if sockets are unavailable.
+            try {
+                if (window.requestManager && typeof window.requestManager.refreshActiveChats === 'function') {
+                    const p = window.requestManager.refreshActiveChats();
+                    if (p && typeof p.catch === 'function') p.catch(() => {});
+                }
+            } catch (_) { /* noop */ }
 
             if (offset === 0) {
                 this.messages = data.messages;
@@ -848,11 +858,34 @@ class ChatManager {
     handleMessageRead(data) {
         if (parseInt(data.chatId) !== parseInt(this.currentChatId)) return;
 
-        // Update message read status
+        // Update message read status for the specific message
         const message = this.messages.find(m => m.id === data.messageId);
         if (message) {
             message.is_read = true;
             message.read_at = data.readAt;
+            this.renderMessages();
+        }
+    }
+
+    handleAllMessagesRead(data) {
+        if (!data || parseInt(data.chatId) !== parseInt(this.currentChatId)) return;
+
+        const currentUserId = (window.authManager && authManager.currentUser)
+            ? authManager.currentUser.id
+            : null;
+
+        // Only update if the other user read our messages
+        if (!currentUserId || data.readBy === currentUserId) return;
+
+        let changed = false;
+        this.messages.forEach(m => {
+            if (m.sender_id === currentUserId && !m.is_read) {
+                m.is_read = true;
+                changed = true;
+            }
+        });
+
+        if (changed) {
             this.renderMessages();
         }
     }
@@ -909,7 +942,7 @@ class ChatManager {
             // Ensure auth
             if (!localStorage.getItem('token')) return;
 
-            const resp = await fetch(`/api/chats/${data.chatId}/messages?limit=1&offset=0&_=${Date.now()}`, {
+            const resp = await fetch(`/api/chats/${data.chatId}/messages?limit=1&offset=0&markRead=0&_=${Date.now()}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
                 cache: 'no-store'
             });
@@ -1382,6 +1415,14 @@ class ChatManager {
                 chatId: this.currentChatId
             });
         }
+
+        // After closing, refresh the Active Chats list so unread highlighting matches
+        try {
+            if (window.requestManager && typeof window.requestManager.refreshActiveChats === 'function') {
+                const p = window.requestManager.refreshActiveChats();
+                if (p && typeof p.catch === 'function') p.catch(() => {});
+            }
+        } catch (_) { /* noop */ }
 
         this.currentChatId = null;
         this.currentChatInfo = null;

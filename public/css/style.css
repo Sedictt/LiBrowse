@@ -7229,6 +7229,15 @@ body {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
+.chats-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-xl);
+    background: rgba(0, 0, 0, 0.25);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
 .chat-card {
     background: transparent;
     backdrop-filter: none;
@@ -7246,6 +7255,20 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
+}
+
+.chat-card.unread {
+    background: rgba(102, 126, 234, 0.16);
+    border-bottom-color: rgba(102, 126, 234, 0.5);
+}
+
+.chat-card.unread h4 {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.chat-card.unread .chat-last-message {
+    color: var(--text-primary);
 }
 
 .chat-card:last-child {

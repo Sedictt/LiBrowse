@@ -126,6 +126,8 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
         const { chatId } = req.params;
         const limit = parseInt(req.query.limit) || 50;
         const offset = parseInt(req.query.offset) || 0;
+        const markReadParam = req.query.markRead;
+        const shouldMarkRead = (markReadParam === undefined || markReadParam === '1');
         
         const connection = await getConnection();
 
@@ -162,12 +164,14 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
             LIMIT ? OFFSET ?
         `, [chatId, limit, offset]);
 
-        // Mark unread messages as read
-        await connection.execute(`
-            UPDATE chat_messages
-            SET is_read = 1, read_at = NOW()
-            WHERE chat_id = ? AND sender_id != ? AND is_read = 0
-        `, [chatId, userId]);
+        // Mark unread messages as read (only when requested)
+        if (shouldMarkRead) {
+            await connection.execute(`
+                UPDATE chat_messages
+                SET is_read = 1, read_at = NOW()
+                WHERE chat_id = ? AND sender_id != ? AND is_read = 0
+            `, [chatId, userId]);
+        }
 
         connection.release();
 
