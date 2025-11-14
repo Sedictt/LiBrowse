@@ -6,6 +6,7 @@ const router = express.Router();
 const { getOne, executeQuery } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const ocrService = require('../services/ocrService_enhanced');
+const NotificationHelper = require('../services/notificationHelper');
 
 // Generate OTP
 function generateOTP() {
@@ -245,7 +246,7 @@ const upload = multer({
     }
 });
 
-// Upload and verify documents with OCR
+// Upload and verify documents with OCR (now processed asynchronously in background)
 router.post('/upload-documents',
     authenticateToken,
     upload.fields([
@@ -277,129 +278,39 @@ router.post('/upload-documents',
                 });
             }
 
-            const fullName = `${userInfo.fname} ${userInfo.lname}`;
-
-            // Process front ID
             const frontIdPath = files.frontId[0].path;
-            console.log(`Processing front ID for user ${user.id}: ${frontIdPath}`);
+            const backIdPath = files.backId && files.backId[0] ? files.backId[0].path : null;
+            console.log(`Queuing OCR processing for user ${user.id}: front=${frontIdPath}, back=${backIdPath}`);
 
-            const frontResult = await ocrService.processDocument(frontIdPath, {
-                student_id: userInfo.student_no,
-                full_name: fullName,
-                email: userInfo.email
-            });
-
-            // Process back ID if provided
-            let backResult = null;
-            if (files.backId && files.backId[0]) {
-                const backIdPath = files.backId[0].path;
-                console.log(`Processing back ID for user ${user.id}: ${backIdPath}`);
-
-                backResult = await ocrService.processDocument(backIdPath, {
-                    student_id: userInfo.student_no,
-                    full_name: fullName,
-                    email: userInfo.email
-                });
-            }
-
-            // Calculate combined confidence
-            const combinedConfidence = backResult
-                ? Math.max(frontResult.confidence, backResult.confidence)
-                : frontResult.confidence;
-
-            // Strict rule: verify only if BOTH name and student ID match
-            const frontStrict = !!(frontResult?.extractedInfo?.matches?.name && frontResult?.extractedInfo?.matches?.studentId);
-            const backStrict = !!(backResult?.extractedInfo?.matches?.name && backResult?.extractedInfo?.matches?.studentId);
-            const strictMatch = frontStrict || backStrict;
-
-            // Collect failure reasons from the best result
-            const bestAuthResult = backResult && backResult.confidence > frontResult.confidence ? backResult : frontResult;
-            const authFailureReasons = bestAuthResult.failureReasons || [];
-
-            const autoApproved = strictMatch;
-            const verificationStatus = autoApproved ? 'verified' : 'pending_review';
-
-            // Store verification record in database
-            const verificationResult = await executeQuery(`
-                INSERT INTO verification_documents (
-                    user_id,
-                    front_id_path,
-                    back_id_path,
-                    front_ocr_text,
-                    back_ocr_text,
-                    front_extracted_info,
-                    back_extracted_info,
-                    front_confidence,
-                    back_confidence,
-                    combined_confidence,
-                    status,
-                    auto_approved,
-                    processed_at,
-                    created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-            `, [
-                user.id,
-                frontIdPath,
-                files.backId ? files.backId[0].path : null,
-                frontResult.extractedText || null,
-                backResult ? backResult.extractedText : null,
-                JSON.stringify(frontResult.extractedInfo || {}),
-                backResult ? JSON.stringify(backResult.extractedInfo || {}) : null,
-                frontResult.confidence || 0,
-                backResult ? backResult.confidence : null,
-                combinedConfidence,
-                verificationStatus,
-                autoApproved ? 1 : 0
-            ]);
-
-            // Update user verification status
-            try {
-                await executeQuery(
-                    "UPDATE users SET verification_status = ?, verification_method = ?, is_verified = CASE WHEN ? OR email_verified = 1 THEN 1 ELSE 0 END, modified = NOW() WHERE id = ?",
-                    [verificationStatus, 'document_upload', autoApproved ? 1 : 0, user.id]
-                );
-            } catch (e) {
-                const msg = (e && (e.sqlMessage || e.message || '')).toLowerCase();
-                if (e && e.code === 'ER_BAD_FIELD_ERROR' && msg.includes('email_verified')) {
-                    // Fallback when email_verified column is absent: base is_verified only on document auto-approval
-                    await executeQuery(
-                        "UPDATE users SET verification_status = ?, verification_method = ?, is_verified = CASE WHEN ? THEN 1 ELSE 0 END, modified = NOW() WHERE id = ?",
-                        [verificationStatus, 'document_upload', autoApproved ? 1 : 0, user.id]
-                    );
-                } else {
-                    throw e;
-                }
-            }
-
-            // Generate appropriate message
-            let authMessage;
-            if (autoApproved) {
-                authMessage = 'Documents verified successfully! Your account is now verified.';
-            } else {
-                if (authFailureReasons.length > 0) {
-                    authMessage = `Verification pending: ${authFailureReasons.join(' ')}`;
-                } else {
-                    authMessage = 'Documents uploaded successfully. Admin review is in progress.';
-                }
-            }
-
-            // Send response
+            // Respond immediately so the frontend isn't blocked by OCR duration
             res.json({
                 success: true,
-                message: authMessage,
-                verificationId: verificationResult.insertId,
-                combinedConfidence: combinedConfidence,
-                autoApproved: autoApproved,
-                requiresReview: !autoApproved,
-                status: verificationStatus,
-                failureReasons: authFailureReasons,
-                confidenceDetails: bestAuthResult.confidenceDetails
+                status: 'queued',
+                message: 'Documents uploaded. We\'ll notify you once processing is complete.'
+            });
+
+            // Run OCR + verification in background (fire-and-forget)
+            (async () => {
+                await runOcrAndFinalizeVerification({
+                    user,
+                    userInfo,
+                    frontIdPath,
+                    backIdPath
+                });
+            })().catch(err => {
+                console.error('Background OCR job crashed:', err);
+                // Best-effort: notify user of failure
+                if (user && user.id) {
+                    NotificationHelper.notifyVerificationFailure(user.id, err.message).catch(e => {
+                        console.error('Failed to send verification failure notification:', e);
+                    });
+                }
             });
 
         } catch (error) {
             console.error('Document upload error:', error);
 
-            // Clean up uploaded files on error
+            // Clean up uploaded files on error (only if response not yet sent)
             if (req.files) {
                 const filesToClean = [];
                 if (req.files.frontId) filesToClean.push(req.files.frontId[0].path);
@@ -414,13 +325,129 @@ router.post('/upload-documents',
                 }
             }
 
-            res.status(500).json({
+            return res.status(500).json({
                 success: false,
-                message: 'Document processing failed',
+                message: 'Document upload failed',
                 error: error.message
             });
         }
     }
 );
+
+// Background OCR + verification job handler
+async function runOcrAndFinalizeVerification({ user, userInfo, frontIdPath, backIdPath }) {
+    try {
+        const fullName = `${userInfo.fname} ${userInfo.lname}`;
+
+        // Process front ID
+        console.log(`Processing front ID for user ${user.id}: ${frontIdPath}`);
+        const frontResult = await ocrService.processDocument(frontIdPath, {
+            student_id: userInfo.student_no,
+            full_name: fullName,
+            email: userInfo.email
+        });
+
+        // Process back ID if provided
+        let backResult = null;
+        if (backIdPath) {
+            console.log(`Processing back ID for user ${user.id}: ${backIdPath}`);
+            backResult = await ocrService.processDocument(backIdPath, {
+                student_id: userInfo.student_no,
+                full_name: fullName,
+                email: userInfo.email
+            });
+        }
+
+        // Calculate combined confidence
+        const combinedConfidence = backResult
+            ? Math.max(frontResult.confidence, backResult.confidence)
+            : frontResult.confidence;
+
+        // Strict rule: verify only if BOTH name and student ID match
+        const frontStrict = !!(frontResult?.extractedInfo?.matches?.name && frontResult?.extractedInfo?.matches?.studentId);
+        const backStrict = !!(backResult?.extractedInfo?.matches?.name && backResult?.extractedInfo?.matches?.studentId);
+        const strictMatch = frontStrict || backStrict;
+
+        // Collect failure reasons from the best result
+        const bestAuthResult = backResult && backResult.confidence > frontResult.confidence ? backResult : frontResult;
+        const authFailureReasons = bestAuthResult.failureReasons || [];
+
+        const autoApproved = strictMatch;
+        const verificationStatus = autoApproved ? 'verified' : 'pending_review';
+
+        // Store verification record in database
+        const verificationResult = await executeQuery(`
+            INSERT INTO verification_documents (
+                user_id,
+                front_id_path,
+                back_id_path,
+                front_ocr_text,
+                back_ocr_text,
+                front_extracted_info,
+                back_extracted_info,
+                front_confidence,
+                back_confidence,
+                combined_confidence,
+                status,
+                auto_approved,
+                processed_at,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        `, [
+            user.id,
+            frontIdPath,
+            backIdPath || null,
+            frontResult.extractedText || null,
+            backResult ? backResult.extractedText : null,
+            JSON.stringify(frontResult.extractedInfo || {}),
+            backResult ? JSON.stringify(backResult.extractedInfo || {}) : null,
+            frontResult.confidence || 0,
+            backResult ? backResult.confidence : null,
+            combinedConfidence,
+            verificationStatus,
+            autoApproved ? 1 : 0
+        ]);
+
+        // Update user verification status
+        try {
+            await executeQuery(
+                "UPDATE users SET verification_status = ?, verification_method = ?, is_verified = CASE WHEN ? OR email_verified = 1 THEN 1 ELSE 0 END, modified = NOW() WHERE id = ?",
+                [verificationStatus, 'document_upload', autoApproved ? 1 : 0, user.id]
+            );
+        } catch (e) {
+            const msg = (e && (e.sqlMessage || e.message || '')).toLowerCase();
+            if (e && e.code === 'ER_BAD_FIELD_ERROR' && msg.includes('email_verified')) {
+                // Fallback when email_verified column is absent: base is_verified only on document auto-approval
+                await executeQuery(
+                    "UPDATE users SET verification_status = ?, verification_method = ?, is_verified = CASE WHEN ? THEN 1 ELSE 0 END, modified = NOW() WHERE id = ?",
+                    [verificationStatus, 'document_upload', autoApproved ? 1 : 0, user.id]
+                );
+            } else {
+                throw e;
+            }
+        }
+
+        // Notify user via in-app notification (and email if you extend EmailService)
+        await NotificationHelper.notifyVerificationResult(user.id, {
+            verificationId: verificationResult.insertId,
+            autoApproved,
+            verificationStatus,
+            failureReasons: authFailureReasons
+        });
+
+        console.log(`OCR verification completed for user ${user.id} with status ${verificationStatus}`);
+
+    } catch (error) {
+        console.error('Background OCR processing error:', error);
+        if (user && user.id) {
+            await NotificationHelper.notifyVerificationFailure(user.id, error.message).catch(e => {
+                console.error('Failed to send verification failure notification:', e);
+            });
+        }
+        // Do not rethrow; this is a background job
+    }
+}
+
+module.exports = router;
 
 module.exports = router;

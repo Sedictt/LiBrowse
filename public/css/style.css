@@ -4348,11 +4348,17 @@ body {
     background: rgba(255, 255, 255, 0.05);
     border-radius: var(--radius-sm);
     position: relative;
+    width: 100%;
+    height: auto;
+    border: none; /* override generic .file-preview border/size */
 }
 
 .verification-form .file-preview img {
     border-radius: var(--radius-xs);
     object-fit: cover;
+    width: 80px;
+    height: 60px;
+    flex-shrink: 0;
 }
 
 .verification-form .file-info {

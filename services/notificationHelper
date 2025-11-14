@@ -184,6 +184,64 @@ class NotificationHelper {
 
         connection.release();
     }
+
+    /**
+     * Notify user about verification completion (OCR ID verification)
+     */
+    static async notifyVerificationResult(userId, { verificationId, autoApproved, verificationStatus, failureReasons }) {
+        const connection = await getConnection();
+
+        const title = autoApproved
+            ? 'ID Verification Successful'
+            : 'ID Verification Pending Review';
+
+        const body = {
+            message: autoApproved
+                ? 'Your student ID was verified successfully. Your account is now verified.'
+                : (Array.isArray(failureReasons) && failureReasons.length
+                    ? `Verification pending: ${failureReasons.join(' ')}`
+                    : 'Your documents were processed. Admin review is in progress.'),
+            status: verificationStatus,
+            autoApproved: !!autoApproved,
+            failureReasons: failureReasons || []
+        };
+
+        await connection.execute(`
+            INSERT INTO notifications
+            (user_id, title, body, category, related_id, is_read)
+            VALUES (?, ?, ?, 'system', ?, FALSE)
+        `, [
+            userId,
+            title,
+            JSON.stringify(body),
+            verificationId || 0
+        ]);
+
+        connection.release();
+    }
+
+    /**
+     * Notify user about verification failure (when OCR job itself fails)
+     */
+    static async notifyVerificationFailure(userId, errorMessage) {
+        const connection = await getConnection();
+
+        const body = {
+            message: 'We could not process your documents. Please upload clearer photos and try again.',
+            error: errorMessage || null
+        };
+
+        await connection.execute(`
+            INSERT INTO notifications
+            (user_id, title, body, category, related_id, is_read)
+            VALUES (?, 'ID Verification Failed', ?, 'system', NULL, FALSE)
+        `, [
+            userId,
+            JSON.stringify(body)
+        ]);
+
+        connection.release();
+    }
 }
 
 module.exports = NotificationHelper;

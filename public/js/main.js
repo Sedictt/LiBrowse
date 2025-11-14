@@ -975,6 +975,10 @@ class App {
                             <i class="fas fa-clock"></i>
                             <span>Email verification is usually instant</span>
                         </div>
+                        <div class="tip-item">
+                            <i class="fas fa-bell"></i>
+                            <span>We9ll notify you in Notifications when document verification is complete</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1693,7 +1697,7 @@ class App {
         reader.onload = (e) => {
             previewContainer.innerHTML = `
                 <div class="file-preview">
-                    <img src="${e.target.result}" alt="${side} preview" style="max-width: 200px; max-height: 150px; border-radius: 4px;">
+                    <img src="${e.target.result}" alt="${side} preview">
                     <div class="file-info">
                         <span class="file-name">${file.name}</span>
                         <span class="file-size">${this.formatFileSize(file.size)}</span>
@@ -1766,7 +1770,7 @@ class App {
                 formData.append('backId', this.profileSelectedFiles.back);
             }
 
-            this.profileDebugLog('🚀 Starting OCR processing...');
+            this.profileDebugLog('🚀 Starting OCR processing (queued)...');
             this.profileDebugLog('📤 Uploading documents to server...');
 
             const response = await fetch('/api/verification/upload-documents', {
@@ -1781,11 +1785,20 @@ class App {
 
             const result = await response.json();
 
-            if (result.success) {
-                this.handleProfileVerificationSuccess(result);
-            } else {
+            if (!response.ok || !result.success) {
                 throw new Error(result.message || 'Verification failed');
             }
+
+            // New async behavior: treat successful response as a queued OCR job
+            if (result.status === 'queued') {
+                showToast(result.message || 'Documents uploaded. We\'ll notify you once processing is complete.', 'info');
+                this.profileDebugLog('⏳ OCR processing queued on server. Waiting for notification...');
+                this.clearProfileUploadForm();
+                return;
+            }
+
+            // Fallback: if backend still returns full OCR result, handle it as before
+            this.handleProfileVerificationSuccess(result);
 
         } catch (error) {
             console.error('Profile verification error:', error);
@@ -1875,11 +1888,12 @@ class App {
         if (uploadBtn) {
             uploadBtn.disabled = isUploading;
             uploadBtn.innerHTML = isUploading ?
-                '<i class="fas fa-spinner fa-spin"></i> Processing Documents...' :
+                '<i class="fas fa-spinner fa-spin"></i> Uploading documents...' :
                 '<i class="fas fa-upload"></i> Upload Documents for Verification';
         }
 
         if (progressContainer) {
+            // Show progress only during the short upload phase, not for the entire OCR time
             progressContainer.style.display = isUploading ? 'block' : 'none';
         }
     }
