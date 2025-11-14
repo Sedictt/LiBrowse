@@ -1198,6 +1198,12 @@ body {
     gap: var(--spacing-lg);
 }
 
+.section-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
 .section-title {
     font-size: 2.5rem;
     font-weight: 700;
@@ -1205,6 +1211,11 @@ body {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+}
+
+.section-subtitle {
+    font-size: 0.9rem;
+    color: var(--text-muted);
 }
 
 /* Search and Filters */
@@ -1354,8 +1365,8 @@ body {
 .section-title-group {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--spacing-lg);
+    align-items: flex-start;
+    /*! margin-bottom: var(--spacing-lg); */
 }
 
 .monitoring-controls {
@@ -2749,7 +2760,7 @@ body {
 .notification-tabs {
     display: flex;
     gap: var(--spacing-xs);
-    margin-bottom: var(--spacing-xl);
+    /*! margin-bottom: var(--spacing-xl); */
     background: var(--bg-glass);
     padding: var(--spacing-xs);
     border-radius: var(--radius-lg);
@@ -10080,6 +10091,32 @@ body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* Reuse notification tabs in the full notifications page header */
+#notifications-section .notification-tabs {
+    padding: 4px 0;
+    border-bottom: none;
+}
+
+.notification-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-direction: column;
+}
+
+.badge-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    padding: 0 6px;
+    margin-left: 4px;
+    font-size: 0.75rem;
+    border-radius: 999px;
+    background: var(--error);
+    color: #fff;
+}
+
 .notification-tab {
     flex: 1;
     padding: 8px 16px;
@@ -10103,11 +10140,25 @@ body {
     color: #667eea;
 }
 
-/* Notification List */
+/* Notification List (dropdown) */
 .notification-list {
     flex: 1;
     overflow-y: auto;
     max-height: 400px;
+}
+
+/* Notifications page list */
+.notifications-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.notifications-list .notification-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    cursor: pointer;
 }
 
 .notification-list::-webkit-scrollbar {

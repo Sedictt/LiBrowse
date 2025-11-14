@@ -897,15 +897,33 @@
             </div>
         </section>
 
-        <!-- Notifications Section (Hidden for now) -->
+        <!-- Notifications Section -->
         <section id="notifications-section" class="section" style="display: none;">
             <div class="container">
                 <div class="section-header">
-                    <h2 class="section-title">Notifications</h2>
-                    <button class="btn btn-outline" id="mark-all-read">
-                        <i class="fas fa-check-double"></i>
-                        Mark All Read
-                    </button>
+                    <div class="section-title-group">
+                        <h2 class="section-title">Notifications</h2>
+                        <p id="notifications-subtitle" class="section-subtitle">
+                            Stay up to date with your requests, reminders, and account updates.
+                        </p>
+                    </div>
+                    <div class="notification-header-actions">
+                        <div class="notification-tabs">
+                            <button class="notification-tab active" data-filter="all">
+                                <i class="fas fa-inbox"></i>
+                                <span>All</span>
+                            </button>
+                            <button class="notification-tab" data-filter="unread">
+                                <i class="fas fa-envelope-open"></i>
+                                <span>Unread</span>
+                                <span id="notifications-unread-pill" class="badge-pill">0</span>
+                            </button>
+                        </div>
+                        <button class="btn btn-outline" id="mark-all-read">
+                            <i class="fas fa-check-double"></i>
+                            Mark All Read
+                        </button>
+                    </div>
                 </div>
                 <div class="notifications-list" id="notifications-list">
                     <!-- Notifications will be loaded here -->

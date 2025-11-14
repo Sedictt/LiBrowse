@@ -2,6 +2,7 @@
 class App {
     constructor() {
         this.currentSection = 'home';
+        this.notificationsFilter = 'all'; // all | unread
         this.init();
     }
 
@@ -156,6 +157,20 @@ class App {
                 } catch (e) {
                     console.error('Failed to mark all as read:', e);
                 }
+            });
+        }
+
+        // Notifications filter tabs (All / Unread)
+        const notificationTabs = document.querySelectorAll('.notification-tab[data-filter]');
+        if (notificationTabs && notificationTabs.length) {
+            notificationTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const filter = tab.getAttribute('data-filter') || 'all';
+                    this.notificationsFilter = filter;
+                    notificationTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    this.loadNotifications();
+                });
             });
         }
 
@@ -1262,13 +1277,38 @@ class App {
     async loadNotifications() {
         if (!authManager.isAuthenticated) return;
 
+        const container = document.getElementById('notifications-list');
+        if (container) {
+            container.innerHTML = `
+                <div class="notification-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading notifications...</p>
+                </div>
+            `;
+        }
+
         try {
-            const resp = await api.getNotifications(false, 20, 0);
+            const filter = this.notificationsFilter || 'all';
+            const unreadOnly = filter === 'unread';
+            const resp = await api.getNotifications(unreadOnly, 20, 0);
             const list = Array.isArray(resp?.notifications) ? resp.notifications : (Array.isArray(resp) ? resp : []);
+            const totalUnread = typeof resp?.unreadCount === 'number'
+                ? resp.unreadCount
+                : (Array.isArray(list) ? list.filter(n => !n.is_read).length : 0);
+
             this.renderNotifications(list);
-            this.updateNotificationBadge(list);
+            this.updateNotificationBadge(list, totalUnread);
+            this.updateNotificationsHeader(totalUnread);
         } catch (error) {
             console.error('Failed to load notifications:', error);
+            if (container) {
+                container.innerHTML = `
+                    <div class="notification-empty">
+                        <i class="fas fa-bell-slash"></i>
+                        <p>Failed to load notifications. Please try again.</p>
+                    </div>
+                `;
+            }
         }
     }
 
@@ -1278,10 +1318,9 @@ class App {
 
         if (!notifications || notifications.length === 0) {
             notificationsList.innerHTML = `
-                <div class="empty-state">
+                <div class="notification-empty">
                     <i class="fas fa-bell"></i>
-                    <h3>No notifications</h3>
-                    <p>You're all caught up!</p>
+                    <p>You're all caught up! No new notifications.</p>
                 </div>
             `;
             return;
@@ -1326,13 +1365,15 @@ class App {
         return icons[type] || 'bell';
     }
 
-    updateNotificationBadge(notifications) {
+    updateNotificationBadge(notifications, unreadCountOverride) {
         const badge = document.getElementById('notification-badge');
         if (!badge) return;
 
-        const unreadCount = Array.isArray(notifications)
-            ? notifications.filter(n => !n.is_read).length
-            : 0;
+        let unreadCount = typeof unreadCountOverride === 'number'
+            ? unreadCountOverride
+            : (Array.isArray(notifications)
+                ? notifications.filter(n => !n.is_read).length
+                : 0);
 
         // Keep badge text in sync
         badge.textContent = unreadCount;
@@ -1347,6 +1388,23 @@ class App {
                 badge.classList.add('active');
             } else {
                 badge.classList.remove('active');
+            }
+        }
+    }
+
+    updateNotificationsHeader(unreadCount) {
+        const pill = document.getElementById('notifications-unread-pill');
+        if (pill) {
+            pill.textContent = unreadCount;
+            pill.style.display = unreadCount > 0 ? 'inline-flex' : 'none';
+        }
+
+        const subtitle = document.getElementById('notifications-subtitle');
+        if (subtitle) {
+            if (unreadCount > 0) {
+                subtitle.textContent = `You have ${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}.`;
+            } else {
+                subtitle.textContent = 'You are all caught up. New notifications will appear here.';
             }
         }
     }
