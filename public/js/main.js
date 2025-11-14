@@ -919,7 +919,7 @@ class App {
                                     <div class="progress-bar">
                                         <div id="profile-upload-progress-bar" class="progress-fill"></div>
                                     </div>
-                                    <div class="progress-text" id="profile-upload-progress-text">Uploading...</div>
+                                    <div class="progress-text" id="profile-upload-progress-text">This may take a few seconds...</div>
                                 </div>
                             </div>
 
