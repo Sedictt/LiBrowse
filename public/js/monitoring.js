@@ -13,8 +13,24 @@ class MonitoringManager {
 
         try {
             const data = await api.getTransactions();
+
+            // DEBUG: Check what data we're getting
+            console.log('=== MONITORING DEBUG ===');
+            console.log('Data:', data);
+            console.log('Transactions:', data?.transactions);
+            console.log('Length:', data?.transactions?.length);
+            console.log('========================');
+
             // Backend returns {transactions: [...]}
-            const transactions = data.transactions || data || [];
+            let transactions = data.transactions || data || [];
+
+            // Add other_user_name to each transaction
+            const currentUserId = authManager.getCurrentUser()?.id;
+            transactions = transactions.map(t => ({
+                ...t,
+                other_user_name: t.borrower_id === currentUserId ? t.lender_name : t.borrower_name
+            }));
+
             this.categorizeTransactions(transactions);
             this.renderTransactions();
         } catch (error) {
@@ -127,28 +143,28 @@ class MonitoringManager {
         // Approved status - lender can mark as picked up
         if (transaction.status === 'approved' && isLender) {
             actionButtons += `
-            <button class="btn btn-primary btn-sm" onclick="monitoringManager.markAsBorrowed(${transaction.id})">
-                <i class="fas fa-hand-holding"></i> Mark as Picked Up
-            </button>
-        `;
+        <button class="btn btn-primary btn-sm" onclick="monitoringManager.markAsBorrowed(${transaction.id})">
+            <i class="fas fa-hand-holding"></i> Mark as Picked Up
+        </button>
+    `;
         }
 
         // Borrowed/ongoing status - borrower can mark as returned
         if (transaction.status === 'borrowed' && isBorrower) {
             actionButtons += `
-            <button class="btn btn-primary btn-sm" onclick="monitoringManager.markAsReturned(${transaction.id})">
-                <i class="fas fa-undo"></i> Mark as Returned
-            </button>
-        `;
+        <button class="btn btn-primary btn-sm" onclick="monitoringManager.markAsReturned(${transaction.id})">
+            <i class="fas fa-undo"></i> Mark as Returned
+        </button>
+    `;
         }
 
         // Returned status - lender can mark as complete
         if (transaction.status === 'returned' && isLender) {
             actionButtons += `
-            <button class="btn btn-success btn-sm" onclick="monitoringManager.markAsCompleted(${transaction.id})">
-                <i class="fas fa-check-circle"></i> Mark as Complete
-            </button>
-        `;
+        <button class="btn btn-success btn-sm" onclick="monitoringManager.markAsCompleted(${transaction.id})">
+            <i class="fas fa-check-circle"></i> Mark as Complete
+        </button>
+    `;
         }
 
         // Show feedback button or "Already Given" badge
@@ -156,37 +172,36 @@ class MonitoringManager {
             if (transaction.user_gave_feedback && transaction.user_gave_feedback > 0) {
                 // Already gave feedback - show badge
                 actionButtons += `
-            <span class="feedback-given-badge">
-                <i class="fas fa-check-circle"></i> Feedback Given
-            </span>
-        `;
+        <span class="feedback-given-badge">
+            <i class="fas fa-check-circle"></i> Feedback Given
+        </span>
+    `;
             } else {
                 // Can still give feedback - show button
                 actionButtons += `
-            <button class="btn btn-primary btn-sm" onclick="monitoringManager.showFeedbackModal(${transaction.id}, '${escapeHtml(transaction.book_title)}', '${transaction.type}')">
-               <i class="fas fa-star"></i> Give Feedback
-             </button>
-        `;
+        <button class="btn btn-primary btn-sm" onclick="monitoringManager.showFeedbackModal(${transaction.id}, '${escapeHtml(transaction.book_title)}', '${transaction.type}')">
+           <i class="fas fa-star"></i> Give Feedback
+         </button>
+    `;
             }
         }
 
-
         return `
-        <div class="transaction-card">
-            <div class="transaction-info">
-                <h4>${escapeHtml(transaction.book_title)}</h4>
-                <p>With: ${escapeHtml(transaction.other_user_name)}</p>
-                <span>${formatDate(transaction.created_at)}</span>
-                ${transaction.due_date ? `<span>Due: ${formatDate(transaction.due_date)}</span>` : ''}
-            </div>
-            <div class="transaction-actions">
-                ${actionButtons}
-                <button class="btn btn-outline btn-sm" onclick="monitoringManager.viewTransaction(${transaction.id})">
-                    <i class="fas fa-eye"></i> View
-                </button>
-            </div>
+    <div class="transaction-card">
+        <div class="transaction-info">
+            <h4>${escapeHtml(transaction.book_title)}</h4>
+            <p>With: ${escapeHtml(transaction.other_user_name)}</p>
+            <span>${formatDate(transaction.created || transaction.request_date)}</span>
+            ${transaction.expected_return_date ? `<span>Due: ${formatDateTime(transaction.expected_return_date)}</span>` : ''}
         </div>
-    `;
+        <div class="transaction-actions">
+            ${actionButtons}
+            <button class="btn btn-outline btn-sm" onclick="monitoringManager.viewTransaction(${transaction.id})">
+                <i class="fas fa-eye"></i> View
+            </button>
+        </div>
+    </div>
+`;
     }
 
 
@@ -373,10 +388,24 @@ class MonitoringManager {
         const completedBadge = document.querySelector('[data-tab="completed"] .badge');
         const overdueBadge = document.querySelector('[data-tab="overdue"] .badge');
 
+        // DEBUG
+        console.log('=== BADGES DEBUG ===');
+        console.log('Active badge element:', activeBadge);
+        console.log('Active transactions count:', this.activeTransactions.length);
+        console.log('Active transactions:', this.activeTransactions);
+        console.log('====================');
+
         if (activeBadge) activeBadge.textContent = this.activeTransactions.length;
         if (pendingBadge) pendingBadge.textContent = this.pendingFeedback.length;
         if (completedBadge) completedBadge.textContent = this.completedTransactions.length;
         if (overdueBadge) overdueBadge.textContent = this.overdueTransactions.length;
+
+        // **ADD THIS** - Update main nav badge
+        const navBadge = document.getElementById('monitoring-badge');
+        if (navBadge) {
+            const totalActive = this.activeTransactions.length + this.pendingFeedback.length;
+            navBadge.textContent = totalActive;
+        }
     }
 
     giveFeedback(transactionId) {
