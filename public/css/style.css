@@ -2182,6 +2182,11 @@ body {
     color: #ff4d4f;
     font-size: 0.85rem;
     margin-top: 4px;
+    display: none;
+    min-height: 0;
+}
+
+.error-message:not(:empty) {
     display: block;
 }
 
