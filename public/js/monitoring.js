@@ -191,7 +191,6 @@ class MonitoringManager {
         <div class="transaction-info">
             <h4>${escapeHtml(transaction.book_title)}</h4>
             <p>With: ${escapeHtml(transaction.other_user_name)}</p>
-            <span>${formatDate(transaction.created || transaction.request_date)}</span>
             ${transaction.expected_return_date ? `<span>Due: ${formatDateTime(transaction.expected_return_date)}</span>` : ''}
         </div>
         <div class="transaction-actions">
@@ -520,7 +519,7 @@ class MonitoringManager {
                             <div class="timeline-icon">📅</div>
                             <div class="timeline-content">
                                 <div class="timeline-title">Expected Return Date</div>
-                                <div class="timeline-date">${formatDate(response.expected_return_date)}</div>
+                                <div class="timeline-date">${formatDateTime(response.expected_return_date)}</div>
                             </div>
                         </div>
                     ` : ''}
