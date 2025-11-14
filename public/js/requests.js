@@ -590,6 +590,14 @@ class RequestManager {
             this.selectedRequests.delete(requestId);
             this.loadRequests();
 
+            // Update monitoring badge in navbar so monitoring count reflects new active transaction
+            try {
+                if (window.app && typeof window.app.updateMonitoringBadge === 'function') {
+                    const p = window.app.updateMonitoringBadge();
+                    if (p && typeof p.catch === 'function') p.catch(() => { });
+                }
+            } catch (_) { }
+
             // Refresh books list to update availability status
             if (window.booksManager) {
                 await window.booksManager.loadBooks(true);
@@ -617,6 +625,14 @@ class RequestManager {
             this.showToast('Request rejected', 'info');
             this.selectedRequests.delete(requestId);
             this.loadRequests();
+
+            // Update monitoring badge in navbar so monitoring count reflects latest active/pending items
+            try {
+                if (window.app && typeof window.app.updateMonitoringBadge === 'function') {
+                    const p = window.app.updateMonitoringBadge();
+                    if (p && typeof p.catch === 'function') p.catch(() => { });
+                }
+            } catch (_) { }
 
             // Refresh books list to update availability status (book becomes available again)
             if (window.booksManager) {
@@ -658,6 +674,14 @@ class RequestManager {
             this.showToast('Request cancelled successfully', 'info');
             this.closeCancelModal();
             this.loadRequests();
+
+            // Update monitoring badge in navbar since cancelling may affect monitoring counts
+            try {
+                if (window.app && typeof window.app.updateMonitoringBadge === 'function') {
+                    const p = window.app.updateMonitoringBadge();
+                    if (p && typeof p.catch === 'function') p.catch(() => { });
+                }
+            } catch (_) { }
         } catch (error) {
             console.error('Failed to cancel request:', error);
             this.showToast(error.message || 'Failed to cancel request', 'error');
@@ -688,6 +712,14 @@ class RequestManager {
             this.selectedRequests.clear();
             this.loadRequests();
 
+            // Update monitoring badge in navbar to reflect newly approved transactions
+            try {
+                if (window.app && typeof window.app.updateMonitoringBadge === 'function') {
+                    const p = window.app.updateMonitoringBadge();
+                    if (p && typeof p.catch === 'function') p.catch(() => { });
+                }
+            } catch (_) { }
+
             // Refresh books list
             if (window.booksManager) {
                 await window.booksManager.loadBooks(true);
@@ -717,6 +749,14 @@ class RequestManager {
             this.showToast(response.message, 'success');
             this.selectedRequests.clear();
             this.loadRequests();
+
+            // Update monitoring badge in navbar to reflect changes after bulk rejection
+            try {
+                if (window.app && typeof window.app.updateMonitoringBadge === 'function') {
+                    const p = window.app.updateMonitoringBadge();
+                    if (p && typeof p.catch === 'function') p.catch(() => { });
+                }
+            } catch (_) { }
 
             // Refresh books list
             if (window.booksManager) {

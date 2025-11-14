@@ -19,6 +19,8 @@ class App {
                 this.startRequestsBadgePolling();
                 await this.updateChatBadge();
                 this.startChatBadgePolling();
+                await this.updateMonitoringBadge();
+                this.startMonitoringBadgePolling();
             }
         } catch (e) {
             console.error('App initialization error:', e);
@@ -212,11 +214,14 @@ class App {
             this.startRequestsBadgePolling();
             await this.updateChatBadge();
             this.startChatBadgePolling();
+            await this.updateMonitoringBadge();
+            this.startMonitoringBadgePolling();
         });
 
         document.addEventListener('logout', () => {
             this.clearRequestsBadgePolling();
             this.clearChatBadgePolling();
+            this.clearMonitoringBadgePolling();
         });
     }
 
@@ -1354,6 +1359,54 @@ class App {
         }
     }
 
+    setMonitoringBadge(count) {
+        const navBadge = document.getElementById('monitoring-badge');
+        if (navBadge) {
+            navBadge.textContent = count;
+            navBadge.style.display = count > 0 ? 'inline' : 'none';
+        }
+    }
+
+    async updateMonitoringBadge() {
+        try {
+            if (!authManager || !authManager.isAuthenticated) {
+                this.setMonitoringBadge(0);
+                return 0;
+            }
+
+            const data = await api.getTransactions();
+            const list = Array.isArray(data?.transactions) ? data.transactions : (Array.isArray(data) ? data : []);
+
+            const activeCount = list.filter(t => t.status === 'approved' || t.status === 'borrowed').length;
+            const pendingFeedbackCount = list.filter(t => t.status === 'returned').length;
+            const totalActive = activeCount + pendingFeedbackCount;
+
+            this.setMonitoringBadge(totalActive);
+            return totalActive;
+        } catch (error) {
+            console.error('Failed to update monitoring badge:', error);
+            return 0;
+        }
+    }
+
+    startMonitoringBadgePolling() {
+        if (this._monitoringBadgeTimer) return;
+        this._monitoringBadgeTimer = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                const p = this.updateMonitoringBadge();
+                if (p && typeof p.catch === 'function') p.catch(() => { });
+            }
+        }, 30000);
+    }
+
+    clearMonitoringBadgePolling() {
+        if (this._monitoringBadgeTimer) {
+            clearInterval(this._monitoringBadgeTimer);
+            this._monitoringBadgeTimer = null;
+        }
+        this.setMonitoringBadge(0);
+    }
+
     async updateRequestsBadge() {
         try {
             if (!authManager || !authManager.isAuthenticated) {
@@ -1613,6 +1666,7 @@ class App {
         try {
             await api.updateTransactionStatus(transactionId, 'approved');
             this.loadTransactions();
+            await this.updateMonitoringBadge();
             authManager.showToast('Transaction approved!', 'success');
         } catch (error) {
             authManager.showToast(error.message, 'error');
@@ -1623,6 +1677,7 @@ class App {
         try {
             await api.updateTransactionStatus(transactionId, 'cancelled');
             this.loadTransactions();
+            await this.updateMonitoringBadge();
             authManager.showToast('Transaction rejected', 'info');
         } catch (error) {
             authManager.showToast(error.message, 'error');
