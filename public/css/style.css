@@ -8777,6 +8777,17 @@ body {
     background: var(--primary-hover);
 }
 
+/* History header actions (profile tab) */
+.history-header-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.75rem;
+}
+
+.history-header-actions .btn-text {
+    font-size: 0.85rem;
+}
+
 /* Loading State */
 .loading-state {
     display: flex;
@@ -8811,6 +8822,85 @@ body {
 
 .empty-state p {
     font-size: 0.95rem;
+}
+
+/* History Modal (full-screen list) */
+.history-modal .modal-body {
+    padding: 20px;
+}
+
+.history-modal-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.history-modal-tab {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.history-modal-tab.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.history-modal-content {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.history-modal-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.history-modal-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+    gap: 12px;
+}
+
+.history-modal-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-modal-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.history-modal-sub {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.history-modal-meta {
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.history-modal-status {
+    display: inline-block;
+    margin-bottom: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
 }
 
 /* History Item Card */

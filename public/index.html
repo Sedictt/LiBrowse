@@ -891,8 +891,8 @@
                                 </div>
                             </div>
 
+                            
                         </div>
-                    </div>
                 </div>
             </div>
         </section>
@@ -915,6 +915,32 @@
     </main>
 
     <!-- Modals -->
+
+    <!-- Borrowing & Lending History Modal -->
+    <div id="history-modal" class="modal">
+        <div class="modal-content modal-large history-modal">
+            <div class="modal-header">
+                <h3>Borrowing & Lending History</h3>
+                <button class="modal-close" data-modal="history-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="history-modal-tabs">
+                    <button class="history-modal-tab active" data-tab="all">All</button>
+                    <button class="history-modal-tab" data-tab="borrow">Borrowing</button>
+                    <button class="history-modal-tab" data-tab="lend">Lending</button>
+                </div>
+                <div id="history-modal-content" class="history-modal-content">
+                    <div class="loading-state">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading history...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Login Modal -->
     <div id="login-modal" class="modal">
         <div class="modal-content">
