@@ -16,6 +16,7 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET_KEY || '';
 const RECAPTCHA_SITE_KEY = process.env.RECAPTCHA_SITE_KEY || '';
+const PLV_EMAIL_DOMAIN = '@plv.edu.ph';
 
 async function verifyCaptcha(token) {
   // If not fully configured, allow by default (align with frontend enablement)
@@ -221,8 +222,8 @@ router.post('/register', async (req, res) => {
     }
 
     // Validate PLV email
-    if (!email.endsWith('@plv.edu.ph')) {
-      return res.status(400).json({ error: "Please use your PLV email address" });
+    if (!String(email || '').toLowerCase().endsWith(PLV_EMAIL_DOMAIN)) {
+      return res.status(400).json({ error: `Please use your PLV email address (${PLV_EMAIL_DOMAIN})` });
     }
 
     // Validate student ID format (e.g., 21-1234)
@@ -324,9 +325,9 @@ router.post("/send-otp", async (req, res) => {
     const startTs = Date.now();
     console.log(`[OTP] send-otp: request received`, { email, env: process.env.NODE_ENV });
 
-    if (!email.endsWith("@plv.edu.ph")) {
+    if (!String(email || '').toLowerCase().endsWith(PLV_EMAIL_DOMAIN)) {
       console.warn(`[OTP] send-otp: rejected non-PLV email`, { email });
-      return res.status(400).json({ error: "Must use PLV email" });
+      return res.status(400).json({ error: `Must use PLV email (${PLV_EMAIL_DOMAIN})` });
     }
 
     const user = await getOne("SELECT * FROM users WHERE email = ?", [email]);

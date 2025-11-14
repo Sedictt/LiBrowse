@@ -61,12 +61,14 @@ const checkOwnership = (resourceIdField = 'id') => {
 };
 
 // Validate PLV email domain
+const PLV_EMAIL_DOMAIN = '@plv.edu.ph';
+
 const validatePLVEmail = (req, res, next) => {
     const { email } = req.body;
     
-    if (!email || !email.endsWith('@plv.edu.ph')) {
+    if (!email || !String(email).toLowerCase().endsWith(PLV_EMAIL_DOMAIN)) {
         return res.status(400).json({ 
-            error: 'Please use your PLV email address (@plv.edu.ph)' 
+            error: `Please use your PLV email address (${PLV_EMAIL_DOMAIN})` 
         });
     }
     

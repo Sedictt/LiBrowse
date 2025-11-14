@@ -339,16 +339,17 @@ class AuthManager {
     async handleLogin(e) {
         e.preventDefault();
 
-        const email = document.getElementById('login-email').value;
+        const rawEmail = document.getElementById('login-email').value;
+        const email = typeof normalizePLVEmail === 'function' ? normalizePLVEmail(rawEmail) : rawEmail;
         const password = document.getElementById('login-password').value;
 
-        if (!email || !password) {
+        if (!rawEmail || !password) {
             this.showToast('Please fill in all fields', 'error');
             return;
         }
 
         if (!isValidPLVEmail(email)) {
-            this.showToast('Please use your PLV email address', 'error');
+            this.showToast('Please use your PLV email address (@plv.edu.ph)', 'error');
             return;
         }
 
@@ -407,10 +408,13 @@ class AuthManager {
         e.preventDefault();
         console.log('🔵 Register form submitted');
 
+        const rawEmail = document.getElementById('register-email').value;
+        const normalizedEmail = typeof normalizePLVEmail === 'function' ? normalizePLVEmail(rawEmail) : rawEmail;
+
         const formData = {
             firstname: document.getElementById('register-firstname').value,
             lastname: document.getElementById('register-lastname').value,
-            email: document.getElementById('register-email').value,
+            email: normalizedEmail,
             student_id: document.getElementById('register-student-id').value,
             program: document.getElementById('register-program').value,
             password: document.getElementById('register-password').value,
@@ -431,7 +435,7 @@ class AuthManager {
 
         if (!isValidPLVEmail(formData.email)) {
             console.log('❌ Validation failed: Invalid PLV email');
-            this.showToast('Please use your PLV email address', 'error');
+            this.showToast('Please use your PLV email address (@plv.edu.ph)', 'error');
             return;
         }
 

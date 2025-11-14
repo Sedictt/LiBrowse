@@ -121,15 +121,28 @@ function debounce(func, wait) {
     };
 }
 
+// Email domain used for all PLV accounts
+const PLV_EMAIL_DOMAIN = '@plv.edu.ph';
+
 // Validate email
 function isValidEmail(email) {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regex.test(email);
 }
 
-// Validate PLV email
+// Normalize user input to a full PLV email.
+// - If the user enters just the local part (e.g. "john.doe"), append @plv.edu.ph
+// - If they enter a full email, leave it as-is so we can validate the domain.
+function normalizePLVEmail(input) {
+    const raw = String(input || '').trim();
+    if (!raw) return '';
+    if (raw.includes('@')) return raw;
+    return `${raw}${PLV_EMAIL_DOMAIN}`;
+}
+
+// Validate PLV email (full address, including domain)
 function isValidPLVEmail(email) {
-    return email.endsWith('@plv.edu.ph');
+    return String(email || '').toLowerCase().endsWith(PLV_EMAIL_DOMAIN);
 }
 
 // Validate password strength

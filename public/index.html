@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -930,7 +930,10 @@
                     <!-- Email -->
                     <div class="form-group">
                         <label for="login-email">PLV Email</label>
-                        <input type="email" id="login-email" name="email" placeholder="your.email@plv.edu.ph" required>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <input type="text" id="login-email" name="email" placeholder="your.email" required>
+                            <span style="white-space:nowrap; color:#9ca3af; font-size:0.9rem;">@plv.edu.ph</span>
+                        </div>
                         <small id="email-error" class="error-message"></small>
                     </div>
 
@@ -1019,10 +1022,10 @@
                     <!-- Email -->
                     <div class="form-group">
                         <label for="register-email">PLV Email *</label>
-                        <input type="email" id="register-email" name="email" placeholder="your.email@plv.edu.ph"
-                            required>
-                        <small class="form-help" style="color: #fbbf24;">Must use your PLV email address
-                            (@plv.edu.ph)</small>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <input type="text" id="register-email" name="email" placeholder="your.email" required>
+                            <span style="white-space:nowrap; color:#9ca3af; font-size:0.9rem;">@plv.edu.ph</span>
+                        </div>
                     </div>
 
                     <!-- Student ID -->
