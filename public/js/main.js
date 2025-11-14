@@ -178,6 +178,29 @@ class App {
             });
         }
 
+        // Floating chat button (opens Requests → Active Chats)
+        const floatingChatBtn = document.getElementById('floating-chat-button');
+        if (floatingChatBtn) {
+            floatingChatBtn.addEventListener('click', () => {
+                if (!authManager || typeof authManager.requireAuth !== 'function' || !authManager.requireAuth()) {
+                    return;
+                }
+
+                this.navigateToSection('requests');
+
+                setTimeout(() => {
+                    try {
+                        if (window.requestManager && typeof window.requestManager.switchTab === 'function') {
+                            window.requestManager.switchTab('active-chats');
+                        } else {
+                            const tab = document.querySelector('.request-tabs .tab-btn[data-tab="active-chats"]');
+                            if (tab) tab.click();
+                        }
+                    } catch (_) { /* noop */ }
+                }, 150);
+            });
+        }
+
         // Window resize handler
         window.addEventListener('resize', this.handleResize.bind(this));
 
@@ -1356,6 +1379,12 @@ class App {
         if (badge) {
             badge.textContent = count;
         }
+
+        const floatingBadge = document.getElementById('floating-chat-badge');
+        if (floatingBadge) {
+            floatingBadge.textContent = count;
+            floatingBadge.classList.toggle('hidden', !count || count <= 0);
+        }
     }
 
     async updateChatBadge() {
@@ -1420,12 +1449,21 @@ class App {
         if (typeof window.booksManager !== 'undefined' && window.booksManager && typeof window.booksManager.loadRecentlyViewed === 'function') {
             window.booksManager.loadRecentlyViewed();
         }
+
+        const floatingChatBtn = document.getElementById('floating-chat-button');
+        if (floatingChatBtn) {
+            floatingChatBtn.classList.remove('hidden');
+        }
     }
 
     hideAuthenticatedFeatures() {
         const recentlyViewedSection = document.getElementById('recently-viewed-section');
-
         if (recentlyViewedSection) recentlyViewedSection.style.display = 'none';
+
+        const floatingChatBtn = document.getElementById('floating-chat-button');
+        if (floatingChatBtn) {
+            floatingChatBtn.classList.add('hidden');
+        }
     }
 
     updateStatsDisplay(stats) {
