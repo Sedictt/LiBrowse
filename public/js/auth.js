@@ -338,18 +338,47 @@ class AuthManager {
 
     async handleLogin(e) {
         e.preventDefault();
+        if (e && typeof e.stopImmediatePropagation === 'function') {
+            // Prevent older inline handlers (if any) from running twice
+            e.stopImmediatePropagation();
+        }
 
-        const rawEmail = document.getElementById('login-email').value;
+        const emailInput = document.getElementById('login-email');
+        const passwordInput = document.getElementById('login-password');
+        const emailError = document.getElementById('email-error');
+        const passwordError = document.getElementById('password-error');
+        if (emailError) emailError.textContent = '';
+        if (passwordError) passwordError.textContent = '';
+
+        const rawEmail = emailInput ? emailInput.value : '';
         const email = typeof normalizePLVEmail === 'function' ? normalizePLVEmail(rawEmail) : rawEmail;
-        const password = document.getElementById('login-password').value;
+        const password = passwordInput ? passwordInput.value : '';
 
-        if (!rawEmail || !password) {
+        let hasLocalError = false;
+        if (!rawEmail) {
+            if (emailError) emailError.textContent = 'Please enter your PLV email.';
+            hasLocalError = true;
+        }
+        if (!password) {
+            if (passwordError) passwordError.textContent = 'Please enter your password.';
+            hasLocalError = true;
+        }
+        if (hasLocalError) {
             this.showToast('Please fill in all fields', 'error');
+            if (!rawEmail && emailInput) {
+                emailInput.focus();
+            } else if (passwordInput) {
+                passwordInput.focus();
+            }
             return;
         }
 
         if (!isValidPLVEmail(email)) {
+            if (emailError) {
+                emailError.textContent = 'Please use your PLV email address (@plv.edu.ph).';
+            }
             this.showToast('Please use your PLV email address (@plv.edu.ph)', 'error');
+            if (emailInput) emailInput.focus();
             return;
         }
 
@@ -396,7 +425,24 @@ class AuthManager {
             }
         } catch (error) {
             console.error('Login error:', error);
-            this.showToast(error.message || 'Login failed. Please try again.', 'error');
+            const emailError = document.getElementById('email-error');
+            const passwordError = document.getElementById('password-error');
+            const msg = (error && error.message) ? error.message : 'Login failed. Please try again.';
+            const lower = msg.toLowerCase();
+
+            if (passwordError) {
+                if (lower.includes('captcha')) {
+                    passwordError.textContent = 'CAPTCHA verification failed. Please try again.';
+                } else if (lower.includes('email') && lower.includes('password')) {
+                    passwordError.textContent = 'Invalid email or password. Please double-check your PLV email and password.';
+                } else {
+                    passwordError.textContent = msg;
+                }
+            } else if (emailError) {
+                emailError.textContent = msg;
+            }
+
+            this.showToast(msg, 'error');
         } finally {
             if (window.captcha && window.captcha.enabled) {
                 window.captcha.reset('login');
@@ -406,9 +452,22 @@ class AuthManager {
 
     async handleRegister(e) {
         e.preventDefault();
+        if (e && typeof e.stopImmediatePropagation === 'function') {
+            // Prevent older inline handlers (if any) from running twice
+            e.stopImmediatePropagation();
+        }
         console.log('🔵 Register form submitted');
 
-        const rawEmail = document.getElementById('register-email').value;
+        const emailInput = document.getElementById('register-email');
+        const studentIdInput = document.getElementById('register-student-id');
+        const emailErrorEl = document.getElementById('register-email-error');
+        const studentErrorEl = document.getElementById('register-student-id-error');
+        const generalErrorEl = document.getElementById('register-general-error');
+        if (emailErrorEl) emailErrorEl.textContent = '';
+        if (studentErrorEl) studentErrorEl.textContent = '';
+        if (generalErrorEl) generalErrorEl.textContent = '';
+
+        const rawEmail = emailInput ? emailInput.value : '';
         const normalizedEmail = typeof normalizePLVEmail === 'function' ? normalizePLVEmail(rawEmail) : rawEmail;
 
         const formData = {
@@ -427,6 +486,9 @@ class AuthManager {
         console.log('🔍 Starting validation...');
         if (Object.values(formData).some(val => !val)) {
             console.log('❌ Validation failed: Empty fields');
+            if (generalErrorEl) {
+                generalErrorEl.textContent = 'Please fill in all fields.';
+            }
             this.showToast('Please fill in all fields', 'error');
             return;
         }
@@ -435,7 +497,11 @@ class AuthManager {
 
         if (!isValidPLVEmail(formData.email)) {
             console.log('❌ Validation failed: Invalid PLV email');
+            if (emailErrorEl) {
+                emailErrorEl.textContent = 'Please use your PLV email address (@plv.edu.ph).';
+            }
             this.showToast('Please use your PLV email address (@plv.edu.ph)', 'error');
+            if (emailInput) emailInput.focus();
             return;
         }
 
@@ -445,6 +511,9 @@ class AuthManager {
         console.log('🔐 Password validation:', passwordValidation);
         if (!passwordValidation.isValid) {
             console.log('❌ Validation failed: Password requirements not met');
+            if (generalErrorEl) {
+                generalErrorEl.textContent = 'Please meet all password requirements.';
+            }
             this.showToast('Please meet all password requirements', 'error');
             return;
         }
@@ -452,6 +521,9 @@ class AuthManager {
         console.log('✅ Password valid');
 
         if (formData.password !== formData.confirm_password) {
+            if (generalErrorEl) {
+                generalErrorEl.textContent = 'Passwords do not match.';
+            }
             this.showToast('Passwords do not match', 'error');
             return;
         }
@@ -514,7 +586,25 @@ class AuthManager {
             }
         } catch (error) {
             console.error('❌ Registration error:', error);
-            this.showToast(error.message || 'Registration failed. Please try again.', 'error');
+            const emailErrorEl = document.getElementById('register-email-error');
+            const studentErrorEl = document.getElementById('register-student-id-error');
+            const generalErrorEl = document.getElementById('register-general-error');
+            const msg = (error && error.message) ? error.message : 'Registration failed. Please try again.';
+            const lower = msg.toLowerCase();
+
+            if (lower.includes('plv email') || lower.includes('@plv.edu.ph')) {
+                if (emailErrorEl) emailErrorEl.textContent = msg;
+            } else if (lower.includes('student id') || lower.includes('student_no')) {
+                if (studentErrorEl) studentErrorEl.textContent = msg;
+            } else if (lower.includes('already exists')) {
+                if (generalErrorEl) {
+                    generalErrorEl.textContent = 'An account with this PLV email or student ID already exists. Try logging in instead.';
+                }
+            } else if (generalErrorEl) {
+                generalErrorEl.textContent = msg;
+            }
+
+            this.showToast(msg, 'error');
         } finally {
             if (window.captcha && window.captcha.enabled) {
                 window.captcha.reset('register');

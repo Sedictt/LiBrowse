@@ -1052,6 +1052,7 @@
                             <input type="text" id="register-email" name="email" placeholder="your.email" required>
                             <span style="white-space:nowrap; color:#9ca3af; font-size:0.9rem;">@plv.edu.ph</span>
                         </div>
+                        <small id="register-email-error" class="error-message"></small>
                     </div>
 
                     <!-- Student ID -->
@@ -1060,6 +1061,7 @@
                         <input type="text" id="register-student-id" name="student_id" placeholder="e.g., 21-1234"
                             pattern="\d{2}-\d{4}" title="Format: 00-0000 (e.g., 21-1234)" required>
                         <small class="form-help">Format: 00-0000 (e.g., 21-1234)</small>
+                        <small id="register-student-id-error" class="error-message"></small>
                     </div>
 
                     <!-- Program -->
@@ -1118,6 +1120,8 @@
                         </div>
                         <div id="password-match-indicator" class="password-match"></div>
                     </div>
+
+                    <div id="register-general-error" class="error-message" style="margin-top:4px;"></div>
 
                     <!-- Captcha -->
                     <div id="register-captcha-container" class="form-group captcha-container">
