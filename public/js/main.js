@@ -3432,6 +3432,7 @@ document.addEventListener("DOMContentLoaded", () => {
             this.currentTab = 'all';
             this.notifications = [];
             this.unreadCount = 0;
+            this._hasPolledOnce = false;
 
             this.init();
         }
@@ -3620,6 +3621,31 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
+        showNewNotificationToast(newCountDelta) {
+            try {
+                const count = Number.isFinite(newCountDelta) && newCountDelta > 0 ? newCountDelta : 1;
+                const message = count === 1
+                    ? 'You have a new notification. Click to view.'
+                    : `You have ${count} new notifications. Click to view.`;
+
+                if (typeof window.showToast === 'function') {
+                    const toast = window.showToast(message, 'info', 5000);
+                    if (toast) {
+                        toast.style.cursor = 'pointer';
+                        toast.addEventListener('click', () => {
+                            try {
+                                if (window.app && typeof window.app.navigateToSection === 'function') {
+                                    window.app.navigateToSection('notifications');
+                                } else if (window.app && typeof window.app.switchSection === 'function') {
+                                    window.app.switchSection('notifications');
+                                }
+                            } catch (_) { /* noop */ }
+                        }, { once: true });
+                    }
+                }
+            } catch (_) { /* noop */ }
+        }
+
         async handleNotificationClick(notificationId, type) {
             try {
                 // Mark as read
@@ -3672,11 +3698,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
                         // Update badge if count changed
                         if (newUnreadCount !== this.unreadCount) {
+                            const previousCount = this.unreadCount;
                             this.unreadCount = newUnreadCount;
                             this.updateBadge();
 
-                            // Play notification sound
-                            this.playNotificationSound();
+                            // Only treat as new notifications when count increases after the first poll
+                            if (this._hasPolledOnce && newUnreadCount > previousCount) {
+                                this.playNotificationSound();
+                                this.showNewNotificationToast(newUnreadCount - previousCount);
+                            }
+                        }
+
+                        // Mark that we've completed at least one poll
+                        if (!this._hasPolledOnce) {
+                            this._hasPolledOnce = true;
                         }
 
                         // If dropdown is open, refresh the list

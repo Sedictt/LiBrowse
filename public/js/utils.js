@@ -79,6 +79,9 @@ function showToast(message, type = 'info', duration = 3000) {
 
     toast.addEventListener('mouseenter', pauseTimer);
     toast.addEventListener('mouseleave', resumeTimer);
+
+    // Allow callers to attach custom click handlers
+    return toast;
 }
 
 // Format date
