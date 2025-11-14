@@ -36,24 +36,33 @@ router.get('/', authenticateToken, async (req, res) => {
                     WHEN t.borrower_id = ? THEN lender.profile_image
                     ELSE borrower.profile_image
                 END as other_user_avatar,
-                (SELECT message FROM chat_messages 
-                 WHERE chat_id = c.id 
-                 ORDER BY id DESC LIMIT 1) as last_message,
-                (SELECT created FROM chat_messages 
-                 WHERE chat_id = c.id 
-                 ORDER BY id DESC LIMIT 1) as last_message_time,
-                (SELECT message_type FROM chat_messages 
-                 WHERE chat_id = c.id 
-                 ORDER BY id DESC LIMIT 1) as last_message_type,
-                (SELECT COUNT(*) FROM chat_messages 
-                 WHERE chat_id = c.id 
-                 AND sender_id != ? 
-                 AND is_read = 0) as unread_count
+                lm.message as last_message,
+                lm.created as last_message_time,
+                lm.message_type as last_message_type,
+                COALESCE(uc.unread_count, 0) as unread_count
             FROM chats c
             INNER JOIN transactions t ON c.transaction_id = t.id
             INNER JOIN books b ON t.book_id = b.id
             INNER JOIN users borrower ON t.borrower_id = borrower.id
             INNER JOIN users lender ON t.lender_id = lender.id
+            LEFT JOIN (
+                SELECT m.chat_id,
+                       m.message,
+                       m.created,
+                       m.message_type
+                FROM chat_messages m
+                INNER JOIN (
+                    SELECT chat_id, MAX(id) as max_id
+                    FROM chat_messages
+                    GROUP BY chat_id
+                ) latest ON latest.chat_id = m.chat_id AND latest.max_id = m.id
+            ) lm ON lm.chat_id = c.id
+            LEFT JOIN (
+                SELECT chat_id, COUNT(*) as unread_count
+                FROM chat_messages
+                WHERE is_read = 0 AND sender_id != ?
+                GROUP BY chat_id
+            ) uc ON uc.chat_id = c.id
             WHERE (t.borrower_id = ? OR t.lender_id = ?)
             AND c.is_active = 1
             ORDER BY c.updated DESC
@@ -124,8 +133,9 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
         res.set('Cache-Control', 'no-store');
         const userId = req.user.id;
         const { chatId } = req.params;
-        const limit = parseInt(req.query.limit) || 50;
-        const offset = parseInt(req.query.offset) || 0;
+        let limit = parseInt(req.query.limit, 10) || 50;
+        limit = Math.min(Math.max(limit, 1), 100);
+        const offset = parseInt(req.query.offset, 10) || 0;
         const markReadParam = req.query.markRead;
         const shouldMarkRead = (markReadParam === undefined || markReadParam === '1');
         
@@ -144,14 +154,7 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Access denied' });
         }
 
-        // Get total message count
-        const [countResult] = await connection.execute(`
-            SELECT COUNT(*) as total FROM chat_messages WHERE chat_id = ?
-        `, [chatId]);
-
-        const total = countResult[0].total;
-
-        // Get messages
+        // Get messages (fetch one extra to determine if there are more)
         const [messages] = await connection.execute(`
             SELECT 
                 cm.*,
@@ -162,7 +165,7 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
             WHERE cm.chat_id = ?
             ORDER BY cm.created DESC
             LIMIT ? OFFSET ?
-        `, [chatId, limit, offset]);
+        `, [chatId, limit + 1, offset]);
 
         // Mark unread messages as read (only when requested)
         if (shouldMarkRead) {
@@ -175,10 +178,12 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
 
         connection.release();
 
+        const hasMore = messages.length > limit;
+        const pageMessages = hasMore ? messages.slice(0, limit) : messages;
+
         res.json({
-            messages: messages.reverse(), // Reverse to show oldest first
-            total,
-            has_more: (offset + limit) < total
+            messages: pageMessages.reverse(), // Reverse to show oldest first
+            has_more: hasMore
         });
     } catch (error) {
         console.error('Error fetching messages:', error);

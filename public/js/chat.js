@@ -11,13 +11,14 @@ class ChatManager {
         this.messages = [];
         this.typingTimeout = null;
         this.messageOffset = 0;
-        this.messageLimit = 200;
+        this.messageLimit = 50; // fetch fewer messages by default for faster initial load
         this.hasMoreMessages = false;
         this.isLoadingMessages = false;
         this.initialLoadComplete = false;
         this.pendingMessages = [];
         this.notifiedMessageIds = new Set();
         this.cancellationStatusOverrides = new Map();
+        this.chatCache = new Map(); // per-chat in-memory cache for faster reopen
 
         this.init();
     }
@@ -242,8 +243,31 @@ class ChatManager {
             }
             modal.classList.add('active');
 
-            // Show loading state
-            this.showLoadingState();
+            // Try to render cached content immediately for snappier reopen
+            let usedCache = false;
+            if (this.chatCache && this.chatCache.has(parseInt(chatId))) {
+                const cached = this.chatCache.get(parseInt(chatId));
+                if (cached) {
+                    this.currentChatInfo = cached.currentChatInfo || null;
+                    this.messages = Array.isArray(cached.messages) ? [...cached.messages] : [];
+                    this.hasMoreMessages = !!cached.hasMoreMessages;
+                    this.messageOffset = cached.messageOffset || 0;
+                    this.initialLoadComplete = true;
+                    this.pendingMessages = [];
+
+                    if (this.currentChatInfo) {
+                        this.renderChatHeader();
+                    }
+                    this.renderMessages();
+                    this.scrollToBottom(false);
+                    usedCache = true;
+                }
+            }
+
+            if (!usedCache) {
+                // Show loading state only when we have nothing cached
+                this.showLoadingState();
+            }
 
             // Ensure auth is available before joining/fetching
             await this.waitForAuth();
@@ -256,11 +280,14 @@ class ChatManager {
                 });
             }
 
-            // Load chat info
-            await this.loadChatInfo(chatId);
+            // Load chat info and initial messages in parallel (fresh data)
+            await Promise.all([
+                this.loadChatInfo(chatId),
+                this.loadMessages(chatId)
+            ]);
 
-            // Load messages
-            await this.loadMessages(chatId);
+            // After we have fresh info + messages, update cache
+            this.updateChatCache(chatId);
 
             // Focus input after modal is open
             this.focusInput();
@@ -343,8 +370,7 @@ class ChatManager {
 
             this.hasMoreMessages = data.has_more;
             this.messageOffset = offset + data.messages.length;
-            // Ensure chronological order before rendering
-            this.ensureSorted();
+            // Messages are already in chronological order from the API
             this.renderMessages();
 
             // Scroll to bottom only on initial load
@@ -364,7 +390,7 @@ class ChatManager {
                         }
                     }
                     this.pendingMessages = [];
-                    this.ensureSorted();
+                    // New messages arrive in order; no need to resort the full array
                     this.renderMessages();
                     this.scrollToBottom(true);
                 }
@@ -837,7 +863,7 @@ class ChatManager {
             const isNearBottom = container ?
                 (container.scrollHeight - container.scrollTop - container.clientHeight < 100) : true;
 
-            this.ensureSorted();
+            // New messages are appended at the end; the array stays in chronological order
             this.renderMessages();
 
             // Only auto-scroll if user was near bottom or it's their own message
@@ -1562,6 +1588,25 @@ class ChatManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    updateChatCache(chatId) {
+        try {
+            if (!chatId) return;
+            if (!this.chatCache) {
+                this.chatCache = new Map();
+            }
+            const key = parseInt(chatId);
+            this.chatCache.set(key, {
+                messages: Array.isArray(this.messages) ? [...this.messages] : [],
+                hasMoreMessages: this.hasMoreMessages,
+                messageOffset: this.messageOffset,
+                currentChatInfo: this.currentChatInfo || null
+            });
+        } catch (e) {
+            // Cache failures should never break chat
+            console.error('updateChatCache error:', e);
+        }
     }
 }
 
