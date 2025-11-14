@@ -16,6 +16,11 @@ const { testConnection } = require('./config/database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// If running behind a proxy (dev tunnels, reverse proxies, etc.),
+// trust X-Forwarded-* headers so express-rate-limit can safely use them.
+// This also resolves ERR_ERL_UNEXPECTED_X_FORWARDED_FOR warnings.
+app.set('trust proxy', 1);
+
 // Initialize HTTP server for Socket.IO
 const http = require('http');
 const server = http.createServer(app);

@@ -67,6 +67,25 @@ function authenticateToken(req, res, next) {
   });
 }
 
+// Helper: update login token with simple retry on lock timeout
+async function updateLoginTokenWithRetry(userId, token, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      await executeQuery("UPDATE users SET ver_token = ? WHERE id = ?", [token, userId]);
+      return;
+    } catch (err) {
+      const isRetryable = err && (err.code === 'ER_LOCK_WAIT_TIMEOUT' || err.code === 'ER_LOCK_DEADLOCK');
+      if (isRetryable && attempt < maxRetries - 1) {
+        const delayMs = 200 * (attempt + 1);
+        console.warn(`updateLoginToken retry ${attempt + 1}/${maxRetries} in ${delayMs}ms due to ${err.code}`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 // ============================
 // Login Route
 // ============================
@@ -96,8 +115,8 @@ router.post('/login', async (req, res) => {
     // 4. Generate JWT token
     const token = generateToken(user);
 
-    // 5. Save token in DB for session management
-    await executeQuery("UPDATE users SET ver_token = ? WHERE id = ?", [token, user.id]);
+    // 5. Save token in DB for session management (with basic retry on lock timeout/deadlock)
+    await updateLoginTokenWithRetry(user.id, token);
 
     return res.json({
       message: "Login successful",

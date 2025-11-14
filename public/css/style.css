@@ -2838,6 +2838,12 @@ body {
     overflow: hidden;
 }
 
+/* Highlight unread notifications in the profile notifications section */
+.notification-card.unread {
+    background: rgba(102, 126, 234, 0.08);
+    border-color: rgba(102, 126, 234, 0.6);
+}
+
 .request-card::before,
 .transaction-card::before,
 .notification-card::before {
@@ -2850,6 +2856,11 @@ body {
     background: linear-gradient(90deg, var(--primary), var(--secondary));
     opacity: 0;
     transition: opacity 0.3s ease;
+}
+
+/* Keep the top accent bar visible for unread notifications */
+.notification-card.unread::before {
+    opacity: 1;
 }
 
 .request-card:hover,

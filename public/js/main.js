@@ -1282,10 +1282,26 @@ class App {
 
     updateNotificationBadge(notifications) {
         const badge = document.getElementById('notification-badge');
-        if (badge) {
-            const unreadCount = notifications.filter(n => !n.is_read).length;
-            badge.textContent = unreadCount;
-            badge.style.display = unreadCount > 0 ? 'block' : 'none';
+        if (!badge) return;
+
+        const unreadCount = Array.isArray(notifications)
+            ? notifications.filter(n => !n.is_read).length
+            : 0;
+
+        // Keep badge text in sync
+        badge.textContent = unreadCount;
+
+        // Prefer the new NotificationManager badge animation if available
+        if (window.notificationManager && typeof window.notificationManager.updateBadge === 'function') {
+            window.notificationManager.unreadCount = unreadCount;
+            window.notificationManager.updateBadge();
+        } else {
+            // Fallback: simple show/hide via active class
+            if (unreadCount > 0) {
+                badge.classList.add('active');
+            } else {
+                badge.classList.remove('active');
+            }
         }
     }
 
@@ -3675,25 +3691,50 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         playNotificationSound() {
-            // Simple beep notification
+            // Respect user preference if added later
+            const pref = localStorage.getItem('notificationSound');
+            if (pref === 'off') return;
+
             try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-
-                oscillator.frequency.value = 800;
-                oscillator.type = 'sine';
-
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.5);
-            } catch (error) {
-                // Silent fail if audio context not available
+                // Reuse shared notification audio if available (used by chat toasts)
+                if (!window.__notifAudio) {
+                    window.__notifAudio = new Audio('/assets/notif.mp3');
+                    try { window.__notifAudio.load(); } catch (_) { /* ignore */ }
+                }
+                window.__notifAudio.currentTime = 0;
+                window.__notifAudio.volume = 0.5;
+                const p = window.__notifAudio.play();
+                if (p && typeof p.catch === 'function') {
+                    p.catch(() => {
+                        // Fallback: lightweight Web Audio beep
+                        try {
+                            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                            const o = ctx.createOscillator();
+                            const g = ctx.createGain();
+                            o.type = 'sine';
+                            o.frequency.value = 880;
+                            g.gain.value = 0.04;
+                            o.connect(g);
+                            g.connect(ctx.destination);
+                            o.start();
+                            setTimeout(() => { o.stop(); ctx.close(); }, 140);
+                        } catch (_) { /* ignore */ }
+                    });
+                }
+            } catch (_) {
+                // Final fallback: try a simple Web Audio beep
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = 'sine';
+                    o.frequency.value = 880;
+                    g.gain.value = 0.04;
+                    o.connect(g);
+                    g.connect(ctx.destination);
+                    o.start();
+                    setTimeout(() => { o.stop(); ctx.close(); }, 140);
+                } catch (_) { /* ignore */ }
             }
         }
     }
