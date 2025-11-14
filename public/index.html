@@ -2214,6 +2214,43 @@
         </div>
     </div>
 
+    <!-- Cancel Request Modal -->
+    <div id="cancel-request-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Cancel Request</h3>
+                <button class="modal-close" onclick="requestManager.closeCancelModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="warning-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p><strong>Are you sure you want to cancel this request?</strong></p>
+                    <p>This action cannot be undone. The lender will be notified.</p>
+                </div>
+
+                <form id="cancel-request-form">
+                    <div class="form-group">
+                        <label for="cancel-reason">Reason for cancellation (optional):</label>
+                        <textarea id="cancel-reason" name="cancel-reason" rows="4" maxlength="500"
+                            placeholder="Provide a reason for cancelling this request (optional)..."></textarea>
+                        <small class="form-help">Max 500 characters</small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="requestManager.closeCancelModal()">
+                            <i class="fas fa-times"></i> Keep Request
+                        </button>
+                        <button type="submit" class="btn btn-error">
+                            <i class="fas fa-ban"></i> Cancel Request
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="/js/utils.js"></script>
     <script src="/js/api.js"></script>

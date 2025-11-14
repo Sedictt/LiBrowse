@@ -811,7 +811,7 @@ router.get("/history/lent", authenticateToken, async (req, res) => {
 // PUT /api/transactions/:id/cancel - Cancel transaction (for both parties)
 router.put('/:id/cancel', [
     authenticateToken,
-    body('cancellation_reason').trim().isLength({ min: 10, max: 500 }).withMessage('Please provide a detailed reason for cancellation (10-500 characters)')
+    body('cancellation_reason').optional().trim().isLength({ min: 1, max: 500 }).withMessage('Cancellation reason must be 1-500 characters if provided')
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -820,7 +820,8 @@ router.put('/:id/cancel', [
         }
 
         const transactionId = req.params.id;
-        const { cancellation_reason } = req.body;
+        const cancellation_reason = req.body.cancellationreason || 'Request cancelled';
+
         const connection = await getConnection();
 
         // Get transaction details
@@ -864,13 +865,21 @@ router.put('/:id/cancel', [
         const otherPartyName = isBorrower ? transaction.lender_name : transaction.borrower_name;
 
         // Update transaction status to cancelled
-        await connection.execute(`
-            UPDATE transactions
-            SET status = 'cancelled',
-                rejection_reason = ?,
-                lender_notes = CONCAT(COALESCE(lender_notes, ''), '\\n[CANCELLED by ', ?, ']: ', ?)
-            WHERE id = ?
-        `, [cancellation_reason, cancelledBy, cancellation_reason, transactionId]);
+        const [updateResult] = await connection.execute(
+            `UPDATE transactions 
+             SET status = 'cancelled', 
+                 rejection_reason = ?, 
+                 updated = NOW()
+             WHERE id = ?`,
+            [cancellation_reason, transactionId]
+        );
+
+        // DEBUG: Check if update worked
+        console.log('=== CANCEL UPDATE DEBUG ===');
+        console.log('Transaction ID:', transactionId);
+        console.log('Cancellation reason:', cancellation_reason);
+        console.log('Rows affected:', updateResult.affectedRows);
+        console.log('========================');
 
         // Make book available again
         await connection.execute('UPDATE books SET is_available = TRUE WHERE id = ?', [transaction.book_id]);
@@ -917,6 +926,7 @@ router.put('/:id/cancel', [
         res.status(500).json({ error: 'Failed to cancel transaction' });
     }
 });
+
 
 // PUT /api/transactions/:id/borrowed - Mark book as picked up/borrowed
 router.put('/:id/borrowed', [

@@ -111,7 +111,6 @@ class RequestManager {
 
     async loadRequests() {
         try {
-            // Check if user is authenticated
             if (!authManager.currentUser) {
                 console.log('User not authenticated, skipping requests load');
                 return;
@@ -120,7 +119,6 @@ class RequestManager {
             console.log('Loading requests for tab:', this.currentTab);
 
             if (this.currentTab === 'incoming' || this.currentTab === 'outgoing') {
-                // Backend returns { transactions: [...] }
                 const data = await api.getTransactions();
                 const list = Array.isArray(data?.transactions) ? data.transactions : (Array.isArray(data) ? data : []);
                 console.log('Transactions array:', list);
@@ -128,14 +126,16 @@ class RequestManager {
                 console.log('Current user ID:', authManager.currentUser.id);
 
                 const transactions = list.filter(t => {
+                    // Filter out cancelled transactions
+                    if (t.status === 'cancelled') {
+                        return false;
+                    }
+
                     if (this.currentTab === 'incoming') {
-                        // Show all incoming requests (where user is lender)
-                        // Status filtering is handled by the status filter dropdown
                         const isLender = t.lender_id === authManager.currentUser.id;
                         console.log(`Transaction ${t.id}: lender_id=${t.lender_id}, status=${t.status}, isLender=${isLender}`);
                         return isLender;
                     } else {
-                        // Show all outgoing requests (where user is borrower)
                         return t.borrower_id === authManager.currentUser.id;
                     }
                 });
@@ -159,6 +159,7 @@ class RequestManager {
             this.showToast('Failed to load requests', 'error');
         }
     }
+
 
     async refreshActiveChats() {
         try {
@@ -270,7 +271,7 @@ class RequestManager {
             if (this.currentTab === 'incoming') {
                 // Check if filters are active
                 const hasActiveFilters = this.filters.status || this.filters.bookTitle ||
-                                        this.filters.borrowerName || this.filters.dateFrom || this.filters.dateTo;
+                    this.filters.borrowerName || this.filters.dateFrom || this.filters.dateTo;
 
                 if (hasActiveFilters) {
                     const statusText = this.filters.status ? ` with status "${this.filters.status}"` : '';
@@ -527,33 +528,54 @@ class RequestManager {
     }
 
     getRequestActions(request, isIncoming) {
+        // INCOMING requests (you're the lender) - Approve/Reject buttons
         if (request.status === 'pending' && isIncoming) {
             return `
-                <button class="btn btn-success" onclick="requestManager.approveRequest(${request.id})">
-                    <i class="fas fa-check"></i> Approve
-                </button>
-                <button class="btn btn-error" onclick="requestManager.rejectRequest(${request.id})">
-                    <i class="fas fa-times"></i> Reject
-                </button>
-            `;
-        } else if (request.status === 'approved') {
-            return `
-                <button class="btn btn-primary" onclick="requestManager.openChatByTransaction(${request.id})">
-                    <i class="fas fa-comments"></i> Open Chat
-                </button>
-                <small class="text-muted">Chat with ${isIncoming ? 'borrower' : 'lender'} to discuss pickup details</small>
-            `;
-        } else if (request.status === 'rejected') {
-            return `
-                <span class="text-muted">Request was rejected</span>
-                ${request.rejection_reason ? `<br><small>Reason: ${this.escapeHtml(request.rejection_reason)}</small>` : ''}
-            `;
-        } else if (request.status === 'cancelled') {
-            return `
-                <span class="text-muted">Transaction was cancelled</span>
-                ${request.rejection_reason ? `<br><small>Reason: ${this.escapeHtml(request.rejection_reason)}</small>` : ''}
-            `;
+            <button class="btn btn-success" onclick="requestManager.approveRequest(${request.id})">
+                <i class="fas fa-check"></i> Approve
+            </button>
+            <button class="btn btn-error" onclick="requestManager.rejectRequest(${request.id})">
+                <i class="fas fa-times"></i> Reject
+            </button>
+        `;
         }
+
+        // OUTGOING requests (you're the borrower) - Cancel button ⬅️ ADD THIS SECTION
+        if (request.status === 'pending' && !isIncoming) {
+            return `
+            <button class="btn btn-error btn-outline" onclick="requestManager.cancelRequest(${request.id})">
+                <i class="fas fa-ban"></i> Cancel Request
+            </button>
+            <small class="text-muted" style="display: block; margin-top: 8px;">Waiting for lender's response</small>
+        `;
+        }
+
+        // Approved status - Open Chat button
+        if (request.status === 'approved') {
+            return `
+            <button class="btn btn-primary" onclick="requestManager.openChatByTransaction(${request.id})">
+                <i class="fas fa-comments"></i> Open Chat
+            </button>
+            <small class="text-muted">Chat with ${isIncoming ? 'borrower' : 'lender'} to discuss pickup details</small>
+        `;
+        }
+
+        // Rejected status
+        if (request.status === 'rejected') {
+            return `
+            <span class="text-muted">Request was rejected</span>
+            ${request.rejection_reason ? `<br><small>Reason: ${this.escapeHtml(request.rejection_reason)}</small>` : ''}
+        `;
+        }
+
+        // Cancelled status
+        if (request.status === 'cancelled') {
+            return `
+            <span class="text-muted">Transaction was cancelled</span>
+            ${request.rejection_reason ? `<br><small>Reason: ${this.escapeHtml(request.rejection_reason)}</small>` : ''}
+        `;
+        }
+
         return '';
     }
 
@@ -605,6 +627,49 @@ class RequestManager {
             this.showToast(error.message || 'Failed to reject request', 'error');
         }
     }
+
+    async cancelRequest(requestId) {
+        // Store the request ID for use in form submission
+        this.cancellingRequestId = requestId;
+
+        // Open the cancel modal
+        const modal = document.getElementById('cancel-request-modal');
+        modal.classList.add('active');
+
+        // Clear previous input
+        document.getElementById('cancel-reason').value = '';
+
+        // Setup form submission
+        const form = document.getElementById('cancel-request-form');
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            await this.submitCancelRequest();
+        };
+    }
+
+    async submitCancelRequest() {
+        try {
+            const reason = document.getElementById('cancel-reason').value.trim();
+
+            await api.put(`/transactions/${this.cancellingRequestId}/cancel`, {
+                cancellationreason: reason || 'Request cancelled by borrower'
+            });
+
+            this.showToast('Request cancelled successfully', 'info');
+            this.closeCancelModal();
+            this.loadRequests();
+        } catch (error) {
+            console.error('Failed to cancel request:', error);
+            this.showToast(error.message || 'Failed to cancel request', 'error');
+        }
+    }
+
+    closeCancelModal() {
+        const modal = document.getElementById('cancel-request-modal');
+        modal.classList.remove('active');
+        this.cancellingRequestId = null;
+    }
+
 
     async bulkApprove() {
         if (this.selectedRequests.size === 0) {
@@ -813,7 +878,7 @@ class RequestManager {
 
     formatTimeAgo(dateString) {
         if (!dateString) return '';
-        
+
         const date = new Date(dateString);
         const now = new Date();
         const diffMs = now - date;
@@ -826,7 +891,7 @@ class RequestManager {
         if (diffHours < 24) return `${diffHours}h`;
         if (diffDays === 1) return 'Yesterday';
         if (diffDays < 7) return `${diffDays}d`;
-        
+
         return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
 
