@@ -3697,6 +3697,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Start polling for notifications
             this.startPolling();
+
+            // Perform an initial load so the navbar badge reflects
+            // the current unread count immediately for logged-in users.
+            try {
+                if (typeof authManager !== 'undefined' && authManager && authManager.isAuthenticated) {
+                    this.loadNotifications();
+                }
+            } catch (_) { /* noop */ }
         }
 
         toggleDropdown() {

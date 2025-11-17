@@ -112,8 +112,12 @@ class RequestManager {
 
     async loadRequests() {
         try {
-            if (!authManager.currentUser) {
-                console.log('User not authenticated, skipping requests load');
+            // For incoming/outgoing requests we need a currentUser to filter
+            // lender/borrower-specific lists. For Active Chats we can rely on
+            // the JWT token alone and still load chats even if currentUser has
+            // not been hydrated yet.
+            if ((!window.authManager || !authManager.currentUser) && this.currentTab !== 'active-chats') {
+                console.log('User not authenticated, skipping requests load for tab:', this.currentTab);
                 return;
             }
 
@@ -924,9 +928,11 @@ class RequestManager {
     }
 
     createChatCard(chat) {
-        // Get initials for avatar
-        const initials = chat.other_user_name
-            .split(' ')
+        // Get a safe display name and initials for avatar
+        const displayName = (chat.other_user_name || '').trim() || 'Chat';
+        const initials = displayName
+            .split(/\s+/)
+            .filter(Boolean)
             .map(n => n[0])
             .join('')
             .toUpperCase()
@@ -943,7 +949,7 @@ class RequestManager {
                 <div class="chat-avatar">${initials}</div>
                 <div class="chat-header">
                     <div class="chat-content">
-                        <h4>${this.escapeHtml(chat.other_user_name)}</h4>
+                        <h4>${this.escapeHtml(displayName)}</h4>
                         <p class="chat-last-message">${this.escapeHtml(previewText)}</p>
                     </div>
                     <div class="chat-meta">

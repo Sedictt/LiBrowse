@@ -29,12 +29,14 @@ router.get('/', authenticateToken, async (req, res) => {
                     ELSE t.borrower_id
                 END as other_user_id,
                 CASE 
-                    WHEN t.borrower_id = ? THEN CONCAT(lender.first_name, ' ', lender.last_name)
-                    ELSE CONCAT(borrower.first_name, ' ', borrower.last_name)
+                    WHEN t.borrower_id = ? 
+                        THEN COALESCE(CONCAT(lender.first_name, ' ', lender.last_name), CONCAT(lender.fname, ' ', lender.lname))
+                        ELSE COALESCE(CONCAT(borrower.first_name, ' ', borrower.last_name), CONCAT(borrower.fname, ' ', borrower.lname))
                 END as other_user_name,
                 CASE 
-                    WHEN t.borrower_id = ? THEN lender.profile_image
-                    ELSE borrower.profile_image
+                    WHEN t.borrower_id = ? 
+                        THEN COALESCE(lender.profile_image, lender.profile_pic)
+                        ELSE COALESCE(borrower.profile_image, borrower.profile_pic)
                 END as other_user_avatar,
                 lm.message as last_message,
                 lm.created as last_message_time,
@@ -98,12 +100,14 @@ router.get('/:chatId/info', authenticateToken, async (req, res) => {
                     ELSE t.borrower_id
                 END as other_user_id,
                 CASE 
-                    WHEN t.borrower_id = ? THEN CONCAT(lender.first_name, ' ', lender.last_name)
-                    ELSE CONCAT(borrower.first_name, ' ', borrower.last_name)
+                    WHEN t.borrower_id = ? 
+                        THEN COALESCE(CONCAT(lender.first_name, ' ', lender.last_name), CONCAT(lender.fname, ' ', lender.lname))
+                        ELSE COALESCE(CONCAT(borrower.first_name, ' ', borrower.last_name), CONCAT(borrower.fname, ' ', borrower.lname))
                 END as other_user_name,
                 CASE
-                    WHEN t.borrower_id = ? THEN lender.profile_image
-                    ELSE borrower.profile_image
+                    WHEN t.borrower_id = ? 
+                        THEN COALESCE(lender.profile_image, lender.profile_pic)
+                        ELSE COALESCE(borrower.profile_image, borrower.profile_pic)
                 END as other_user_avatar
             FROM chats c
             INNER JOIN transactions t ON c.transaction_id = t.id
@@ -158,8 +162,8 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
         const [messages] = await connection.execute(`
             SELECT 
                 cm.*,
-                CONCAT(u.first_name, ' ', u.last_name) as sender_name,
-                u.profile_image as sender_avatar
+                COALESCE(CONCAT(u.first_name, ' ', u.last_name), CONCAT(u.fname, ' ', u.lname)) as sender_name,
+                COALESCE(u.profile_image, u.profile_pic) as sender_avatar
             FROM chat_messages cm
             LEFT JOIN users u ON cm.sender_id = u.id
             WHERE cm.chat_id = ?

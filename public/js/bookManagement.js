@@ -541,7 +541,7 @@ class BookManagement {
                 <small>Max size: 5MB (JPG, PNG, GIF, WebP)</small>
             </div>
         `;
-        const imageInput = activeModal ? activeModal.querySelector('#book-image') : document.getElementById('book-image');
+        const imageInput = activeModal ? activeModal.querySelector('#book-image-input') : document.getElementById('book-image-input');
 
         if (imageInput) imageInput.value = '';
         this.imagePreview = null;
@@ -657,7 +657,7 @@ class BookManagement {
 
             // Add image if selected
             // Add image validation
-            const imageInput = activeModal ? activeModal.querySelector('#book-image') : document.getElementById('book-image');
+            const imageInput = activeModal ? activeModal.querySelector('#book-image-input') : document.getElementById('book-image-input');
 
 
             // Validate image size BEFORE uploading
@@ -833,7 +833,7 @@ class BookManagement {
             console.log('✅ Book updated successfully');
 
             // Handle image upload separately if changed
-            const imageInput = activeModal ? activeModal.querySelector('#book-image') : document.getElementById('book-image');
+            const imageInput = activeModal ? activeModal.querySelector('#book-image-input') : document.getElementById('book-image-input');
 
             if (imageInput && imageInput.files && imageInput.files[0]) {
                 console.log('Uploading new image...');

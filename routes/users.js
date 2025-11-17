@@ -2,8 +2,11 @@
 const express = require('express');
 const { authenticateToken, sanitizeUser } = require('../middleware/auth');
 const { getConnection } = require('../config/database');
+const fileUpload = require('express-fileupload');
 
 const router = express.Router();
+// Enable file upload handling (used for /api/users/profile-picture)
+router.use(fileUpload());
 
 // GET /api/users/profile - current user's profile
 router.get('/profile', authenticateToken, async (req, res) => {
