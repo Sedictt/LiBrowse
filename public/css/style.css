@@ -2194,7 +2194,20 @@ body {
     color: var(--info-light);
     font-weight: 500;
     text-decoration: none;
+    display: inline; /* prevent stretching to parent width */
+    width: auto;
+    padding: 0; /* remove any inherited padding that enlarges hitbox */
+    max-width: fit-content;
 }
+
+/* Force strict inline hitbox for the forgot password anchor */
+#forgot-password-link {
+    display: inline-block !important;
+    width: auto !important;
+    max-width: fit-content !important;
+    line-height: 1.2;
+}
+
 
 #login-modal .forgot-password a:hover,
 #forgot-password-link:hover {
