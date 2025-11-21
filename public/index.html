@@ -800,6 +800,7 @@
                             <button class="tab-btn" data-tab="verification">Verification</button>
                             <button class="tab-btn" data-tab="books">My Books</button>
                             <button class="tab-btn" data-tab="reviews">Reviews</button>
+                            <button class="tab-btn" data-tab="violations">Violations</button>
                             <button class="tab-btn" data-tab="settings">Settings</button>
                             <button class="tab-btn" data-tab="borrowing-history">Borrowing & Lending History</button>
                         </div>
@@ -859,6 +860,13 @@
                                 </div>
                             </div>
 
+                            <!-- Violations Tab (NEW) -->
+                            <div class="tab-content" id="violations-content" style="display: none;">
+                                <div id="violation-section">
+                                    <!-- Violation history will be loaded here by main.js -->
+                                </div>
+                            </div>
+
                             <!-- Settings Tab -->
                             <div class="tab-content" id="settings-content">
                                 <div class="settings-section">
@@ -890,12 +898,12 @@
                                     </div>
                                 </div>
                             </div>
-
-                            
                         </div>
+                    </div>
                 </div>
             </div>
         </section>
+
 
         <!-- Notifications Section -->
         <section id="notifications-section" class="section" style="display: none;">
@@ -2018,7 +2026,8 @@
     <div class="toast-container" id="toast-container"></div>
 
     <!-- Floating Chat Button -->
-    <button id="floating-chat-button" class="floating-chat-button hidden" type="button" aria-label="Open chats and messages">
+    <button id="floating-chat-button" class="floating-chat-button hidden" type="button"
+        aria-label="Open chats and messages">
         <i class="fas fa-comments"></i>
         <span id="floating-chat-badge" class="floating-chat-badge hidden">0</span>
     </button>

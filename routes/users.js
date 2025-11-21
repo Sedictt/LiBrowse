@@ -1,5 +1,6 @@
 // LiBrowse - Users Routes
 const express = require('express');
+const { executeQuery } = require('../config/database');
 const { authenticateToken, sanitizeUser } = require('../middleware/auth');
 const { getConnection } = require('../config/database');
 const fileUpload = require('express-fileupload');
@@ -63,6 +64,63 @@ router.get('/profile', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to load profile' });
   }
 });
+
+// In users.js
+router.get('/violation-history/:userId', authenticateToken, async (req, res) => {
+  try {
+    const targetUserId = req.params.userId;
+
+    console.log('📊 Fetching violation history for user:', targetUserId);
+
+    // Get violation history
+    const violations = await executeQuery(
+      `SELECT violation_type, credits_deducted, credit_balance_after, description, created_at 
+       FROM violation_history 
+       WHERE user_id = ? 
+       ORDER BY created_at DESC 
+       LIMIT 10`,
+      [targetUserId]
+    );
+
+    console.log('✅ Violations fetched:', violations.length);
+
+    // Get user summary
+    const userResult = await executeQuery(
+      `SELECT times_hit_threshold, account_status, lowest_credit_reached 
+       FROM users 
+       WHERE id = ?`,
+      [targetUserId]
+    );
+
+    console.log('✅ User data fetched:', userResult);
+
+    // Check if user exists
+    if (!userResult || userResult.length === 0) {
+      console.log('❌ User not found');
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userResult[0];
+
+    res.json({
+      violations,
+      summary: {
+        offenseCount: user.times_hit_threshold || 0,
+        accountStatus: user.account_status || 'active',
+        lowestCreditReached: user.lowest_credit_reached || 100
+      }
+    });
+
+    console.log('✅ Response sent successfully');
+
+  } catch (error) {
+    console.error('❌ Get violation history error:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: 'Failed to fetch violation history', details: error.message });
+  }
+});
+
+
 
 
 // PUT /api/users/profile - update profile

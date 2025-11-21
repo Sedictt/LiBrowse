@@ -85,6 +85,99 @@ async function createNotification(connection, userId, title, body, category, rel
     );
 }
 
+// In transactions.js or appropriate backend service
+async function trackViolation(userId, violationType, creditsDeducted, transactionId = null, description = null) {
+    const connection = await getConnection();
+
+    try {
+        console.log('🔍 trackViolation called for user:', userId);
+
+        // Get current user data
+        const [rows] = await connection.execute(
+            `SELECT credits, lowest_credit_reached, times_hit_threshold, account_status 
+       FROM users 
+       WHERE id = ?`,
+            [userId]
+        );
+
+        if (!rows || rows.length === 0) {
+            throw new Error('User not found');
+        }
+
+        const user = rows[0]; // ✅ Get first row from array
+        console.log('📊 Current user data:', user);
+
+        const currentCredits = user.credits || 0;
+        const newBalance = currentCredits - creditsDeducted;
+
+        console.log(`💰 Credits: ${currentCredits} - ${creditsDeducted} = ${newBalance}`);
+
+        // ✅ Track lowest credits reached
+        let lowestReached = user.lowest_credit_reached || 100;
+        if (newBalance < lowestReached) {
+            lowestReached = newBalance;
+        }
+
+        console.log(`📉 Lowest credits: ${user.lowest_credit_reached} → ${lowestReached}`);
+
+        // Track threshold violations (when credits drop to 30 or below)
+        let timesHitThreshold = user.times_hit_threshold || 0;
+        if (newBalance <= 30 && currentCredits > 30) {
+            timesHitThreshold++;
+            console.log(`⚠️ Hit threshold! Count: ${timesHitThreshold}`);
+        }
+
+        // Determine account status
+        let accountStatus = 'active';
+        if (timesHitThreshold >= 3) {
+            accountStatus = 'banned';
+        } else if (timesHitThreshold === 2) {
+            accountStatus = 'restricted';
+        } else if (newBalance <= 30) {
+            accountStatus = 'warned';
+        }
+
+        console.log(`🎯 New status: ${accountStatus}`);
+
+        // Insert violation record
+        await connection.execute(
+            `INSERT INTO violation_history 
+       (user_id, violation_type, credits_deducted, credit_balance_after, transaction_id, description) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
+            [userId, violationType, creditsDeducted, newBalance, transactionId, description]
+        );
+
+        console.log('✅ Violation record inserted');
+
+        // Update user with new credits AND lowest_credit_reached
+        await connection.execute(
+            `UPDATE users 
+       SET credits = ?, 
+           lowest_credit_reached = ?, 
+           times_hit_threshold = ?, 
+           account_status = ? 
+       WHERE id = ?`,
+            [newBalance, lowestReached, timesHitThreshold, accountStatus, userId]
+        );
+
+        console.log(`✅ User updated: credits=${newBalance}, lowest=${lowestReached}, threshold=${timesHitThreshold}, status=${accountStatus}`);
+
+        return {
+            newBalance,
+            lowestReached,
+            timesHitThreshold,
+            accountStatus
+        };
+
+    } catch (error) {
+        console.error('❌ trackViolation error:', error);
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
+
+
 // GET /api/transactions - Get user's transactions
 router.get('/', authenticateToken, async (req, res) => {
     try {
@@ -534,6 +627,7 @@ router.put('/:id/reject', [
 });
 
 // PUT /api/transactions/:id/return - Mark book as returned and handle feedback
+// PUT /api/transactions/:id/return - Mark book as returned and handle feedback
 router.put('/:id/return', [
     authenticateToken,
     body('return_condition').isIn(['excellent', 'good', 'fair', 'poor', 'damaged']).withMessage('Valid return condition required'),
@@ -557,8 +651,6 @@ router.put('/:id/return', [
             JOIN books b ON t.book_id = b.id
             JOIN users u ON t.borrower_id = u.id
             WHERE t.id = ? AND t.borrower_id = ?
-
-
         `, [transactionId, req.user.id]);
 
         if (transactions.length === 0) {
@@ -613,17 +705,45 @@ router.put('/:id/return', [
             creditReason += ' in damaged condition';
         }
 
-        // Update borrower credits
-        if (creditChange !== 0) {
+        // ✅ NEW: Track violations separately for late returns and damage
+        if (!isOnTime && daysLate > 0) {
+            const latePenalty = Math.min(daysLate * 1, 10);
+            await trackViolation(
+                transaction.borrower_id,
+                'late_return',
+                latePenalty,
+                transactionId,
+                `Book "${transaction.book_title}" returned ${daysLate} day(s) late`
+            );
+        }
+
+        if (return_condition === 'damaged') {
+            await trackViolation(
+                transaction.borrower_id,
+                'damaged_book',
+                5,
+                transactionId,
+                `Book "${transaction.book_title}" returned in damaged condition`
+            );
+        }
+
+        // ✅ MODIFIED: Only give positive credits (rewards), violations handle penalties
+        if (creditChange > 0) {
             await updateUserCredits(connection, transaction.borrower_id, creditChange, creditReason, transactionId);
         }
 
         // Send notifications
+        const notificationMessage = creditChange > 0
+            ? `Your return of "${transaction.book_title}" has been confirmed. You earned ${creditChange} credits!`
+            : creditChange < 0
+                ? `Your return of "${transaction.book_title}" has been confirmed. ${Math.abs(creditChange)} credits deducted due to ${!isOnTime ? 'late return' : ''}${!isOnTime && return_condition === 'damaged' ? ' and ' : ''}${return_condition === 'damaged' ? 'damage' : ''}.`
+                : `Your return of "${transaction.book_title}" has been confirmed.`;
+
         await createNotification(
             connection,
             transaction.borrower_id,
             'Book Return Confirmed',
-            `Your return of "${transaction.book_title}" has been confirmed. ${creditChange > 0 ? `You earned ${creditChange} credits!` : creditChange < 0 ? `${Math.abs(creditChange)} credits deducted.` : ''}`,
+            notificationMessage,
             'transaction',
             transactionId
         );
@@ -643,6 +763,7 @@ router.put('/:id/return', [
         res.status(500).json({ error: 'Failed to process book return' });
     }
 });
+
 
 // ============================
 // COMPLETE TRANSACTION
@@ -1242,6 +1363,48 @@ router.post('/bulk-reject', [
         res.status(500).json({ error: 'Failed to process bulk rejection' });
     }
 });
+
+// ✅ ADD THIS TEST ENDPOINT (temporary for testing)
+router.post('/test-violation', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        console.log('🧪 Test violation triggered for user:', userId);
+
+        // Trigger a test violation
+        const result = await trackViolation(
+            userId,
+            'late_return',
+            15,
+            null,
+            'Test violation - 3 days late'
+        );
+
+        // Get updated user data to verify
+        const connection = await getConnection();
+        const [rows] = await connection.execute(
+            `SELECT credits, lowest_credit_reached, times_hit_threshold, account_status 
+       FROM users 
+       WHERE id = ?`,
+            [userId]
+        );
+        connection.release();
+
+        res.json({
+            success: true,
+            message: 'Test violation applied',
+            result: result,
+            userStatus: rows[0] // ✅ Return first row, not entire array
+        });
+
+    } catch (error) {
+        console.error('❌ Test violation error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+module.exports = router;
 
 
 module.exports = router;

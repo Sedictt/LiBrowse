@@ -1331,7 +1331,7 @@ body {
 }
 
 /* Ensure each book card never stretches to fill the grid track height */
-#books-grid > .book-card {
+#books-grid>.book-card {
     align-self: start;
     height: auto;
 }
@@ -1351,7 +1351,7 @@ body {
     display: block;
 }
 
-#books-grid .book-card > img {
+#books-grid .book-card>img {
     width: 100%;
     height: 220px;
     max-height: 220px;
@@ -2194,9 +2194,11 @@ body {
     color: var(--info-light);
     font-weight: 500;
     text-decoration: none;
-    display: inline; /* prevent stretching to parent width */
+    display: inline;
+    /* prevent stretching to parent width */
     width: auto;
-    padding: 0; /* remove any inherited padding that enlarges hitbox */
+    padding: 0;
+    /* remove any inherited padding that enlarges hitbox */
     max-width: fit-content;
 }
 
@@ -4398,7 +4400,8 @@ body {
     position: relative;
     width: 100%;
     height: auto;
-    border: none; /* override generic .file-preview border/size */
+    border: none;
+    /* override generic .file-preview border/size */
 }
 
 .verification-form .file-preview img {
@@ -6558,6 +6561,7 @@ body {
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+
     .saved-searches-header h3,
     .section-header-small h3 {
         font-size: 0.9rem;
@@ -8451,7 +8455,7 @@ body {
     overflow: hidden;
     position: relative;
     background: var(--bg-secondary);
-    border: 2px solid rgba(255,255,255,0.12);
+    border: 2px solid rgba(255, 255, 255, 0.12);
     box-shadow: var(--shadow-md);
 }
 
@@ -10388,3 +10392,87 @@ body {
     pointer-events: auto !important;
 }
 
+/* Violation History Styles */
+.violation-summary {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+}
+
+.violation-summary h4 {
+    margin-bottom: 1rem;
+    color: #fff;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.status-badge.active {
+    background: rgba(0, 212, 170, 0.2);
+    color: #00d4aa;
+}
+
+.status-badge.warned {
+    background: rgba(255, 184, 0, 0.2);
+    color: #ffb800;
+}
+
+.status-badge.restricted {
+    background: rgba(255, 107, 107, 0.2);
+    color: #ff6b6b;
+}
+
+.status-badge.banned {
+    background: rgba(0, 0, 0, 0.5);
+    color: #ff0000;
+    border: 1px solid #ff0000;
+}
+
+.offense-count {
+    font-weight: 600;
+    color: #ff6b6b;
+}
+
+.violation-item {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+    border-left: 3px solid #ff6b6b;
+}
+
+.violation-type {
+    font-weight: 600;
+    color: #ff6b6b;
+    margin-bottom: 0.5rem;
+}
+
+.violation-details {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.credits-lost {
+    color: #ff6b6b;
+    font-weight: 600;
+}
+
+.no-violations {
+    text-align: center;
+    padding: 2rem;
+    color: rgba(255, 255, 255, 0.5);
+}

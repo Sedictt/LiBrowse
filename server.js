@@ -1,6 +1,5 @@
 // server.js
 // Main entry point for LiBrowse backend
-// Restructured but keeps the same behavior, names, and functions
 
 const express = require('express');
 const cors = require('cors');
@@ -16,9 +15,7 @@ const { testConnection } = require('./config/database');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// If running behind a proxy (dev tunnels, reverse proxies, etc.),
-// trust X-Forwarded-* headers so express-rate-limit can safely use them.
-// This also resolves ERR_ERL_UNEXPECTED_X_FORWARDED_FOR warnings.
+// Trust proxy for rate limiting
 app.set('trust proxy', 1);
 
 // Initialize HTTP server for Socket.IO
@@ -35,10 +32,6 @@ const io = socketIO(server, {
     }
 });
 
-// ❌ REMOVE THESE LINES - you're using multer instead
-// const fileUpload = require('express-fileupload');
-// app.use(fileUpload());
-
 // Initialize chat socket handlers
 const chatHandler = require('./socket/chatHandler');
 chatHandler(io);
@@ -54,6 +47,20 @@ app.use(helmet({
 }));
 
 // =======================
+// CORS Configuration
+// =======================
+app.use(cors({
+    origin: process.env.NODE_ENV === 'production' ? 'your-domain.com' : '*',
+    credentials: true
+}));
+
+// =======================
+// ✅ BODY PARSING - MUST BE BEFORE ROUTES
+// =======================
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// =======================
 // Rate Limiting
 // =======================
 const limiter = rateLimit({
@@ -61,7 +68,6 @@ const limiter = rateLimit({
     max: process.env.NODE_ENV === 'production' ? 100 : 1000,
     message: 'Too many requests from this IP, try again later.',
     skip: (req) => {
-        // Allow more requests for dev on static + healthcheck
         if (process.env.NODE_ENV !== 'production') {
             return req.path === '/api/health' ||
                 req.path.startsWith('/uploads/') ||
@@ -74,29 +80,13 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // =======================
-// CORS Configuration
-// =======================
-app.use(cors({
-    origin: process.env.NODE_ENV === 'production'
-        ? 'your-domain.com'
-        : '*',
-    credentials: true
-}));
-
-// =======================
-// Body Parsing
-// =======================
-app.use(express.json({ limit: '10mb' }));
-//app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// =======================
 // Static Files
 // =======================
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // =======================
-// Routes
+// ✅ API Routes - AFTER MIDDLEWARE
 // =======================
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
@@ -104,10 +94,10 @@ app.use('/api/books', require('./routes/books'));
 app.use('/api/transactions', require('./routes/transactions'));
 app.use('/api/feedback', require('./routes/feedback'));
 app.use('/api/disputes', require('./routes/disputes'));
-app.use('/api/chats', require('./routes/chats-new')); // Updated to use new chat system
-app.use('/api/chat-attachments', require('./routes/chat-attachments')); // Image attachment feature
-app.use('/api/reports', require('./routes/reports')); // Automated reporting system
-app.use('/api/cancellations', require('./routes/cancellations')); // Transaction cancellation
+app.use('/api/chats', require('./routes/chats-new'));
+app.use('/api/chat-attachments', require('./routes/chat-attachments'));
+app.use('/api/reports', require('./routes/reports'));
+app.use('/api/cancellations', require('./routes/cancellations'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/verification', require('./routes/verification'));
 app.use('/api/verification', require('./routes/emailVerification'));
@@ -188,14 +178,13 @@ cron.schedule('0 8 * * *', () => {
     });
 });
 
-// Also run once on startup after 5 seconds (only if DB is connected)
+// Run once on startup after 5 seconds
 setTimeout(() => {
     console.log('[Scheduler] Running initial reminder check...');
     ReminderTask.checkDueDates().catch(err => {
         console.error('[Scheduler] Initial reminder check failed:', err.message);
     });
 }, 5000);
-
 
 startServer();
 

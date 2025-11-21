@@ -182,7 +182,7 @@ class App {
                 const idStr = item.getAttribute('data-id');
                 const nid = idStr ? parseInt(idStr) : null;
                 if (!nid) return;
-                try { await api.markNotificationAsRead(nid); } catch (_) {}
+                try { await api.markNotificationAsRead(nid); } catch (_) { }
                 const category = item.getAttribute('data-category') || '';
                 if (category === 'transaction' || category === 'reminder' || category === 'system') {
                     this.navigateToSection('monitoring');
@@ -524,6 +524,8 @@ class App {
         }
     }
 
+
+
     renderProfile(profile, stats) {
         // Use profile data if available, fallback to current user
         const userData = profile || authManager.getCurrentUser();
@@ -661,10 +663,12 @@ class App {
             case 'info':
                 tabContent.innerHTML = this.getPersonalInfoTab();
                 break;
+
             case 'verification':
                 tabContent.innerHTML = this.getVerificationTab();
                 this.setupVerificationEventListeners();
                 break;
+
             case 'books':
                 tabContent.innerHTML = this.getMyBooksTab();
                 // Trigger book loading after DOM is ready
@@ -675,49 +679,60 @@ class App {
                     }
                 }, 100);
                 break;
+
             case 'reviews':
                 tabContent.innerHTML = this.getReviewsTab();
                 this.loadUserReviews();
                 break;
+
+            // ✅ ADD THIS NEW CASE
+            case 'violations':
+                tabContent.innerHTML = this.getViolationsTab();
+                setTimeout(() => {
+                    this.loadViolationHistory();
+                }, 100);
+                break;
+
             case 'settings':
                 tabContent.innerHTML = this.getSettingsTab();
                 this.setupSettingsEventListeners();
                 break;
+
             case 'borrowing-history':
                 tabContent.innerHTML = `
-    <div class="history-container">
-      <h3>Borrowing & Lending History</h3>
-      <div class="history-header-actions">
-        <button class="btn-text" id="expand-history-all">
-          <i class="fas fa-expand"></i>
-          View as full list
-        </button>
-      </div>
-      <div class="history-grid">
-        <!-- Borrowing Column -->
-        <div class="history-column">
-          <h4><i class="fas fa-book-reader"></i> Books I Borrowed</h4>
-          <div id="borrowing-history-list" class="history-list">
-            <div class="loading-state">
-              <i class="fas fa-spinner fa-spin"></i>
-              <p>Loading borrowing history...</p>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Lending Column -->
-        <div class="history-column">
-          <h4><i class="fas fa-hands-helping"></i> Books I Lent</h4>
-          <div id="lending-history-list" class="history-list">
-            <div class="loading-state">
-              <i class="fas fa-spinner fa-spin"></i>
-              <p>Loading lending history...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
+                <div class="history-container">
+                  <h3>Borrowing & Lending History</h3>
+                  <div class="history-header-actions">
+                    <button class="btn-text" id="expand-history-all">
+                      <i class="fas fa-expand"></i>
+                      View as full list
+                    </button>
+                  </div>
+                  <div class="history-grid">
+                    <!-- Borrowing Column -->
+                    <div class="history-column">
+                      <h4><i class="fas fa-book-reader"></i> Books I Borrowed</h4>
+                      <div id="borrowing-history-list" class="history-list">
+                        <div class="loading-state">
+                          <i class="fas fa-spinner fa-spin"></i>
+                          <p>Loading borrowing history...</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- Lending Column -->
+                    <div class="history-column">
+                      <h4><i class="fas fa-hands-helping"></i> Books I Lent</h4>
+                      <div id="lending-history-list" class="history-list">
+                        <div class="loading-state">
+                          <i class="fas fa-spinner fa-spin"></i>
+                          <p>Loading lending history...</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+            `;
 
                 // Load history and wire up modal after DOM is ready
                 setTimeout(() => {
@@ -725,9 +740,9 @@ class App {
                     this.setupHistoryExpandButton();
                 }, 100);
                 break;
-
         }
     }
+
 
     getPersonalInfoTab() {
         const user = authManager.getCurrentUser();
@@ -1650,7 +1665,7 @@ class App {
                 const newUrl = window.location.pathname + window.location.hash;
                 window.history.replaceState({}, '', newUrl);
             }
-        } catch (_) {}
+        } catch (_) { }
         const hash = window.location.hash.slice(1);
         if (hash) {
             this.navigateToSection(hash);
@@ -3099,6 +3114,125 @@ class App {
         }
     }
 
+    // Violation History Methods
+    getViolationsTab() {
+        return `
+            <div class="violations-content">
+                <h3>Violation History & Account Standing</h3>
+                <div id="violation-summary" class="violation-summary">
+                    <div class="loading-state">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading account standing...</p>
+                    </div>
+                </div>
+                <div id="violation-list" class="violation-list">
+                    <div class="loading-state">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading violation history...</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    async loadViolationHistory() {
+        const summaryContainer = document.getElementById('violation-summary');
+        const listContainer = document.getElementById('violation-list');
+        const user = authManager.getCurrentUser();
+
+        if (!summaryContainer || !listContainer || !user) return;
+
+        try {
+            const response = await fetch(`/api/users/violation-history/${user.id}`, {
+                headers: {
+                    'Authorization': `Bearer ${authManager.getToken()}`
+                }
+            });
+
+            if (!response.ok) throw new Error('Failed to fetch violations');
+
+            const data = await response.json();
+
+            // Render summary
+            summaryContainer.innerHTML = `
+                <h4>Account Standing</h4>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Status:</span>
+                        <span class="status-badge ${data.summary.accountStatus}">${this.formatAccountStatus(data.summary.accountStatus)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Offense Count:</span>
+                        <span class="offense-count ${data.summary.offenseCount >= 2 ? 'warning' : ''}">${data.summary.offenseCount}/3</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Lowest Credits Reached:</span>
+                        <span class="credits-value">${data.summary.lowestCreditReached}</span>
+                    </div>
+                </div>
+                ${data.summary.offenseCount >= 2 ? `
+                    <div class="warning-banner">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>${data.summary.offenseCount === 2 ? 'Final Warning: One more violation will result in permanent ban!' : 'Account permanently banned due to repeated violations'}</span>
+                    </div>
+                ` : ''}
+            `;
+
+            // Render violation list
+            if (data.violations.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="no-violations">
+                        <i class="fas fa-check-circle"></i>
+                        <p>No violations recorded! Keep up the good behavior ✨</p>
+                    </div>
+                `;
+            } else {
+                listContainer.innerHTML = `
+                    <h4>Recent Violations</h4>
+                    <div class="violations-list">
+                        ${data.violations.map(v => `
+                            <div class="violation-item">
+                                <div class="violation-header">
+                                    <div class="violation-type">${this.formatViolationType(v.violation_type)}</div>
+                                    <div class="violation-date">${new Date(v.created_at).toLocaleDateString()}</div>
+                                </div>
+                                <div class="violation-details">
+                                    <span class="credits-lost">-${v.credits_deducted} credits</span>
+                                    <span class="balance-after">Balance after: ${v.credit_balance_after}</span>
+                                </div>
+                                ${v.description ? `<p class="violation-desc">${v.description}</p>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+        } catch (error) {
+            console.error('Error loading violation history:', error);
+            summaryContainer.innerHTML = '<p class="error-message">Failed to load account standing</p>';
+            listContainer.innerHTML = '<p class="error-message">Failed to load violation history</p>';
+        }
+    }
+
+    formatAccountStatus(status) {
+        const statuses = {
+            'active': 'Active',
+            'warned': 'Warned',
+            'restricted': 'Restricted',
+            'banned': 'Permanently Banned'
+        };
+        return statuses[status] || status;
+    }
+
+    formatViolationType(type) {
+        const types = {
+            'late_return': 'Late Return',
+            'damaged_book': 'Damaged Book',
+            'no_return': 'No Return',
+            'other': 'Other Violation'
+        };
+        return types[type] || type;
+    }
 
 
 }
@@ -3606,6 +3740,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+
+    // Call on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        if (localStorage.getItem('token')) {
+            checkAccountStatus();
+        }
+    });
 
 
     // Display a modal for book details

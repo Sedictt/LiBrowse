@@ -86,6 +86,75 @@ async function updateLoginTokenWithRetry(userId, token, maxRetries = 3) {
   }
 }
 
+// Add to auth.js or new dailyReward.js
+router.post('/daily-login-reward', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // ✅ Check if reward was already claimed today using SQL
+    const [rewardCheck] = await executeQuery(
+      `SELECT 
+        credits, 
+        times_hit_threshold, 
+        account_status,
+        last_daily_login_reward,
+        DATE(last_daily_login_reward) = CURDATE() as claimed_today
+       FROM users 
+       WHERE id = ?`,
+      [userId]
+    );
+
+    if (!rewardCheck) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (rewardCheck.account_status === 'banned') {
+      return res.status(403).json({ error: 'Account permanently banned from earning credits' });
+    }
+
+    // ✅ SQL already checked if claimed today
+    if (rewardCheck.claimed_today === 1) {
+      return res.status(400).json({ error: 'Daily reward already claimed today' });
+    }
+
+    // Calculate reward based on offense level
+    let rewardAmount = 10;
+    if (rewardCheck.times_hit_threshold === 2) rewardAmount = 5;
+    if (rewardCheck.times_hit_threshold >= 3) rewardAmount = 2;
+    if (rewardCheck.account_status === 'banned') rewardAmount = 0;
+
+    const newCredits = rewardCheck.credits + rewardAmount;
+
+    // Update with current date
+    await executeQuery(
+      `UPDATE users SET credits = ?, last_daily_login_reward = CURDATE() WHERE id = ?`,
+      [newCredits, userId]
+    );
+
+    // Log to credit history
+    await executeQuery(
+      `INSERT INTO credit_history (user_id, credit_change, reason, old_balance, new_balance, created_at) 
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [userId, rewardAmount, 'Daily login reward', rewardCheck.credits, newCredits]
+    );
+
+    res.json({
+      success: true,
+      rewardAmount,
+      newBalance: newCredits,
+      offenseLevel: rewardCheck.times_hit_threshold,
+      message: `You earned ${rewardAmount} credits for logging in today!`
+    });
+
+  } catch (e) {
+    console.error('Daily reward error:', e);
+    res.status(500).json({ error: 'Failed to process daily reward' });
+  }
+});
+
+
+
+
 // ============================
 // Login Route
 // ============================

@@ -77,42 +77,84 @@ router.post('/verify-otp', authenticateToken, async (req, res) => {
             [codes[0].id]
         );
 
-        // Update user email verification status AND verification_status
+        // ✅ Check if ALREADY VERIFIED (by any method)
+        const [userRows] = await pool.query(
+            `SELECT is_verified, credits FROM users WHERE id = ?`,
+            [userId]
+        );
+
+        const isFirstTimeVerification = !userRows[0].is_verified; // Check is_verified, not just email_verified
+        const oldCredits = userRows[0].credits;
+
+        console.log('🎯 Is first time verification?', isFirstTimeVerification);
+
+        // Update user - mark as FULLY verified
         try {
             await pool.query(
                 `UPDATE users 
-         SET email_verified = TRUE, 
-             verification_status = 'verified',
-             verification_method = 'email',
-             is_verified = 1,
-             modified = NOW()
-         WHERE id = ?`,
-                [userId]
+                 SET email_verified = TRUE, 
+                     verification_status = 'verified',
+                     verification_method = 'email',
+                     is_verified = 1,
+                     credits = credits + ?,
+                     modified = NOW()
+                 WHERE id = ?`,
+                [isFirstTimeVerification ? 15 : 0, userId]
             );
         } catch (e) {
             if (e && e.code === 'ER_BAD_FIELD_ERROR') {
-                // Fallback if email_verified column is missing
                 await pool.query(
                     `UPDATE users 
-             SET verification_status = 'verified',
-                 verification_method = 'email',
-                 is_verified = 1,
-                 modified = NOW()
-             WHERE id = ?`,
-                    [userId]
+                     SET verification_status = 'verified',
+                         verification_method = 'email',
+                         is_verified = 1,
+                         credits = credits + ?,
+                         modified = NOW()
+                     WHERE id = ?`,
+                    [isFirstTimeVerification ? 15 : 0, userId]
                 );
             } else {
                 throw e;
             }
         }
 
-        res.json({ message: 'Email verified successfully' });
+        // Log credit history if bonus was awarded
+        if (isFirstTimeVerification) {
+            const newCredits = oldCredits + 15;
+
+            await pool.query(
+                `INSERT INTO credit_history (user_id, credit_change, reason, old_balance, new_balance, created_at)
+                 VALUES (?, 15, 'Account verification bonus', ?, ?, NOW())`,
+                [userId, oldCredits, newCredits]
+            );
+
+            console.log(`✅ Verification bonus awarded: User ${userId} received +15 credits (${oldCredits} → ${newCredits})`);
+        }
+
+        // Get updated user data
+        const [updatedUser] = await pool.query(
+            `SELECT id, email, first_name, last_name, credits, is_verified, 
+                    email_verified, verification_status, verification_method 
+             FROM users 
+             WHERE id = ?`,
+            [userId]
+        );
+
+        res.json({
+            message: 'Email verified successfully',
+            bonusAwarded: isFirstTimeVerification,
+            creditsEarned: isFirstTimeVerification ? 15 : 0,
+            user: updatedUser[0]
+        });
 
     } catch (error) {
-        console.error('Error verifying OTP:', error);
+        console.error('❌ Error verifying OTP:', error);
         res.status(500).json({ error: 'Failed to verify OTP' });
     }
 });
+
+
+
 
 // Check verification status
 router.get('/status', authenticateToken, async (req, res) => {
@@ -368,71 +410,96 @@ async function runOcrAndFinalizeVerification({ user, userInfo, frontIdPath, back
         const backStrict = !!(backResult?.extractedInfo?.matches?.name && backResult?.extractedInfo?.matches?.studentId);
         const strictMatch = frontStrict || backStrict;
 
-        // Collect failure reasons from the best result
         const bestAuthResult = backResult && backResult.confidence > frontResult.confidence ? backResult : frontResult;
         const authFailureReasons = bestAuthResult.failureReasons || [];
 
         const autoApproved = strictMatch;
         const verificationStatus = autoApproved ? 'verified' : 'pending_review';
 
-        // Store verification record in database
+        // Store verification record
         const verificationResult = await executeQuery(`
             INSERT INTO verification_documents (
-                user_id,
-                front_id_path,
-                back_id_path,
-                front_ocr_text,
-                back_ocr_text,
-                front_extracted_info,
-                back_extracted_info,
-                front_confidence,
-                back_confidence,
-                combined_confidence,
-                status,
-                auto_approved,
-                processed_at,
-                created_at
+                user_id, front_id_path, back_id_path, front_ocr_text, back_ocr_text,
+                front_extracted_info, back_extracted_info, front_confidence, back_confidence,
+                combined_confidence, status, auto_approved, processed_at, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         `, [
-            user.id,
-            frontIdPath,
-            backIdPath || null,
-            frontResult.extractedText || null,
-            backResult ? backResult.extractedText : null,
+            user.id, frontIdPath, backIdPath || null,
+            frontResult.extractedText || null, backResult ? backResult.extractedText : null,
             JSON.stringify(frontResult.extractedInfo || {}),
             backResult ? JSON.stringify(backResult.extractedInfo || {}) : null,
-            frontResult.confidence || 0,
-            backResult ? backResult.confidence : null,
-            combinedConfidence,
-            verificationStatus,
-            autoApproved ? 1 : 0
+            frontResult.confidence || 0, backResult ? backResult.confidence : null,
+            combinedConfidence, verificationStatus, autoApproved ? 1 : 0
         ]);
 
-        // Update user verification status
+        // ✅ Check if ALREADY VERIFIED (bonus only once, regardless of method)
+        let isFirstTimeVerification = false;
+        let oldCredits = 0;
+
+        if (autoApproved) {
+            const [userRows] = await executeQuery(
+                `SELECT is_verified, credits FROM users WHERE id = ?`,
+                [user.id]
+            );
+
+            isFirstTimeVerification = !userRows[0].is_verified; // Check is_verified, not id_verified
+            oldCredits = userRows[0].credits;
+        }
+
+        console.log('🎯 Document verification - First time?', isFirstTimeVerification);
+
+        // Update user - mark as FULLY verified if auto-approved
         try {
             await executeQuery(
-                "UPDATE users SET verification_status = ?, verification_method = ?, is_verified = CASE WHEN ? OR email_verified = 1 THEN 1 ELSE 0 END, modified = NOW() WHERE id = ?",
-                [verificationStatus, 'document_upload', autoApproved ? 1 : 0, user.id]
+                `UPDATE users 
+                 SET verification_status = ?, 
+                     verification_method = ?, 
+                     is_verified = CASE WHEN ? THEN 1 ELSE is_verified END,
+                     id_verified = CASE WHEN ? THEN TRUE ELSE id_verified END,
+                     credits = credits + ?,
+                     modified = NOW() 
+                 WHERE id = ?`,
+                [verificationStatus, 'document_upload', autoApproved, autoApproved, isFirstTimeVerification ? 15 : 0, user.id]
             );
         } catch (e) {
             const msg = (e && (e.sqlMessage || e.message || '')).toLowerCase();
-            if (e && e.code === 'ER_BAD_FIELD_ERROR' && msg.includes('email_verified')) {
-                // Fallback when email_verified column is absent: base is_verified only on document auto-approval
+            if (e && e.code === 'ER_BAD_FIELD_ERROR') {
                 await executeQuery(
-                    "UPDATE users SET verification_status = ?, verification_method = ?, is_verified = CASE WHEN ? THEN 1 ELSE 0 END, modified = NOW() WHERE id = ?",
-                    [verificationStatus, 'document_upload', autoApproved ? 1 : 0, user.id]
+                    `UPDATE users 
+                     SET verification_status = ?, 
+                         verification_method = ?, 
+                         is_verified = CASE WHEN ? THEN 1 ELSE is_verified END,
+                         id_verified = CASE WHEN ? THEN TRUE ELSE id_verified END,
+                         credits = credits + ?,
+                         modified = NOW() 
+                     WHERE id = ?`,
+                    [verificationStatus, 'document_upload', autoApproved, autoApproved, isFirstTimeVerification ? 15 : 0, user.id]
                 );
             } else {
                 throw e;
             }
         }
 
-        // Notify user via in-app notification (and email if you extend EmailService)
+        // ✅ Log credit history if bonus was awarded
+        if (isFirstTimeVerification) {
+            const newCredits = oldCredits + 15;
+
+            await executeQuery(
+                `INSERT INTO credit_history (user_id, credit_change, reason, old_balance, new_balance, created_at)
+                 VALUES (?, 15, 'Account verification bonus (document)', ?, ?, NOW())`,
+                [user.id, oldCredits, newCredits]
+            );
+
+            console.log(`✅ Verification bonus awarded: User ${user.id} received +15 credits (${oldCredits} → ${newCredits})`);
+        }
+
+        // Notify user
         await NotificationHelper.notifyVerificationResult(user.id, {
             verificationId: verificationResult.insertId,
             autoApproved,
             verificationStatus,
-            failureReasons: authFailureReasons
+            failureReasons: authFailureReasons,
+            bonusAwarded: isFirstTimeVerification
         });
 
         console.log(`OCR verification completed for user ${user.id} with status ${verificationStatus}`);
@@ -444,9 +511,10 @@ async function runOcrAndFinalizeVerification({ user, userInfo, frontIdPath, back
                 console.error('Failed to send verification failure notification:', e);
             });
         }
-        // Do not rethrow; this is a background job
     }
 }
+
+
 
 module.exports = router;
 

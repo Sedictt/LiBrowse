@@ -279,6 +279,8 @@ class AuthManager {
 
     }
 
+
+
     setupFormValidation() {
         // Password validation for registration
         const registerPassword = document.getElementById('register-password');
@@ -468,6 +470,9 @@ class AuthManager {
                 this.closeModal('login-modal');
                 this.showToast('Welcome back!', 'success');
 
+                // ✅ NEW: Check for daily login reward
+                await this.checkDailyReward();
+
                 // Reload the current section
                 if (window.app) {
                     window.app.loadCurrentSection();
@@ -501,6 +506,7 @@ class AuthManager {
             }
         }
     }
+
 
     async handleRegister(e) {
         e.preventDefault();
@@ -663,6 +669,8 @@ class AuthManager {
             }
         }
     }
+
+
 
     setAuth(token, user) {
         localStorage.setItem('token', token);
@@ -1000,6 +1008,90 @@ class AuthManager {
             this.showToast(err.message || "Failed to send reset link", "error");
         }
     }
+
+    // Add these methods to your AuthManager class in public/js/auth.js
+
+    async checkDailyReward() {
+        console.log('🔍 checkDailyReward() called');
+
+        try {
+            console.log('📡 Sending request to /api/auth/daily-login-reward');
+
+            const response = await fetch('/api/auth/daily-login-reward', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.getToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            console.log('📥 Response status:', response.status);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('✅ Daily reward data:', data);
+                showToast(`🎉 Daily Reward: +${data.rewardAmount} credits!`, 'success');
+                this.updateUserCreditsDisplay(data.newBalance);
+            } else if (response.status === 400) {
+                console.log('ℹ️ Already claimed today');
+            } else if (response.status === 403) {
+                const data = await response.json();
+                console.log('❌ Forbidden:', data.error);
+                showToast(data.error, 'error');
+            } else {
+                console.error('⚠️ Unexpected response:', response.status);
+            }
+        } catch (error) {
+            console.error('💥 Daily reward check failed:', error);
+        }
+    }
+
+    updateUserCreditsDisplay(newBalance) {
+        console.log('💰 Updating credits display to:', newBalance);
+
+        // Update all credit display elements
+        const creditElements = document.querySelectorAll('.user-credits, #user-credits, .credits-badge, .credits-value');
+
+        creditElements.forEach(el => {
+            el.textContent = newBalance;
+        });
+
+        // Update stored user data
+        const user = this.getCurrentUser();
+        if (user) {
+            user.credits = newBalance;
+            localStorage.setItem('user', JSON.stringify(user));
+        }
+
+        console.log(`✅ Credits updated to: ${newBalance}`);
+    }
+
+
+    // Call after login success
+    async handleLoginSuccess(token, userData) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('userId', userData.id);
+
+        // Check for daily reward
+        await checkDailyReward();
+
+        // Continue with normal login flow
+        window.location.href = '/dashboard';
+    }
+
+    // In auth.js - after successful login
+
+    async handleLoginSuccess(data) {
+        this.setToken(data.token);
+        this.setCurrentUser(data.user);
+
+        // Check for daily reward
+        await this.checkDailyReward();
+
+        // Continue with rest of login flow
+        // ... your existing code
+    }
+
 
 }
 // (Global forgot password listeners are registered inside AuthManager methods)
