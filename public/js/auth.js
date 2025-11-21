@@ -311,7 +311,28 @@ class AuthManager {
         }
         if (studentIdInput && studentIdPreview) {
             studentIdInput.addEventListener('input', () => {
-                studentIdPreview.textContent = studentIdInput.value.trim();
+                const raw = studentIdInput.value;
+                // Strip non-digits
+                let digits = raw.replace(/\D/g, '').slice(0, 6); // max 6 digits total
+                let formatted = digits;
+                if (digits.length > 2) {
+                    const first = digits.slice(0, 2);
+                    const rest = digits.slice(2); // up to 4 remaining digits
+                    formatted = first + '-' + rest;
+                }
+                studentIdInput.value = formatted;
+                studentIdPreview.textContent = formatted;
+            });
+            // Handle paste events (ensure formatting applied)
+            studentIdInput.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pasted = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+                let formatted = pasted;
+                if (pasted.length > 2) {
+                    formatted = pasted.slice(0, 2) + '-' + pasted.slice(2);
+                }
+                studentIdInput.value = formatted;
+                studentIdPreview.textContent = formatted;
             });
         }
 
