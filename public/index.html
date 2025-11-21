@@ -979,6 +979,8 @@
                             <span style="white-space:nowrap; color:#9ca3af; font-size:0.9rem;">@plv.edu.ph</span>
                         </div>
                         <small id="email-error" class="error-message"></small>
+                        <small class="form-help">Example: juan.dela.cruz@plv.edu.ph</small>
+                        <small class="form-help">Preview: <span id="login-email-preview"></span></small>
                     </div>
 
                     <!-- Password -->
@@ -1071,15 +1073,18 @@
                             <span style="white-space:nowrap; color:#9ca3af; font-size:0.9rem;">@plv.edu.ph</span>
                         </div>
                         <small id="register-email-error" class="error-message"></small>
+                        <small class="form-help">Example: juan.dela.cruz@plv.edu.ph</small>
+                        <small class="form-help">Preview: <span id="register-email-preview"></span></small>
                     </div>
 
                     <!-- Student ID -->
                     <div class="form-group">
                         <label for="register-student-id">Student ID</label>
-                        <input type="text" id="register-student-id" name="student_id" placeholder="e.g., 21-1234"
-                            pattern="\d{2}-\d{4}" title="Format: 00-0000 (e.g., 21-1234)" required>
-                        <small class="form-help">Format: 00-0000 (e.g., 21-1234)</small>
+                        <input type="text" id="register-student-id" name="student_id" placeholder="e.g., 23-001"
+                            pattern="\d{2}-\d{3,4}" title="Format: YY-NNN or YY-NNNN (e.g., 23-001, 21-1234)" required>
+                        <small class="form-help">Format: YY-NNN or YY-NNNN (e.g., 23-001, 21-1234)</small>
                         <small id="register-student-id-error" class="error-message"></small>
+                        <small class="form-help">Preview: <span id="register-student-id-preview"></span></small>
                     </div>
 
                     <!-- Program -->

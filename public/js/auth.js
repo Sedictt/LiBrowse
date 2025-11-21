@@ -283,6 +283,37 @@ class AuthManager {
         // Password validation for registration
         const registerPassword = document.getElementById('register-password');
         const confirmPassword = document.getElementById('register-confirm-password');
+        // Email preview helpers
+        const loginEmailInput = document.getElementById('login-email');
+        const loginEmailPreview = document.getElementById('login-email-preview');
+        const registerEmailInput = document.getElementById('register-email');
+        const registerEmailPreview = document.getElementById('register-email-preview');
+        const studentIdInput = document.getElementById('register-student-id');
+        const studentIdPreview = document.getElementById('register-student-id-preview');
+
+        function buildEmailPreview(raw) {
+            if (!raw) return '';
+            const trimmed = raw.trim();
+            // If user already types domain, keep it; else append
+            if (/@plv\.edu\.ph$/i.test(trimmed)) return trimmed.toLowerCase();
+            return (trimmed.replace(/@.*/, '') + '@plv.edu.ph').toLowerCase();
+        }
+
+        if (loginEmailInput && loginEmailPreview) {
+            loginEmailInput.addEventListener('input', () => {
+                loginEmailPreview.textContent = buildEmailPreview(loginEmailInput.value);
+            });
+        }
+        if (registerEmailInput && registerEmailPreview) {
+            registerEmailInput.addEventListener('input', () => {
+                registerEmailPreview.textContent = buildEmailPreview(registerEmailInput.value);
+            });
+        }
+        if (studentIdInput && studentIdPreview) {
+            studentIdInput.addEventListener('input', () => {
+                studentIdPreview.textContent = studentIdInput.value.trim();
+            });
+        }
 
         if (registerPassword) {
             registerPassword.addEventListener('input', () => {
