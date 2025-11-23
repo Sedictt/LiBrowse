@@ -1162,10 +1162,12 @@ class AuthManager {
                 claimBtnText.textContent = `Claim ${data.nextRewardAmount} Credits`;
                 checkinInfo.textContent = 'Click to claim your daily reward!';
                 
-                // Add click handler
-                claimBtn.onclick = async () => {
+                // Add click handler using addEventListener for better event handling
+                claimBtn.removeEventListener('click', this._claimHandler);
+                this._claimHandler = async () => {
                     await this.claimDailyReward(claimBtn, claimBtnText);
                 };
+                claimBtn.addEventListener('click', this._claimHandler);
             } else {
                 claimBtn.disabled = true;
                 claimBtnText.textContent = 'Already Claimed Today';

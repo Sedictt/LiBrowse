@@ -4161,6 +4161,13 @@ body {
     50% { opacity: 0.7; }
 }
 
+/* Respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    @keyframes flicker {
+        0%, 100% { opacity: 1; }
+    }
+}
+
 .checkin-timeline {
     display: flex;
     gap: var(--spacing-sm);
@@ -4237,6 +4244,24 @@ body {
     50% {
         transform: scale(1.05);
         box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
+    }
+}
+
+/* Respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    @keyframes pulse {
+        0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.5);
+        }
+    }
+    
+    .timeline-day.today .day-indicator {
+        animation: none;
+    }
+    
+    .checkin-streak i {
+        animation: none;
     }
 }
 

@@ -98,6 +98,7 @@ router.post('/daily-login-reward', authenticateToken, async (req, res) => {
         times_hit_threshold, 
         account_status,
         last_daily_login_reward,
+        daily_checkin_streak,
         DATE(last_daily_login_reward) = CURDATE() as claimed_today
        FROM users 
        WHERE id = ?`,
@@ -137,11 +138,7 @@ router.post('/daily-login-reward', authenticateToken, async (req, res) => {
       
       // Check if last check-in was yesterday (consecutive)
       if (lastDate.toDateString() === yesterday.toDateString()) {
-        const [streakData] = await executeQuery(
-          'SELECT daily_checkin_streak FROM users WHERE id = ?',
-          [userId]
-        );
-        newStreak = (streakData?.daily_checkin_streak || 0) + 1;
+        newStreak = (rewardCheck.daily_checkin_streak || 0) + 1;
       }
     }
     
@@ -160,8 +157,7 @@ router.post('/daily-login-reward', authenticateToken, async (req, res) => {
     // Log to daily_checkins table for timeline tracking
     try {
       await executeQuery(
-        `INSERT INTO daily_checkins (user_id, checkin_date, reward_amount) 
-         VALUES (?, CURDATE(), ?)`,
+        `INSERT INTO daily_checkins (user_id, checkin_date, reward_amount) VALUES (?, CURDATE(), ?)`,
         [userId, rewardAmount]
       );
     } catch (err) {
