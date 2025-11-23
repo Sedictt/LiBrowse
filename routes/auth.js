@@ -125,10 +125,29 @@ router.post('/daily-login-reward', authenticateToken, async (req, res) => {
 
     const newCredits = rewardCheck.credits + rewardAmount;
 
-    // Update with current date
+    // Update with current date and calculate streak
+    const lastCheckin = rewardCheck.last_daily_login_reward;
+    let newStreak = 1;
+    
+    if (lastCheckin) {
+      const lastDate = new Date(lastCheckin);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      // Check if last check-in was yesterday (consecutive)
+      if (lastDate.toDateString() === yesterday.toDateString()) {
+        const [streakData] = await executeQuery(
+          'SELECT daily_checkin_streak FROM users WHERE id = ?',
+          [userId]
+        );
+        newStreak = (streakData?.daily_checkin_streak || 0) + 1;
+      }
+    }
+    
     await executeQuery(
-      `UPDATE users SET credits = ?, last_daily_login_reward = CURDATE() WHERE id = ?`,
-      [newCredits, userId]
+      `UPDATE users SET credits = ?, last_daily_login_reward = CURDATE(), daily_checkin_streak = ? WHERE id = ?`,
+      [newCredits, newStreak, userId]
     );
 
     // Log to credit history
@@ -138,17 +157,119 @@ router.post('/daily-login-reward', authenticateToken, async (req, res) => {
       [userId, rewardAmount, 'Daily login reward', rewardCheck.credits, newCredits]
     );
 
+    // Log to daily_checkins table for timeline tracking
+    try {
+      await executeQuery(
+        `INSERT INTO daily_checkins (user_id, checkin_date, reward_amount) 
+         VALUES (?, CURDATE(), ?)`,
+        [userId, rewardAmount]
+      );
+    } catch (err) {
+      // Ignore duplicate key errors (already checked in today)
+      if (err.code !== 'ER_DUP_ENTRY') {
+        console.error('Error logging daily check-in:', err);
+      }
+    }
+
     res.json({
       success: true,
       rewardAmount,
       newBalance: newCredits,
       offenseLevel: rewardCheck.times_hit_threshold,
+      streak: newStreak,
       message: `You earned ${rewardAmount} credits for logging in today!`
     });
 
   } catch (e) {
     console.error('Daily reward error:', e);
     res.status(500).json({ error: 'Failed to process daily reward' });
+  }
+});
+
+// Get 7-day check-in timeline
+router.get('/daily-checkin-timeline', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get user data
+    const [userData] = await executeQuery(
+      `SELECT 
+        last_daily_login_reward,
+        daily_checkin_streak,
+        times_hit_threshold,
+        account_status,
+        credits
+       FROM users 
+       WHERE id = ?`,
+      [userId]
+    );
+
+    if (!userData) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get last 7 days of check-ins
+    const checkins = await executeQuery(
+      `SELECT 
+        checkin_date,
+        reward_amount,
+        created_at
+       FROM daily_checkins 
+       WHERE user_id = ? 
+         AND checkin_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+       ORDER BY checkin_date DESC`,
+      [userId]
+    );
+
+    // Build 7-day timeline (today and previous 6 days)
+    const timeline = [];
+    const today = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const checkin = checkins.find(c => {
+        const checkinDate = new Date(c.checkin_date).toISOString().split('T')[0];
+        return checkinDate === dateStr;
+      });
+
+      timeline.push({
+        date: dateStr,
+        dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        isToday: i === 0,
+        claimed: !!checkin,
+        rewardAmount: checkin ? checkin.reward_amount : null,
+        claimedAt: checkin ? checkin.created_at : null
+      });
+    }
+
+    // Check if today's reward is available
+    const todayStr = today.toISOString().split('T')[0];
+    const lastCheckinStr = userData.last_daily_login_reward 
+      ? new Date(userData.last_daily_login_reward).toISOString().split('T')[0]
+      : null;
+    const canClaimToday = todayStr !== lastCheckinStr;
+
+    // Calculate reward amount for today based on offense level
+    let nextRewardAmount = 10;
+    if (userData.times_hit_threshold === 2) nextRewardAmount = 5;
+    if (userData.times_hit_threshold >= 3) nextRewardAmount = 2;
+    if (userData.account_status === 'banned') nextRewardAmount = 0;
+
+    res.json({
+      success: true,
+      timeline,
+      currentStreak: userData.daily_checkin_streak || 0,
+      canClaimToday,
+      nextRewardAmount,
+      totalCredits: userData.credits
+    });
+
+  } catch (e) {
+    console.error('Timeline fetch error:', e);
+    res.status(500).json({ error: 'Failed to fetch check-in timeline' });
   }
 });
 

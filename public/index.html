@@ -756,6 +756,38 @@
                                 </div>
                             </div>
 
+                            <!-- Daily Check-In Timeline -->
+                            <div class="daily-checkin-card">
+                                <div class="checkin-header">
+                                    <div class="checkin-title">
+                                        <i class="fas fa-calendar-check"></i>
+                                        <span>Daily Check-In</span>
+                                    </div>
+                                    <div class="checkin-streak" id="checkin-streak">
+                                        <i class="fas fa-fire"></i>
+                                        <span id="streak-count">0</span> day streak
+                                    </div>
+                                </div>
+                                
+                                <div class="checkin-timeline" id="checkin-timeline">
+                                    <!-- Timeline will be populated by JavaScript -->
+                                    <div class="timeline-loading">
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                        <span>Loading check-in history...</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="checkin-action">
+                                    <button class="btn btn-primary btn-full" id="claim-daily-reward-btn" disabled>
+                                        <i class="fas fa-gift"></i>
+                                        <span id="claim-btn-text">Loading...</span>
+                                    </button>
+                                    <div class="checkin-info" id="checkin-info">
+                                        Check in daily to earn credits!
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="profile-stats">
                                 <div class="stat">
                                     <div class="stat-icon">

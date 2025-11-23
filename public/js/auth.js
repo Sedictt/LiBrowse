@@ -1093,6 +1093,125 @@ class AuthManager {
     }
 
 
+    // Fetch and display the daily check-in timeline
+    async fetchDailyCheckinTimeline() {
+        console.log('📅 Fetching daily check-in timeline...');
+        
+        try {
+            const response = await fetch('/api/auth/daily-checkin-timeline', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.getToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                console.error('Failed to fetch timeline:', response.status);
+                return;
+            }
+
+            const data = await response.json();
+            console.log('✅ Timeline data:', data);
+
+            this.renderCheckinTimeline(data);
+        } catch (error) {
+            console.error('💥 Error fetching check-in timeline:', error);
+        }
+    }
+
+    renderCheckinTimeline(data) {
+        const timelineContainer = document.getElementById('checkin-timeline');
+        const streakCount = document.getElementById('streak-count');
+        const claimBtn = document.getElementById('claim-daily-reward-btn');
+        const claimBtnText = document.getElementById('claim-btn-text');
+        const checkinInfo = document.getElementById('checkin-info');
+
+        if (!timelineContainer) return;
+
+        // Update streak counter
+        if (streakCount) {
+            streakCount.textContent = data.currentStreak || 0;
+        }
+
+        // Build timeline HTML
+        const timelineHTML = data.timeline.map(day => {
+            const dayClasses = ['timeline-day'];
+            if (day.isToday) dayClasses.push('today');
+            if (day.claimed) dayClasses.push('claimed');
+
+            const indicatorContent = day.claimed 
+                ? '<i class="fas fa-check"></i>'
+                : new Date(day.date).getDate();
+
+            return `
+                <div class="${dayClasses.join(' ')}" title="${day.claimed ? 'Claimed' : 'Not claimed'}">
+                    <div class="day-name">${day.dayName}</div>
+                    <div class="day-indicator">${indicatorContent}</div>
+                    <div class="day-date">${new Date(day.date).getDate()}</div>
+                </div>
+            `;
+        }).join('');
+
+        timelineContainer.innerHTML = timelineHTML;
+
+        // Update claim button
+        if (claimBtn && claimBtnText && checkinInfo) {
+            if (data.canClaimToday) {
+                claimBtn.disabled = false;
+                claimBtnText.textContent = `Claim ${data.nextRewardAmount} Credits`;
+                checkinInfo.textContent = 'Click to claim your daily reward!';
+                
+                // Add click handler
+                claimBtn.onclick = async () => {
+                    await this.claimDailyReward(claimBtn, claimBtnText);
+                };
+            } else {
+                claimBtn.disabled = true;
+                claimBtnText.textContent = 'Already Claimed Today';
+                checkinInfo.textContent = 'Come back tomorrow for your next reward!';
+            }
+        }
+    }
+
+    async claimDailyReward(button, buttonText) {
+        const originalText = buttonText.textContent;
+        buttonText.textContent = 'Claiming...';
+        button.disabled = true;
+
+        try {
+            const response = await fetch('/api/auth/daily-login-reward', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.getToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                showToast(`🎉 Claimed ${data.rewardAmount} credits! New balance: ${data.newBalance}`, 'success');
+                
+                // Update credits display
+                this.updateUserCreditsDisplay(data.newBalance);
+                
+                // Refresh timeline
+                await this.fetchDailyCheckinTimeline();
+            } else if (response.status === 400) {
+                const data = await response.json();
+                showToast(data.error || 'Already claimed today', 'info');
+            } else {
+                throw new Error('Failed to claim reward');
+            }
+        } catch (error) {
+            console.error('Error claiming reward:', error);
+            showToast('Failed to claim reward. Please try again.', 'error');
+            buttonText.textContent = originalText;
+            button.disabled = false;
+        }
+    }
+
+
 }
 // (Global forgot password listeners are registered inside AuthManager methods)
 

@@ -592,6 +592,11 @@ class App {
         // Setup profile tabs
         this.setupProfileTabs();
 
+        // Fetch daily check-in timeline
+        if (authManager && typeof authManager.fetchDailyCheckinTimeline === 'function') {
+            authManager.fetchDailyCheckinTimeline();
+        }
+
         // Setup edit profile button (with delay to ensure DOM is ready)
         setTimeout(() => {
             this.setupEditProfileButton();
