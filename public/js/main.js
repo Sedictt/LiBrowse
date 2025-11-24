@@ -374,6 +374,9 @@ class App {
                 break;
             case 'monitoring':  // ⭐ ADD THIS
                 if (typeof monitoringManager !== 'undefined' && monitoringManager) {
+                    if (typeof monitoringManager.switchTab === 'function') {
+                        monitoringManager.switchTab('active');
+                    }
                     await monitoringManager.loadTransactions();
                 }
                 break;

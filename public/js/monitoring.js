@@ -23,6 +23,27 @@ class MonitoringManager {
                 this.loadTransactions();
             }
         });
+
+        // Setup tab button listeners
+        const tabBtns = document.querySelectorAll('.monitoring-tabs .tab-btn[data-tab]');
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tab = e.currentTarget.getAttribute('data-tab');
+                this.switchTab(tab);
+            });
+        });
+    }
+
+    switchTab(tab) {
+        // Update buttons
+        document.querySelectorAll('.monitoring-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+        const activeBtn = document.querySelector(`.monitoring-tabs .tab-btn[data-tab="${tab}"]`);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        // Update tab contents
+        document.querySelectorAll('#monitoring-section .tab-content').forEach(c => c.classList.remove('active'));
+        const targetContent = document.getElementById(`${tab}-tab`);
+        if (targetContent) targetContent.classList.add('active');
     }
 
     async loadTransactions() {
