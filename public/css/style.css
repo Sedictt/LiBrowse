@@ -1938,6 +1938,36 @@ body {
     padding: var(--spacing-lg);
 }
 
+/* Highlight for books owned by the current user */
+.book-card.owner {
+    border-color: var(--warning);
+    box-shadow: 0 0 0 2px rgba(255, 184, 0, 0.3);
+}
+
+.book-card .owner-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #222;
+    padding: 4px 10px;
+    border-radius: 14px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    z-index: 5;
+    text-transform: uppercase;
+}
+
+.book-card .owner-badge i {
+    color: #222;
+    font-size: 0.7rem;
+}
+
 .book-card::before {
     content: '';
     position: absolute;

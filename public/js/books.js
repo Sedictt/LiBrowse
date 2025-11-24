@@ -155,10 +155,24 @@ class BooksManager {
         const requiredCredits = book.minimum_credits || book.min_credit || 0;
         const isAuthenticated = authManager?.isAuthenticated ?? false;
         const hasEnoughCredits = !isAuthenticated || userCredits >= requiredCredits;
-        const canRequest = isAvailable && hasEnoughCredits;
+        const isOwner = !!currentUser && (currentUser.id === book.owner_id);
+        const canRequest = isAvailable && hasEnoughCredits && !isOwner;
+
+        // Determine label for request button
+        let requestLabel;
+        if (isOwner) {
+            requestLabel = 'Your Book';
+        } else if (!isAvailable) {
+            requestLabel = 'Unavailable';
+        } else if (!hasEnoughCredits && isAuthenticated) {
+            requestLabel = 'Not Enough Credits';
+        } else {
+            requestLabel = 'Request';
+        }
 
         return `
-            <div class="book-card" data-book-id="${book.id}">
+            <div class="book-card${isOwner ? ' owner' : ''}" data-book-id="${book.id}">
+                ${isOwner ? '<span class="owner-badge"><i class="fas fa-star"></i> Your Book</span>' : ''}
                 <div class="book-image">
                     <img src="${imageUrl}" alt="${escapeHtml(book.title)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                     <div class="book-image-fallback" style="display: none; width: 100%; height: 100%; background: var(--bg-secondary); align-items: center; justify-content: center; font-size: 3rem; color: var(--text-muted);">
@@ -191,9 +205,9 @@ class BooksManager {
                         </div>
                     ` : ''}
                     <div class="book-actions">
-                        <button class="btn btn-primary btn-sm" onclick="booksManager.requestBook(${book.id})" ${!canRequest ? 'disabled' : ''}>
+                        <button class="btn btn-primary btn-sm" onclick="${isOwner ? '' : `booksManager.requestBook(${book.id})`}" ${!canRequest ? 'disabled' : ''}>
                             <i class="fas fa-hand-paper"></i>
-                            ${!isAvailable ? 'Unavailable' : !hasEnoughCredits && isAuthenticated ? 'Not Enough Credits' : 'Request'}
+                            ${requestLabel}
                         </button>
                         <button class="btn btn-outline btn-sm" onclick="booksManager.viewBook(${book.id})">
                             <i class="fas fa-eye"></i>
