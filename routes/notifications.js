@@ -21,22 +21,19 @@ router.get('/', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Invalid pagination parameters' });
         }
 
-        let query = `
+        let baseQuery = `
             SELECT * FROM notifications
             WHERE user_id = ?
         `;
 
         if (unreadOnly === 'true') {
-            query += ' AND is_read = FALSE';
+            baseQuery += ' AND is_read = FALSE';
         }
 
-        query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+        // Inline sanitized integers for LIMIT/OFFSET
+        const notificationsQuery = `${baseQuery} ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offsetNum}`;
 
-        const [notifications] = await connection.execute(query, [
-            userId,
-            limitNum,
-            offsetNum
-        ]);
+        const [notifications] = await connection.execute(notificationsQuery, [userId]);
 
         // Get unread count
         const [countResult] = await connection.execute(

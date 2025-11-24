@@ -204,6 +204,69 @@ For production deployment, consider:
 - **File Storage**: Cloud storage for uploaded images
 - **Environment**: Update NODE_ENV to 'production'
 
+### Render Deployment (render-deploy branch)
+The `render-deploy` branch is prepared for deploying LiBrowse on Render.
+
+#### 1. Create Service
+1. Push the `render-deploy` branch: `git push origin render-deploy` (already created locally).
+2. In Render dashboard, create a new Web Service from your GitHub repo.
+3. Select the `render-deploy` branch.
+
+#### 2. Build & Start Commands
+Render auto-detects Node. Use:
+```
+Build Command: npm install
+Start Command: node server.js
+```
+
+#### 3. Required Environment Variables
+Add these in Render (Environment tab):
+```
+DB_HOST=<railway_public_host>
+DB_PORT=<railway_public_port>
+DB_USER=root
+DB_PASSWORD=<railway_password>
+DB_NAME=librowse
+JWT_SECRET=<secure_random_string>
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=librowse.book@gmail.com
+EMAIL_PASSWORD=<gmail_app_password>
+SENDGRID_API_KEY=<optional_if_used>
+SENDGRID_FROM_EMAIL=noreply@booqy.app
+RECAPTCHA_SITE_KEY=<if enabled>
+RECAPTCHA_SECRET_KEY=<if enabled>
+NODE_ENV=production
+```
+
+#### 4. Database SSL
+Railway MySQL uses SSL; the config auto-detects and sets `rejectUnauthorized: false` for hosts containing `railway`.
+
+#### 5. Health Check
+Set a health check path (optional): `/api/auth/verify` returns 401 if no token; you can also expose a simple `/health` endpoint if needed.
+
+#### 6. File Uploads
+Render’s ephemeral filesystem means uploaded files are lost on redeploy. For production persistence:
+- Migrate `uploads/` to an S3 bucket or Cloudinary.
+- Replace local paths with remote URLs.
+
+#### 7. WebSocket (Socket.IO)
+Socket.IO works on Render; ensure you are not scaling to multiple instances without a shared adapter (e.g. Redis) or you may get inconsistent real-time behavior.
+
+#### 8. Common Issues
+- `ER_WRONG_ARGUMENTS`: Ensure branch includes latest inline LIMIT/OFFSET fixes.
+- JWT errors: Confirm `JWT_SECRET` set.
+- Email failures: Verify Gmail App Password.
+
+#### 9. Post-Deploy Verification
+Test endpoints:
+```
+curl https://<your-render-domain>/api/books
+curl -X POST https://<your-render-domain>/api/auth/login
+```
+Check logs in Render dashboard for startup confirmation.
+
+
 ## 🤝 Contributing
 
 This project was developed by the PLV BSIT 3-4 team:

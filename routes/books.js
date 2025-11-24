@@ -126,7 +126,8 @@ router.get('/', [
         // ========================================
 
         // Get books with owner information
-        const [books] = await connection.execute(`
+        // Inject sanitized integers for LIMIT/OFFSET to avoid prepared statement argument issues
+        const booksQuery = `
             SELECT
                 b.*,
                 CONCAT(u.fname, ' ', u.lname) as owner_name,
@@ -136,8 +137,9 @@ router.get('/', [
             JOIN users u ON b.owner_id = u.id
             ${whereClause}
             ORDER BY ${orderBy}
-            LIMIT ? OFFSET ?
-        `, [...queryParams, limit, offset]);
+            LIMIT ${limit} OFFSET ${offset}
+        `;
+        const [books] = await connection.execute(booksQuery, queryParams);
 
         // Get total count for pagination
         const [countResult] = await connection.execute(`
@@ -367,7 +369,8 @@ router.get('/search', [
             else if (sort === 'oldest') orderBy = 'b.created_at ASC';
         }
 
-        const [books] = await connection.execute(`
+        // Inline LIMIT/OFFSET to avoid statement argument mismatch (sanitized integers)
+        const relevanceQuery = `
             SELECT
                 b.*,
                 CONCAT(u.fname, ' ', u.lname) AS owner_name,
@@ -378,8 +381,9 @@ router.get('/search', [
             JOIN users u ON b.owner_id = u.id
             ${whereClause}
             ORDER BY ${orderBy}
-            LIMIT ? OFFSET ?
-        `, [...relevanceParams, ...whereParams, limit, offset]);
+            LIMIT ${limit} OFFSET ${offset}
+        `;
+        const [books] = await connection.execute(relevanceQuery, [...relevanceParams, ...whereParams]);
 
         const [countResult] = await connection.execute(`
             SELECT COUNT(*) AS total
@@ -486,7 +490,8 @@ router.get('/autocomplete', async (req, res) => {
 router.get('/recommendations', authenticateToken, async (req, res) => {
     try {
         const connection = await getConnection();
-        const limit = parseInt(req.query.limit) || 8;
+        const limitRaw = parseInt(req.query.limit, 10);
+        const safeLimit = Math.max(1, Math.min(Number.isInteger(limitRaw) ? limitRaw : 8, 50));
 
         // Get user's activity to determine preferences
         const [userActivity] = await connection.execute(
@@ -533,8 +538,8 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
 
         const params = [...subjects, (userData?.course || ''), req.user.id, req.user.id];
 
-        query += ` ORDER BY relevance_score DESC, b.created_at DESC LIMIT ?`;
-        params.push(limit);
+        // Inline sanitized limit
+        query += ` ORDER BY relevance_score DESC, b.created_at DESC LIMIT ${safeLimit}`;
 
         const [recommendations] = await connection.execute(query, params);
         connection.release();
@@ -747,19 +752,17 @@ router.get('/recently-viewed', authenticateToken, async (req, res) => {
         const limitNum = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 10, 50));
         const conn = await getConnection();
 
-        const [books] = await conn.execute(
-            `SELECT b.*, rv.viewed_at,
-              CONCAT(u.fname, ' ', u.lname) as owner_name,
-              u.email as owner_email,
-              u.course as owner_program
-       FROM recently_viewed rv
-       INNER JOIN books b ON rv.book_id = b.id
-       INNER JOIN users u ON b.owner_id = u.id
-       WHERE rv.user_id = ?
-       ORDER BY rv.viewed_at DESC
-       LIMIT ?`,
-            [req.user.id, limitNum]
-        );
+                const recentlyViewedQuery = `SELECT b.*, rv.viewed_at,
+                            CONCAT(u.fname, ' ', u.lname) as owner_name,
+                            u.email as owner_email,
+                            u.course as owner_program
+             FROM recently_viewed rv
+             INNER JOIN books b ON rv.book_id = b.id
+             INNER JOIN users u ON b.owner_id = u.id
+             WHERE rv.user_id = ?
+             ORDER BY rv.viewed_at DESC
+             LIMIT ${limitNum}`;
+                const [books] = await conn.execute(recentlyViewedQuery, [req.user.id]);
 
         conn.release();
         res.json({
