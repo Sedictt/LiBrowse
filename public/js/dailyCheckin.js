@@ -8,6 +8,24 @@ class DailyCheckinManager {
     }
 
     /**
+     * Get local date string in YYYY-MM-DD
+     */
+    getLocalDateString(date = new Date()) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    /**
+     * Parse YYYY-MM-DD as a local Date (midnight local)
+     */
+    parseLocalDate(dateStr) {
+        const [y, m, d] = dateStr.split('-').map(Number);
+        return new Date(y, m - 1, d);
+    }
+
+    /**
      * Initialize the daily check-in system
      */
     async init() {
@@ -51,6 +69,14 @@ class DailyCheckinManager {
         if (!navUser) {
             console.log('nav-user not found, retrying...');
             setTimeout(() => this.createCheckinButton(), 500);
+            return;
+        }
+
+        // Respect backend setting: if disabled, do not render
+        if (this.checkinData && this.checkinData.enabled === false) {
+            // Remove existing if present and exit
+            const existingBtn = document.getElementById('daily-checkin-btn');
+            if (existingBtn) existingBtn.remove();
             return;
         }
 
@@ -211,9 +237,27 @@ class DailyCheckinManager {
             `;
         }
 
-        const { claimedToday, currentStreak, nextDayNumber, timeline, userCredits } = this.checkinData;
+        const { enabled, claimedToday, currentStreak, nextDayNumber, timeline, userCredits, nextReward } = this.checkinData;
+        if (enabled === false) {
+            return `
+                <div class="checkin-card-content">
+                    <div class="checkin-header-section">
+                        <div class="checkin-credits-header">
+                            <span class="credits-label">My Credits</span>
+                            <div class="credits-display">${(userCredits || 0).toLocaleString()}</div>
+                        </div>
+                    </div>
+                    <div class="checkin-section">
+                        <div class="section-header">
+                            <h3>Daily Check-in</h3>
+                            <p>The daily check-in feature is currently disabled. Please check back later.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
         const credits = userCredits || 0;
-        const nextReward = nextDayNumber === 7 ? 20 : 5;
+        const computedNextReward = typeof nextReward === 'number' ? nextReward : (nextDayNumber === 7 ? 20 : 5);
 
         return `
             <div class="checkin-card-content">
@@ -234,7 +278,7 @@ class DailyCheckinManager {
                         <div class="stat-item">
                             <i class="fas fa-gift"></i>
                             <div class="stat-content">
-                                <span class="stat-value">+${nextReward}</span>
+                                <span class="stat-value">+${computedNextReward}</span>
                                 <span class="stat-label">Next Reward</span>
                             </div>
                         </div>
@@ -283,11 +327,14 @@ class DailyCheckinManager {
             return '<p>No check-in data available</p>';
         }
 
-        const today = new Date().toISOString().split('T')[0];
+        // Use local timezone for "today" to avoid UTC off-by-one
+        const today = this.getLocalDateString();
+        const todayDate = this.parseLocalDate(today);
         const { currentStreak, nextDayNumber } = this.checkinData;
 
         return timeline.map((day, index) => {
-            const date = new Date(day.date);
+            // Interpret backend date strings as local dates (no timezone shift)
+            const date = this.parseLocalDate(day.date);
             const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
             const dayNum = date.getDate();
             const isToday = day.date === today;
@@ -317,7 +364,7 @@ class DailyCheckinManager {
                 statusClass = 'day-missed';
                 statusIcon = '<i class="fas fa-times-circle"></i>';
                 // Calculate what day it would have been
-                const daysDiff = Math.floor((new Date(today) - date) / (1000 * 60 * 60 * 24));
+                const daysDiff = Math.floor((todayDate - date) / (1000 * 60 * 60 * 24));
                 const wouldBeDayNum = ((nextDayNumber - daysDiff - 1) <= 0) ? 1 : (nextDayNumber - daysDiff);
                 displayDayNumber = wouldBeDayNum;
                 displayReward = wouldBeDayNum === 7 ? 20 : 5;
@@ -325,7 +372,7 @@ class DailyCheckinManager {
                 // Future day - show projected reward
                 statusClass = 'day-future';
                 statusIcon = '<i class="fas fa-calendar"></i>';
-                const daysDiff = Math.floor((date - new Date(today)) / (1000 * 60 * 60 * 24));
+                const daysDiff = Math.floor((date - todayDate) / (1000 * 60 * 60 * 24));
                 const willBeDayNum = ((nextDayNumber + daysDiff) % 7) || 7;
                 displayDayNumber = willBeDayNum;
                 displayReward = willBeDayNum === 7 ? 20 : 5;

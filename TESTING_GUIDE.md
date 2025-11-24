@@ -400,6 +400,35 @@ ls -lh uploads/verification/
 # Watch console output for OCR debug messages
 ```
 
+---
+
+## Daily Check-in Testing
+
+The daily check-in API includes unit tests that mock authentication and database calls to validate core behaviors without requiring a live MySQL instance.
+
+- Disabled feature guard returns HTTP 403.
+- Duplicate same-day claim returns HTTP 400 without changing credits.
+
+Run only the daily check-in tests:
+
+```
+powershell
+npm test -- -t "Daily Check-in API"
+```
+
+Configure daily check-in settings in the `settings` table:
+
+```
+powershell
+node .\add-checkin-settings.js
+```
+
+Defaults configured by the script:
+- `daily_checkin_enabled`: `true`
+- `daily_checkin_reward_day_1_6`: `5`
+- `daily_checkin_reward_day_7`: `20`
+```
+
 ## Next Steps After Testing
 
 1. ✅ Verify all test cases pass

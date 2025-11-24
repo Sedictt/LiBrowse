@@ -13,61 +13,90 @@ const { authenticateToken } = require('../middleware/auth');
 router.get('/status', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    
-    // Get user's check-ins from the last 7 days
-    const checkins = await executeQuery(
-      `SELECT checkin_date, day_number, reward_amount, claimed_at, streak_count
-       FROM daily_checkins
-       WHERE user_id = ? 
-       AND checkin_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-       ORDER BY checkin_date DESC`,
-      [userId]
+
+    // Load settings for rewards and enabled flag
+    const settings = await executeQuery(
+      `SELECT setting_name, setting_val FROM settings 
+       WHERE setting_name IN ('daily_checkin_enabled', 'daily_checkin_reward_day_1_6', 'daily_checkin_reward_day_7')`
     );
+    const settingsMap = settings.reduce((acc, s) => { acc[s.setting_name] = s.setting_val; return acc; }, {});
+    const enabled = String(settingsMap['daily_checkin_enabled'] || 'true').toLowerCase() === 'true';
+    const reward1to6 = parseInt(settingsMap['daily_checkin_reward_day_1_6'] || '5', 10);
+    const reward7 = parseInt(settingsMap['daily_checkin_reward_day_7'] || '20', 10);
+
+    // Timezone offset (default to +08:00)
+    const tzSetting = await getOne(`SELECT setting_val FROM settings WHERE setting_name = 'daily_checkin_timezone_offset'`);
+    const tzOffset = tzSetting?.setting_val || '+08:00';
+
+    // Compute today and the Monday of the current week in the target timezone
+    const todayRow = await getOne(
+      "SELECT DATE_FORMAT(DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', ?)), '%Y-%m-%d') AS today",
+      [tzOffset]
+    );
+    const mondayRow = await getOne(
+      "SELECT DATE_FORMAT(\n        DATE_SUB(DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', ?)),\n        INTERVAL WEEKDAY(DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', ?))) DAY),\n        '%Y-%m-%d'\n      ) AS monday",
+      [tzOffset, tzOffset]
+    );
+    const todayStr = todayRow.today;
+    const mondayStr = mondayRow.monday;
+
+    // Get user's check-ins for the current week (Mon..Sun) in target timezone
+    const checkins = await executeQuery(
+      "SELECT DATE_FORMAT(checkin_date, '%Y-%m-%d') AS checkin_date,\n              day_number, reward_amount, claimed_at, streak_count\n       FROM daily_checkins\n       WHERE user_id = ? \n         AND checkin_date BETWEEN ? AND DATE_ADD(?, INTERVAL 6 DAY)\n       ORDER BY checkin_date DESC",
+      [userId, mondayStr, mondayStr]
+    );
+
+    // Check if claimed today via SQL
+    const todayClaim = await getOne(
+      "SELECT EXISTS(\n          SELECT 1 FROM daily_checkins \n          WHERE user_id = ? \n            AND checkin_date = DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', ?))\n       ) AS claimedToday",
+      [userId, tzOffset]
+    );
+    const claimedToday = !!(todayClaim && todayClaim.claimedToday);
 
     // Get user's current credits
-    const userCredits = await getOne(
-      'SELECT credits FROM users WHERE id = ?',
-      [userId]
-    );
+    const userCredits = await getOne('SELECT credits FROM users WHERE id = ?', [userId]);
 
-    // Get today's check-in status
-    const today = new Date().toISOString().split('T')[0];
-    const todayCheckin = checkins.find(c => c.checkin_date.toISOString().split('T')[0] === today);
-    
-    // Calculate current streak
+    // Determine current streak and last day_number
     let currentStreak = 0;
+    let lastDayNumber = 0;
     if (checkins.length > 0) {
-      const sortedCheckins = checkins.sort((a, b) => new Date(b.checkin_date) - new Date(a.checkin_date));
-      currentStreak = sortedCheckins[0].streak_count || 0;
-      
-      // Check if streak is still valid (last check-in was yesterday or today)
-      const lastCheckinDate = new Date(sortedCheckins[0].checkin_date);
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      yesterday.setHours(0, 0, 0, 0);
-      lastCheckinDate.setHours(0, 0, 0, 0);
-      
-      const todayDate = new Date();
-      todayDate.setHours(0, 0, 0, 0);
-      
-      if (lastCheckinDate < yesterday) {
-        currentStreak = 0; // Streak broken
+      const last = checkins[0]; // ordered DESC
+      currentStreak = last.streak_count || 0;
+      lastDayNumber = last.day_number || 0;
+
+      // Validate streak continuity (gap > 1 day breaks)
+      const gap = await getOne(
+        "SELECT DATEDIFF(DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', ?)), MAX(checkin_date)) AS gap\n         FROM daily_checkins WHERE user_id = ?",
+        [tzOffset, userId]
+      );
+      if (gap && typeof gap.gap === 'number' && gap.gap > 1) {
+        currentStreak = 0;
+        lastDayNumber = 0;
       }
     }
 
-    // Build 7-day timeline
+    // Compute next day number (for today if not claimed, otherwise tomorrow)
+    let nextDayNumber = 1;
+    if (claimedToday) {
+      // If claimed today, base next on today's day_number
+      nextDayNumber = lastDayNumber === 7 ? 1 : (lastDayNumber + 1);
+    } else if (lastDayNumber > 0) {
+      nextDayNumber = lastDayNumber === 7 ? 1 : (lastDayNumber + 1);
+    } else {
+      nextDayNumber = 1;
+    }
+
+    // Build 7-day timeline as normalized date strings
+    const checkinsMap = new Map(checkins.map(c => [c.checkin_date, c]));
     const timeline = [];
-    const currentDate = new Date();
-    
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(currentDate);
-      date.setDate(currentDate.getDate() - i);
-      const dateString = date.toISOString().split('T')[0];
-      
-      const checkin = checkins.find(c => 
-        c.checkin_date.toISOString().split('T')[0] === dateString
+    // Build timeline from Monday -> Sunday
+    for (let i = 0; i <= 6; i++) {
+      const dayRes = await getOne(
+        "SELECT DATE_FORMAT(DATE_ADD(?, INTERVAL ? DAY), '%Y-%m-%d') AS d",
+        [mondayStr, i]
       );
-      
+      const dateString = dayRes.d;
+      const checkin = checkinsMap.get(dateString);
       timeline.push({
         date: dateString,
         dayNumber: checkin ? checkin.day_number : null,
@@ -79,12 +108,14 @@ router.get('/status', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      claimedToday: !!todayCheckin,
+      enabled,
+      claimedToday,
       currentStreak,
-      nextDayNumber: currentStreak >= 7 ? 1 : (currentStreak % 7) + 1,
+      nextDayNumber,
       timeline,
       totalCheckins: checkins.length,
-      userCredits: userCredits?.credits || 0
+      userCredits: userCredits?.credits || 0,
+      nextReward: (nextDayNumber === 7 ? reward7 : reward1to6)
     });
 
   } catch (error) {
@@ -101,139 +132,129 @@ router.get('/status', authenticateToken, async (req, res) => {
 // Claims today's daily reward
 // ============================
 router.post('/claim', authenticateToken, async (req, res) => {
-  const connection = await require('../config/database').pool.getConnection();
-  
-  try {
-    await connection.beginTransaction();
-    
-    const userId = req.user.id;
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Check if already claimed today
-    const existingCheckin = await connection.query(
-      'SELECT id FROM daily_checkins WHERE user_id = ? AND checkin_date = ?',
-      [userId, today]
-    );
-    
-    if (existingCheckin[0].length > 0) {
-      await connection.rollback();
-      connection.release();
-      return res.status(400).json({ 
-        success: false,
-        error: 'You have already claimed your reward today. Come back tomorrow!' 
-      });
-    }
+  const { transaction, getOne, executeQuery } = require('../config/database');
 
-    // Get yesterday's check-in to calculate streak
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayString = yesterday.toISOString().split('T')[0];
-    
-    const yesterdayCheckin = await connection.query(
-      'SELECT streak_count, day_number FROM daily_checkins WHERE user_id = ? AND checkin_date = ?',
-      [userId, yesterdayString]
-    );
-    
-    // Calculate current day number and streak
-    let dayNumber = 1;
-    let streakCount = 1;
-    
-    if (yesterdayCheckin[0].length > 0) {
-      const prevStreak = yesterdayCheckin[0][0].streak_count;
-      const prevDay = yesterdayCheckin[0][0].day_number;
-      
-      if (prevDay === 7) {
-        // Completed a cycle, start over
-        dayNumber = 1;
+  try {
+    const result = await transaction(async (conn) => {
+      const userId = req.user.id;
+
+      // Check if feature is enabled
+      const enabledRow = await getOne(
+        `SELECT setting_val FROM settings WHERE setting_name = 'daily_checkin_enabled'`
+      );
+      const enabled = String(enabledRow?.setting_val || 'true').toLowerCase() === 'true';
+      if (!enabled) {
+        return { status: 403, body: { success: false, error: 'Daily check-in is currently disabled.' } };
+      }
+
+      // Timezone offset (default to +08:00)
+      const tzSetting = await getOne(`SELECT setting_val FROM settings WHERE setting_name = 'daily_checkin_timezone_offset'`);
+      const tzOffset = tzSetting?.setting_val || '+08:00';
+
+      // Guard: already claimed today
+      const already = await getOne(
+        "SELECT id FROM daily_checkins WHERE user_id = ? AND checkin_date = DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', ?))",
+        [userId, tzOffset]
+      );
+      if (already) {
+        return { status: 400, body: { success: false, error: 'You have already claimed your reward today. Come back tomorrow!' } };
+      }
+
+      // Determine yesterday's record
+      const yCheckin = await getOne(
+        "SELECT streak_count, day_number \n         FROM daily_checkins \n         WHERE user_id = ? \n           AND checkin_date = DATE_SUB(DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', ?)), INTERVAL 1 DAY)",
+        [userId, tzOffset]
+      );
+
+      let dayNumber = 1;
+      let streakCount = 1;
+      if (yCheckin) {
+        const prevDay = yCheckin.day_number;
+        const prevStreak = yCheckin.streak_count || 0;
+        dayNumber = prevDay === 7 ? 1 : (prevDay + 1);
         streakCount = prevStreak + 1;
       } else {
-        // Continue the streak
-        dayNumber = prevDay + 1;
-        streakCount = prevStreak + 1;
-      }
-    } else {
-      // Check if there's any check-in in the last 2 days (to determine if streak is broken)
-      const recentCheckin = await connection.query(
-        `SELECT streak_count, checkin_date FROM daily_checkins 
-         WHERE user_id = ? 
-         ORDER BY checkin_date DESC LIMIT 1`,
-        [userId]
-      );
-      
-      if (recentCheckin[0].length > 0) {
-        const lastCheckinDate = new Date(recentCheckin[0][0].checkin_date);
-        const daysDiff = Math.floor((new Date(today) - lastCheckinDate) / (1000 * 60 * 60 * 24));
-        
-        if (daysDiff > 1) {
-          // Streak broken, start over
-          dayNumber = 1;
-          streakCount = 1;
+        const last = await getOne(
+          `SELECT checkin_date FROM daily_checkins 
+           WHERE user_id = ? ORDER BY checkin_date DESC LIMIT 1`,
+          [userId]
+        );
+        if (last) {
+          const gapRow = await getOne(
+            "SELECT DATEDIFF(DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', ?)), ?) AS gap",
+            [tzOffset, last.checkin_date]
+          );
+          const gap = gapRow?.gap ?? 999;
+          if (typeof gap === 'number' && gap > 1) {
+            dayNumber = 1;
+            streakCount = 1;
+          }
         }
       }
-    }
-    
-    // Calculate reward based on day number
-    const rewardAmount = dayNumber === 7 ? 20 : 5;
-    
-    // Get current user credits
-    const userResult = await connection.query(
-      'SELECT credits FROM users WHERE id = ?',
-      [userId]
-    );
-    
-    if (userResult[0].length === 0) {
-      await connection.rollback();
-      connection.release();
-      return res.status(404).json({ 
-        success: false,
-        error: 'User not found' 
-      });
-    }
-    
-    const oldBalance = userResult[0][0].credits;
-    const newBalance = oldBalance + rewardAmount;
-    
-    // Update user credits
-    await connection.query(
-      'UPDATE users SET credits = ? WHERE id = ?',
-      [newBalance, userId]
-    );
-    
-    // Insert check-in record
-    await connection.query(
-      `INSERT INTO daily_checkins (user_id, checkin_date, day_number, reward_amount, streak_count) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [userId, today, dayNumber, rewardAmount, streakCount]
-    );
-    
-    // Log credit change
-    await connection.query(
-      `INSERT INTO credit_history (user_id, credit_change, remark, old_balance, new_balance)
-       VALUES (?, ?, ?, ?, ?)`,
-      [userId, rewardAmount, `Daily Check-in Day ${dayNumber}`, oldBalance, newBalance]
-    );
-    
-    await connection.commit();
-    connection.release();
-    
-    res.json({
-      success: true,
-      message: `Day ${dayNumber} reward claimed! +${rewardAmount} credits`,
-      dayNumber,
-      rewardAmount,
-      newBalance,
-      streakCount,
-      isWeekComplete: dayNumber === 7
+
+      // Rewards from settings
+      const rewards = await executeQuery(
+        `SELECT setting_name, setting_val FROM settings 
+         WHERE setting_name IN ('daily_checkin_reward_day_1_6','daily_checkin_reward_day_7')`
+      );
+      const rewardMap = rewards.reduce((acc, r) => { acc[r.setting_name] = parseInt(r.setting_val, 10); return acc; }, {});
+      const rewardAmount = dayNumber === 7 ? (rewardMap['daily_checkin_reward_day_7'] || 20) : (rewardMap['daily_checkin_reward_day_1_6'] || 5);
+
+      // Insert check-in first (race-safe via unique constraint)
+      try {
+        await conn.execute(
+          "INSERT INTO daily_checkins (user_id, checkin_date, day_number, reward_amount, streak_count)\n           VALUES (?, DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', ?)), ?, ?, ?)",
+          [userId, tzOffset, dayNumber, rewardAmount, streakCount]
+        );
+      } catch (err) {
+        // Duplicate means already claimed today
+        if (err && (err.code === 'ER_DUP_ENTRY' || err.errno === 1062)) {
+          return { status: 400, body: { success: false, error: 'You have already claimed your reward today. Come back tomorrow!' } };
+        }
+        throw err;
+      }
+
+      // Update credits and log history
+      const userRow = await getOne('SELECT credits FROM users WHERE id = ?', [userId]);
+      if (!userRow) {
+        throw new Error('User not found');
+      }
+      const oldBalance = userRow.credits || 0;
+      const newBalance = oldBalance + rewardAmount;
+
+      await conn.execute('UPDATE users SET credits = ? WHERE id = ?', [newBalance, userId]);
+      await conn.execute(
+        `INSERT INTO credit_history (user_id, credit_change, remark, old_balance, new_balance)
+         VALUES (?, ?, ?, ?, ?)`,
+        [userId, rewardAmount, `Daily Check-in Day ${dayNumber}`, oldBalance, newBalance]
+      );
+
+      return {
+        status: 200,
+        body: {
+          success: true,
+          message: `Day ${dayNumber} reward claimed! +${rewardAmount} credits`,
+          dayNumber,
+          rewardAmount,
+          newBalance,
+          streakCount,
+          isWeekComplete: dayNumber === 7
+        }
+      };
     });
 
+    // If transaction returned a specific status (guards), respond accordingly
+    if (result && result.status && result.body) {
+      return res.status(result.status).json(result.body);
+    }
+
+    // Fallback success
+    return res.json(result);
   } catch (error) {
-    await connection.rollback();
-    connection.release();
     console.error('Error claiming daily check-in:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to claim daily reward. Please try again.' 
-    });
+    const msg = (error && error.message === 'User not found') ? 'User not found' : 'Failed to claim daily reward. Please try again.';
+    const status = (error && error.message === 'User not found') ? 404 : 500;
+    res.status(status).json({ success: false, error: msg });
   }
 });
 

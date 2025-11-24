@@ -23,6 +23,11 @@ async function addSettings() {
                 name: 'daily_checkin_enabled',
                 value: 'true',
                 description: 'Enable or disable daily check-in system'
+            },
+            {
+                name: 'daily_checkin_timezone_offset',
+                value: '+08:00',
+                description: 'Timezone offset for local day boundary (e.g., +08:00)'
             }
         ];
 
