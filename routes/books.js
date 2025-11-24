@@ -70,6 +70,14 @@ router.get('/', [
         const limit = Math.min(parseInt(req.query.limit) || 12, 50);
         const offset = (page - 1) * limit;
 
+        // Ensure valid numbers
+        if (!Number.isInteger(limit) || limit <= 0) {
+            return res.status(400).json({ error: 'Invalid limit parameter' });
+        }
+        if (!Number.isInteger(offset) || offset < 0) {
+            return res.status(400).json({ error: 'Invalid page parameter' });
+        }
+
         const connection = await getConnection();
 
         // Build WHERE clause based on filters

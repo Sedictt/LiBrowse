@@ -11,9 +11,15 @@ router.get('/', authenticateToken, async (req, res) => {
 
         const connection = await getConnection();
 
-        // Ensure valid integers
-        const limitNum = parseInt(limit) || 20;
-        const offsetNum = parseInt(offset) || 0;
+        // Ensure valid integers (convert to number, not NaN)
+        const limitNum = Math.max(1, Math.min(parseInt(limit, 10) || 20, 100));
+        const offsetNum = Math.max(0, parseInt(offset, 10) || 0);
+
+        // Validate they are actual numbers
+        if (!Number.isFinite(limitNum) || !Number.isFinite(offsetNum)) {
+            connection.release();
+            return res.status(400).json({ error: 'Invalid pagination parameters' });
+        }
 
         let query = `
             SELECT * FROM notifications
@@ -24,7 +30,7 @@ router.get('/', authenticateToken, async (req, res) => {
             query += ' AND is_read = FALSE';
         }
 
-        query += ' ORDER BY created DESC LIMIT ? OFFSET ?';
+        query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
 
         const [notifications] = await connection.execute(query, [
             userId,
