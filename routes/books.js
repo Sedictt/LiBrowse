@@ -3,6 +3,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
+const cloudinary = require('cloudinary').v2;
 const { body, validationResult, query } = require('express-validator');
 
 const { authenticateToken, optionalAuth } = require('../middleware/auth');
@@ -10,25 +11,33 @@ const { getConnection } = require('../config/database');
 
 const router = express.Router();
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-    destination: async (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '..', 'uploads', 'books');
-        try {
-            await fs.mkdir(uploadDir, { recursive: true });
-            cb(null, uploadDir);
-        } catch (error) {
-            cb(error);
-        }
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'book-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
+// Helper: resolve image URL (legacy local path vs Cloudinary/external URL)
+function resolveImageUrl(coverImage) {
+    if (!coverImage) return null;
+    if (/^https?:\/\//.test(coverImage)) return coverImage;
+    return `/uploads/books/${path.basename(coverImage)}`;
+}
 
+// Cloudinary config: prefer CLOUDINARY_URL; fallback to discrete env vars
+try {
+    if (process.env.CLOUDINARY_URL) {
+        cloudinary.config({ secure: true });
+    } else if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+        cloudinary.config({
+            cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+            api_key: process.env.CLOUDINARY_API_KEY,
+            api_secret: process.env.CLOUDINARY_API_SECRET,
+            secure: true
+        });
+    }
+    console.log('[Cloudinary] Configured. Cloud name:', cloudinary.config().cloud_name || '(none)');
+} catch (e) {
+    console.warn('[Cloudinary] Configuration failed:', e.message);
+}
+
+// Use memory storage; upload buffer directly to Cloudinary
 const upload = multer({
-    storage: storage,
+    storage: multer.memoryStorage(),
     limits: {
         fileSize: 8 * 1024 * 1024,  // 8MB limit
         fieldSize: 10 * 1024 * 1024  // 10MB for total form data
@@ -161,7 +170,7 @@ router.get('/', [
                 status: book.is_available ? 'available' : 'borrowed',
                 condition: book.condition_rating,
                 min_credit: book.minimum_credits,
-                image_url: book.cover_image ? `/uploads/books/${path.basename(book.cover_image)}` : null
+                image_url: resolveImageUrl(book.cover_image)
             })),
             pagination: {
                 page,
@@ -1026,7 +1035,9 @@ router.post('/:id/image', [
     upload.single('image')
 ], async (req, res) => {
     try {
+        console.log('[Book Image Upload] Incoming request for book ID:', req.params.id);
         if (!req.file) {
+            console.log('[Book Image Upload] No file provided');
             return res.status(400).json({ error: 'No image file provided' });
         }
 
@@ -1041,45 +1052,33 @@ router.post('/:id/image', [
 
         if (books.length === 0) {
             connection.release();
-            // Delete uploaded file
-            await fs.unlink(req.file.path);
             return res.status(404).json({ error: 'Book not found or access denied' });
         }
 
         const book = books[0];
-
-        // Delete old image if exists
-        if (book.cover_image) {
-            try {
-                await fs.unlink(book.cover_image);
-            } catch (error) {
-                console.log('Old image file not found:', error.message);
-            }
+        // If previous was local path (non-URL) attempt best-effort cleanup
+        if (book.cover_image && !/^https?:\/\//.test(book.cover_image)) {
+            try { await fs.unlink(book.cover_image); } catch (_) { }
         }
 
-        // Update book with new image path
-        await connection.execute(
-            'UPDATE books SET cover_image = ? WHERE id = ?',
-            [req.file.path, bookId]
-        );
+        // Upload buffer to Cloudinary
+        console.log('[Book Image Upload] Uploading to Cloudinary. Size:', req.file.size);
+        const uploadResult = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream({ folder: 'librowse/books' }, (err, result) => {
+                if (err) return reject(err);
+                resolve(result);
+            });
+            stream.end(req.file.buffer);
+        });
+        console.log('[Book Image Upload] Cloudinary upload complete. Public ID:', uploadResult.public_id);
 
+        await connection.execute('UPDATE books SET cover_image = ? WHERE id = ?', [uploadResult.secure_url, bookId]);
         connection.release();
 
-        res.json({
-            message: 'Image uploaded successfully',
-            image_url: `/uploads/books/${req.file.filename}`
-        });
+        res.json({ message: 'Image uploaded successfully', image_url: uploadResult.secure_url });
 
     } catch (error) {
         console.error('Upload image error:', error);
-        // Clean up uploaded file on error
-        if (req.file) {
-            try {
-                await fs.unlink(req.file.path);
-            } catch (unlinkError) {
-                console.error('Failed to delete uploaded file:', unlinkError);
-            }
-        }
         res.status(500).json({ error: 'Failed to upload image' });
     }
 });
