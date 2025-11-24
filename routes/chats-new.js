@@ -144,6 +144,14 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
         if (isNaN(offset)) offset = 0;
         const markReadParam = req.query.markRead;
         const shouldMarkRead = (markReadParam === undefined || markReadParam === '1');
+        const numericChatId = parseInt(chatId, 10);
+        if (isNaN(numericChatId) || numericChatId < 1) {
+            return res.status(400).json({ error: 'Invalid chatId' });
+        }
+        const debugEnabled = process.env.DEBUG_CHATS === '1';
+        if (debugEnabled) {
+            console.log('[Chats] Fetch messages params', { userId, chatId: numericChatId, limit, offset, shouldMarkRead });
+        }
         
         const connection = await getConnection();
 
@@ -153,7 +161,7 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
             FROM chats c
             INNER JOIN transactions t ON c.transaction_id = t.id
             WHERE c.id = ? AND (t.borrower_id = ? OR t.lender_id = ?)
-        `, [chatId, userId, userId]);
+        `, [numericChatId, userId, userId]);
 
         if (chatAccess.length === 0) {
             connection.release();
@@ -161,6 +169,9 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
         }
 
         // Get messages (fetch one extra to determine if there are more)
+        const safeLimit = limit + 1; // fetch one extra to determine has_more
+        const safeOffset = offset;
+        // Interpolate LIMIT/OFFSET after numeric validation to avoid placeholder issues on some MySQL deployments
         const [messages] = await connection.execute(`
             SELECT 
                 cm.*,
@@ -170,8 +181,8 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
             LEFT JOIN users u ON cm.sender_id = u.id
             WHERE cm.chat_id = ?
             ORDER BY cm.created DESC
-            LIMIT ? OFFSET ?
-        `, [parseInt(chatId, 10), parseInt(limit, 10) + 1, parseInt(offset, 10)]);
+            LIMIT ${safeLimit} OFFSET ${safeOffset}
+        `, [numericChatId]);
 
         // Mark unread messages as read (only when requested)
         if (shouldMarkRead) {
@@ -179,7 +190,7 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
                 UPDATE chat_messages
                 SET is_read = 1, read_at = NOW()
                 WHERE chat_id = ? AND sender_id != ? AND is_read = 0
-            `, [chatId, userId]);
+            `, [numericChatId, userId]);
         }
 
         connection.release();
