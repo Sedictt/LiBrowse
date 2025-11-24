@@ -1438,6 +1438,17 @@ body {
     gap: var(--spacing-lg);
 }
 
+/* Center empty state in monitoring grid */
+.monitoring-grid .empty-state,
+.monitoring-grid .no-transactions {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+}
+
 /* Transaction Cards */
 .transaction-card {
     background: var(--bg-card);
