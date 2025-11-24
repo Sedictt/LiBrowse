@@ -606,7 +606,7 @@ router.get('/:id/similar', optionalAuth, async (req, res) => {
         res.json({
             recommendations: similar.map(book => ({
                 ...book,
-                image_url: book.cover_image ? `/uploads/books/${path.basename(book.cover_image)}` : null
+                image_url: resolveImageUrl(book.cover_image)
             }))
         });
     } catch (error) {
@@ -642,7 +642,7 @@ router.get('/my-books', authenticateToken, async (req, res) => {
                 status: book.is_available ? 'available' : 'borrowed',
                 condition: book.condition_rating,
                 min_credit: book.minimum_credits,
-                image_url: book.cover_image ? `/uploads/books/${path.basename(book.cover_image)}` : null
+                image_url: resolveImageUrl(book.cover_image)
             }))
         });
 
@@ -813,9 +813,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
         }
 
         const book = books[0];
-        book.image_url = book.cover_image ? `/uploads/books/${path.basename(book.cover_image)}` : null;
-
-        res.json({ book });
+        res.json({ book: { ...book, image_url: resolveImageUrl(book.cover_image) } });
 
     } catch (error) {
         console.error('Get book error:', error);
@@ -892,6 +890,23 @@ router.post('/',
 
             const connection = await getConnection();
 
+            // Upload to Cloudinary if image provided (memory storage)
+            let coverUrl = null;
+            if (req.file) {
+                try {
+                    const uploadResult = await new Promise((resolve, reject) => {
+                        const stream = cloudinary.uploader.upload_stream({ folder: 'librowse/books' }, (err, result) => {
+                            if (err) return reject(err);
+                            resolve(result);
+                        });
+                        stream.end(req.file.buffer);
+                    });
+                    coverUrl = uploadResult.secure_url;
+                } catch (e) {
+                    console.error('Cloudinary upload failed (create book):', e.message);
+                }
+            }
+
             const [result] = await connection.execute(`
                 INSERT INTO books (
                     title, author, isbn, course_code, subject, edition, publisher, publication_year,
@@ -911,7 +926,7 @@ router.post('/',
                 description || null,
                 req.user.id,
                 minimum_credits,
-                req.file ? req.file.path : null
+                coverUrl
             ]);
 
             // Get the created book
@@ -927,12 +942,7 @@ router.post('/',
             connection.release();
 
             const book = books[0];
-            book.image_url = book.cover_image ? `/uploads/books/${path.basename(book.cover_image)}` : null;
-
-            res.status(201).json({
-                message: 'Book added successfully',
-                book
-            });
+            res.status(201).json({ message: 'Book added successfully', book: { ...book, image_url: resolveImageUrl(book.cover_image) } });
 
         } catch (error) {
             console.error('Add book error:', error);
@@ -1018,10 +1028,7 @@ router.put('/:id', [
 
         connection.release();
 
-        res.json({
-            message: 'Book updated successfully',
-            book: updatedBooks[0]
-        });
+        res.json({ message: 'Book updated successfully', book: { ...updatedBooks[0], image_url: resolveImageUrl(updatedBooks[0].cover_image) } });
 
     } catch (error) {
         console.error('Update book error:', error);
