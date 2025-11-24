@@ -66,8 +66,8 @@ router.get('/', [
             });
         }
 
-        const page = parseInt(req.query.page) || 1;
-        const limit = Math.min(parseInt(req.query.limit) || 12, 50);
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = Math.min(parseInt(req.query.limit, 10) || 12, 50);
         const offset = (page - 1) * limit;
 
         // Ensure valid numbers
@@ -744,7 +744,7 @@ router.post('/:id/view', authenticateToken, async (req, res) => {
 // GET /api/books/recently-viewed - Get recently viewed books
 router.get('/recently-viewed', authenticateToken, async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit) || 10;
+        const limitNum = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 10, 50));
         const conn = await getConnection();
 
         const [books] = await conn.execute(
@@ -758,7 +758,7 @@ router.get('/recently-viewed', authenticateToken, async (req, res) => {
        WHERE rv.user_id = ?
        ORDER BY rv.viewed_at DESC
        LIMIT ?`,
-            [req.user.id, limit]
+            [req.user.id, limitNum]
         );
 
         conn.release();
