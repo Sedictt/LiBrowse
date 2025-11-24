@@ -709,7 +709,8 @@ body {
     box-shadow: var(--shadow-lg);
 }
 
-.nav-user:hover .user-dropdown {
+.user-avatar:hover + .user-dropdown,
+.user-dropdown:hover {
     opacity: 1;
     visibility: visible;
     transform: translateY(0);

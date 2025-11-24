@@ -72,8 +72,8 @@ class DailyCheckinManager {
                     title="Daily Check-in">
                 <i class="fas fa-calendar-check"></i>
                 <span class="checkin-btn-text">Daily Check-in</span>
-                ${showBadge ? '<span class="checkin-badge"></span>' : ''}
             </button>
+            ${showBadge ? '<span class="checkin-badge"></span>' : ''}
         `;
 
         // Insert before the user avatar

@@ -8,6 +8,7 @@
     align-items: center;
     margin-right: 15px;
     z-index: 100;
+    position: relative;
 }
 
 #nav-user {
@@ -66,6 +67,7 @@
     border-radius: 50%;
     border: 2px solid white;
     animation: pulse-badge 2s infinite;
+    z-index: 500;
 }
 
 @keyframes pulse-badge {
