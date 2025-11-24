@@ -6,12 +6,30 @@ class MonitoringManager {
         this.pendingFeedback = [];
         this.completedTransactions = [];
         this.overdueTransactions = [];
+        // Elements optional now (refresh & loading removed from UI)
+        this.loadingEl = document.getElementById('monitoring-loading') || null;
+        this.lastRefreshEl = document.getElementById('last-refresh-time') || null;
+        this.refreshBtn = document.getElementById('refresh-transactions') || null;
+        if (this.refreshBtn) this.refreshBtn.addEventListener('click', () => this.manualRefresh());
+
+        // Auto-load when already authenticated
+        if (authManager?.isAuthenticated) {
+            this.loadTransactions();
+        }
+        // Load once after login if section is active
+        document.addEventListener('login-success', () => {
+            const monitoringSection = document.getElementById('monitoring-section');
+            if (monitoringSection && monitoringSection.classList.contains('active')) {
+                this.loadTransactions();
+            }
+        });
     }
 
     async loadTransactions() {
         if (!authManager.isAuthenticated) return;
 
         try {
+            this.showLoading(true);
             const data = await api.getTransactions();
 
             // DEBUG: Check what data we're getting
@@ -33,10 +51,37 @@ class MonitoringManager {
 
             this.categorizeTransactions(transactions);
             this.renderTransactions();
+            this.updateLastRefresh();
         } catch (error) {
             console.error('Failed to load transactions:', error);
             showToast('Failed to load transactions', 'error');
+        } finally {
+            this.showLoading(false);
         }
+    }
+
+    showLoading(isLoading) {
+        if (this.loadingEl) this.loadingEl.style.display = isLoading ? 'inline-flex' : 'none';
+        if (this.refreshBtn) {
+            this.refreshBtn.disabled = isLoading;
+            this.refreshBtn.innerHTML = isLoading ? '<i class="fas fa-sync-alt fa-spin"></i>' : '<i class="fas fa-sync-alt"></i>';
+        }
+        if (this.lastRefreshEl && isLoading) {
+            this.lastRefreshEl.style.display = 'none';
+        }
+    }
+
+    updateLastRefresh() {
+        if (!this.lastRefreshEl) return;
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        this.lastRefreshEl.textContent = `Updated ${timeStr}`;
+        this.lastRefreshEl.style.display = 'inline';
+    }
+
+    async manualRefresh() {
+        await this.loadTransactions();
+        showToast('Monitoring data refreshed', 'success');
     }
 
 
