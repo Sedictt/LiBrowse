@@ -206,7 +206,7 @@ class BookManagement {
         modal.innerHTML = `
             <div class="modal-content book-form-modal">
                 <div class="modal-header">
-                    <h3>${isEdit ? 'Edit Book' : 'Add New Book'}</h3>
+                    <h3>${isEdit ? 'Edit Book' : 'Lend a Book'}</h3>
                     <button class="modal-close" onclick="bookManagement.closeModal('${modalId}')">
                         <i class="fas fa-times"></i>
                     </button>
