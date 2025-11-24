@@ -57,7 +57,12 @@ class App {
         // CTA Register button
         const ctaRegisterBtn = document.getElementById('cta-register-btn');
         if (ctaRegisterBtn) {
-            ctaRegisterBtn.addEventListener('click', () => {
+            ctaRegisterBtn.addEventListener('click', (e) => {
+                if (authManager && authManager.isAuthenticated) {
+                    e.preventDefault();
+                    authManager.showToast("You're already registered and logged in.", 'info');
+                    return;
+                }
                 authManager.openModal('register-modal');
             });
         }
@@ -73,7 +78,12 @@ class App {
         }
 
         if (mobileRegisterBtn) {
-            mobileRegisterBtn.addEventListener('click', () => {
+            mobileRegisterBtn.addEventListener('click', (e) => {
+                if (authManager && authManager.isAuthenticated) {
+                    e.preventDefault();
+                    authManager.showToast("You're already registered and logged in.", 'info');
+                    return;
+                }
                 authManager.openModal('register-modal');
             });
         }

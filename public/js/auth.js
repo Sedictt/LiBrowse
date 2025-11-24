@@ -183,7 +183,14 @@ class AuthManager {
         }
 
         if (registerBtn) {
-            registerBtn.addEventListener('click', () => this.openModal('register-modal'));
+            registerBtn.addEventListener('click', (e) => {
+                if (this.isAuthenticated) {
+                    e.preventDefault();
+                    this.showToast("You're already registered and logged in.", 'info');
+                    return;
+                }
+                this.openModal('register-modal');
+            });
         }
 
         // Modal switching links
@@ -193,6 +200,10 @@ class AuthManager {
         if (switchToRegister) {
             switchToRegister.addEventListener('click', (e) => {
                 e.preventDefault();
+                if (this.isAuthenticated) {
+                    this.showToast("You're already registered and logged in.", 'info');
+                    return;
+                }
                 this.closeModal('login-modal');
                 this.openModal('register-modal');
             });
@@ -726,11 +737,13 @@ class AuthManager {
             if (navCredits) navCredits.classList.remove('hidden');
             if (navMenu) navMenu.classList.add('authenticated');
             this.updateCreditsDisplay();
+            this.setRegisterControlsEnabled(false);
         } else {
             if (navAuth) navAuth.classList.remove('hidden');
             if (navUser) navUser.classList.add('hidden');
             if (navCredits) navCredits.classList.add('hidden');
             if (navMenu) navMenu.classList.remove('authenticated');
+            this.setRegisterControlsEnabled(true);
         }
     }
 
@@ -749,6 +762,29 @@ class AuthManager {
         if (prev && prev !== String(creditsVal)) {
             navCredits.classList.add('updated');
             setTimeout(() => navCredits.classList.remove('updated'), 1000);
+        }
+    }
+
+    // Enable/disable all registration entry points when logged in
+    setRegisterControlsEnabled(enabled) {
+        const desktopReg = document.getElementById('register-btn');
+        const mobileReg = document.getElementById('mobile-register-btn');
+        const ctaReg = document.getElementById('cta-register-btn');
+        const switchToRegister = document.getElementById('switch-to-register');
+
+        const titleText = enabled ? '' : 'You are already logged in';
+
+        [desktopReg, mobileReg, ctaReg].forEach(btn => {
+            if (!btn) return;
+            // Do not hard-disable to allow showing a message; use aria-disabled for styling
+            if (!enabled) btn.setAttribute('aria-disabled', 'true'); else btn.removeAttribute('aria-disabled');
+            btn.title = titleText;
+        });
+
+        if (switchToRegister) {
+            // Keep link clickable to show info toast
+            switchToRegister.style.opacity = enabled ? '' : '0.6';
+            switchToRegister.title = titleText;
         }
     }
 

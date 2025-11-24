@@ -819,6 +819,13 @@ body {
     transform: none !important;
 }
 
+/* Style buttons marked aria-disabled like real disabled buttons */
+.btn[aria-disabled="true"] {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: auto; /* allow click to show info toast */
+}
+
 .btn-primary {
     background: var(--primary-gradient);
     color: white;
