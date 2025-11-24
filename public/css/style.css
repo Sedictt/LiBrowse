@@ -1363,12 +1363,7 @@ body {
 }
 
 /* Monitoring Section */
-.section-title-group {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    /*! margin-bottom: var(--spacing-lg); */
-}
+/* Keep section-title-group consistent globally; add scoped overrides only if needed */
 
 .monitoring-controls {
     display: flex;
@@ -4802,7 +4797,7 @@ body {
     margin-bottom: var(--spacing-xl);
 }
 
-.section-header {
+.verification-section .section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -4811,7 +4806,7 @@ body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.section-header h4 {
+.verification-section .section-header h4 {
     color: var(--text-primary);
     margin: 0;
     font-size: 1.2rem;
