@@ -20,8 +20,19 @@ class RequestManager {
         this.setupEventListeners();
         // Ensure status filter options exist (in case HTML was outdated)
         this.ensureStatusOptions();
-        // Don't load requests on init - wait for section to be navigated to
-        // this.loadRequests();
+        
+        // Auto-load when already authenticated
+        if (authManager?.isAuthenticated && authManager?.currentUser) {
+            this.loadRequests();
+        }
+        
+        // Load once after login if section is active
+        document.addEventListener('login-success', () => {
+            const requestsSection = document.getElementById('requests-section');
+            if (requestsSection && requestsSection.classList.contains('active')) {
+                this.loadRequests();
+            }
+        });
     }
 
     setupEventListeners() {
@@ -117,7 +128,10 @@ class RequestManager {
             // the JWT token alone and still load chats even if currentUser has
             // not been hydrated yet.
             if ((!window.authManager || !authManager.currentUser) && this.currentTab !== 'active-chats') {
-                console.log('User not authenticated, skipping requests load for tab:', this.currentTab);
+                console.log('User not authenticated, showing empty state for tab:', this.currentTab);
+                // Still show empty state even if not authenticated
+                this.currentRequests = [];
+                this.renderRequests();
                 return;
             }
 
@@ -161,6 +175,9 @@ class RequestManager {
             }
         } catch (error) {
             console.error('Failed to load requests:', error);
+            // Show empty state on error
+            this.currentRequests = [];
+            this.renderRequests();
             this.showToast('Failed to load requests', 'error');
         }
     }

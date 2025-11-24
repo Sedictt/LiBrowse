@@ -3483,7 +3483,9 @@ body {
     background: var(--bg-glass);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: var(--radius-xl);
-    margin: var(--spacing-lg) 0;
+    margin: var(--spacing-lg) auto;
+    width: 100%;
+    max-width: 600px;
 }
 
 .no-requests i,
@@ -6790,6 +6792,23 @@ body {
 .requests-grid {
     display: grid;
     gap: var(--spacing-xl);
+}
+
+/* Center empty states in requests grid */
+.requests-grid:has(.no-requests),
+.requests-grid:has(.empty-state) {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    min-height: 400px;
+}
+
+/* Ensure empty state and no-requests are centered */
+.requests-grid .empty-state,
+.requests-grid .no-requests {
+    margin: 0 auto;
+    width: 100%;
+    max-width: 500px;
 }
 
 .request-card {
