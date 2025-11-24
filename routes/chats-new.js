@@ -137,9 +137,11 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
         res.set('Cache-Control', 'no-store');
         const userId = req.user.id;
         const { chatId } = req.params;
-        let limit = parseInt(req.query.limit, 10) || 50;
+        let limit = parseInt(req.query.limit, 10);
+        if (isNaN(limit)) limit = 50;
         limit = Math.min(Math.max(limit, 1), 100);
-        const offset = parseInt(req.query.offset, 10) || 0;
+        let offset = parseInt(req.query.offset, 10);
+        if (isNaN(offset)) offset = 0;
         const markReadParam = req.query.markRead;
         const shouldMarkRead = (markReadParam === undefined || markReadParam === '1');
         
@@ -169,7 +171,7 @@ router.get('/:chatId/messages', authenticateToken, async (req, res) => {
             WHERE cm.chat_id = ?
             ORDER BY cm.created DESC
             LIMIT ? OFFSET ?
-        `, [chatId, limit + 1, offset]);
+        `, [parseInt(chatId, 10), parseInt(limit, 10) + 1, parseInt(offset, 10)]);
 
         // Mark unread messages as read (only when requested)
         if (shouldMarkRead) {
