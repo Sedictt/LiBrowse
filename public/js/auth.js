@@ -717,16 +717,38 @@ class AuthManager {
     updateUIForAuthState(isAuthenticated) {
         const navAuth = document.getElementById('nav-auth');
         const navUser = document.getElementById('nav-user');
+        const navCredits = document.getElementById('nav-credits');
         const navMenu = document.getElementById('nav-menu');
 
         if (isAuthenticated) {
             if (navAuth) navAuth.classList.add('hidden');
             if (navUser) navUser.classList.remove('hidden');
+            if (navCredits) navCredits.classList.remove('hidden');
             if (navMenu) navMenu.classList.add('authenticated');
+            this.updateCreditsDisplay();
         } else {
             if (navAuth) navAuth.classList.remove('hidden');
             if (navUser) navUser.classList.add('hidden');
+            if (navCredits) navCredits.classList.add('hidden');
             if (navMenu) navMenu.classList.remove('authenticated');
+        }
+    }
+
+    // Update the nav credits pill with current user credits
+    updateCreditsDisplay(newCredits) {
+        const navCredits = document.getElementById('nav-credits');
+        const creditsSpan = document.getElementById('user-credits-display');
+        if (!navCredits || !creditsSpan) return;
+        if (!this.isAuthenticated || !this.currentUser) {
+            navCredits.classList.add('hidden');
+            return;
+        }
+        const creditsVal = (typeof newCredits === 'number') ? newCredits : (this.currentUser.credits || 0);
+        const prev = creditsSpan.textContent;
+        creditsSpan.textContent = creditsVal;
+        if (prev && prev !== String(creditsVal)) {
+            navCredits.classList.add('updated');
+            setTimeout(() => navCredits.classList.remove('updated'), 1000);
         }
     }
 

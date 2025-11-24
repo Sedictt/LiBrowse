@@ -44,6 +44,7 @@ class BooksManager {
                 try {
                     const prof = await api.getProfile();
                     if (prof?.user) authManager.currentUser = prof.user;
+                    if (prof?.user) authManager.updateCreditsDisplay(prof.user.credits);
                 } catch (_) { /* non-blocking */ }
             }
 
@@ -443,6 +444,7 @@ class BooksManager {
             try {
                 const prof = await api.getProfile();
                 if (prof?.user) authManager.currentUser = prof.user;
+                if (prof?.user) authManager.updateCreditsDisplay(prof.user.credits);
             } catch (_) { /* non-blocking */ }
         }
 
