@@ -13,11 +13,15 @@ const dbConfig = {
     queueLimit: 0,
     connectTimeout: 30000,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 0,
-    ssl: {
-    rejectUnauthorized: true
-  }
+    keepAliveInitialDelay: 0
 };
+
+// Add SSL configuration for Railway when in production
+if (process.env.DB_HOST && process.env.DB_HOST.includes('railway')) {
+    dbConfig.ssl = {
+        rejectUnauthorized: false
+    };
+}
 
 // Create connection pool
 const pool = mysql.createPool(dbConfig);
