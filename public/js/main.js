@@ -364,7 +364,12 @@ class App {
                 break;
             case 'requests':
                 if (typeof requestManager !== 'undefined' && requestManager) {
-                    await requestManager.loadRequests();
+                    if (typeof requestManager.switchTab === 'function') {
+                        // Ensure Incoming Requests is active by default
+                        requestManager.switchTab('incoming');
+                    } else if (typeof requestManager.loadRequests === 'function') {
+                        await requestManager.loadRequests();
+                    }
                 }
                 break;
             case 'monitoring':  // ⭐ ADD THIS
