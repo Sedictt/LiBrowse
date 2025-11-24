@@ -11,6 +11,10 @@ router.get('/', authenticateToken, async (req, res) => {
 
         const connection = await getConnection();
 
+        // Ensure valid integers
+        const limitNum = parseInt(limit) || 20;
+        const offsetNum = parseInt(offset) || 0;
+
         let query = `
             SELECT * FROM notifications
             WHERE user_id = ?
@@ -24,8 +28,8 @@ router.get('/', authenticateToken, async (req, res) => {
 
         const [notifications] = await connection.execute(query, [
             userId,
-            parseInt(limit),
-            parseInt(offset)
+            limitNum,
+            offsetNum
         ]);
 
         // Get unread count

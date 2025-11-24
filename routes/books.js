@@ -67,7 +67,7 @@ router.get('/', [
         }
 
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 12;
+        const limit = Math.min(parseInt(req.query.limit) || 12, 50);
         const offset = (page - 1) * limit;
 
         const connection = await getConnection();
