@@ -28,7 +28,9 @@ async function updateUserCreditsFromFeedback(connection, userId, rating, transac
         if (users.length === 0) return false;
 
         const currentCredits = users[0].credits;
-        const newCredits = Math.max(0, currentCredits + creditChange);
+        // Cap credits between 0 and 200 (maximum indicates best behavior)
+        const MAX_CREDITS = 200;
+        const newCredits = Math.min(MAX_CREDITS, Math.max(0, currentCredits + creditChange));
 
         // Update user credits
         await connection.execute('UPDATE users SET credits = ? WHERE id = ?', [newCredits, userId]);

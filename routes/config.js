@@ -3,6 +3,7 @@
 
 const express = require('express');
 const router = express.Router();
+const { getOne } = require('../config/database');
 
 router.get('/recaptcha', (req, res) => {
   const siteKey = process.env.RECAPTCHA_SITE_KEY || '';
@@ -32,6 +33,34 @@ router.get('/library', (req, res) => {
       holidays
     }
   });
+});
+
+// Credits system configuration
+router.get('/credits', async (req, res) => {
+  try {
+    // Try to get max credits from settings, default to 200
+    let maxCredits = 200;
+    try {
+      const setting = await getOne(
+        `SELECT setting_val FROM settings WHERE setting_name = 'max_user_credits'`
+      );
+      if (setting && setting.setting_val) {
+        maxCredits = parseInt(setting.setting_val, 10) || 200;
+      }
+    } catch (e) {
+      // Settings table may not exist or have this setting yet
+      console.warn('Could not load max_user_credits setting, using default:', e.message);
+    }
+
+    res.json({
+      maxCredits,
+      defaultCredits: 100,
+      description: 'Maximum of 200 credits indicates best behavior on the platform'
+    });
+  } catch (error) {
+    console.error('Error fetching credits config:', error);
+    res.status(500).json({ error: 'Failed to fetch credits configuration' });
+  }
 });
 
 

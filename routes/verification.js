@@ -127,33 +127,36 @@ async function processVerificationRewards(userId, verificationMethod) {
     }
     
     // Award credits and update claim flags
-    const newBalance = oldBalance + creditsToAward;
+    // Cap credits at 200 (maximum indicates best behavior)
+    const MAX_CREDITS = 200;
+    const newBalance = Math.min(MAX_CREDITS, oldBalance + creditsToAward);
+    const actualCreditsAwarded = newBalance - oldBalance; // May be less if capped
     const updateL1 = isNowVerified && !userState.l1_claimed;
     const updateL2 = isNowFullyVerified && !userState.l2_claimed;
     
     try {
         await pool.query(
             `UPDATE users SET 
-                credits = credits + ?,
+                credits = LEAST(?, credits + ?),
                 verification_reward_l1_claimed = CASE WHEN ? THEN TRUE ELSE verification_reward_l1_claimed END,
                 verification_reward_l2_claimed = CASE WHEN ? THEN TRUE ELSE verification_reward_l2_claimed END,
                 modified = NOW()
              WHERE id = ?`,
-            [creditsToAward, updateL1, updateL2, userId]
+            [MAX_CREDITS, creditsToAward, updateL1, updateL2, userId]
         );
     } catch (e) {
         // Fallback if new columns don't exist
         if (e.code === 'ER_BAD_FIELD_ERROR') {
             await pool.query(
-                `UPDATE users SET credits = credits + ?, modified = NOW() WHERE id = ?`,
-                [creditsToAward, userId]
+                `UPDATE users SET credits = LEAST(?, credits + ?), modified = NOW() WHERE id = ?`,
+                [MAX_CREDITS, creditsToAward, userId]
             );
         } else {
             throw e;
         }
     }
     
-    // Log to credit history
+    // Log to credit history (log actual credits awarded after cap)
     const reason = rewardLevel === 'both' 
         ? 'Full account verification bonus (Verified + Fully Verified)'
         : rewardLevel === 1 
@@ -163,12 +166,12 @@ async function processVerificationRewards(userId, verificationMethod) {
     await executeQuery(
         `INSERT INTO credit_history (user_id, credit_change, reason, old_balance, new_balance, created_at)
          VALUES (?, ?, ?, ?, ?, NOW())`,
-        [userId, creditsToAward, reason, oldBalance, newBalance]
+        [userId, actualCreditsAwarded, reason, oldBalance, newBalance]
     );
     
-    console.log(`✅ Verification reward awarded: User ${userId} received +${creditsToAward} credits (${oldBalance} → ${newBalance})`);
+    console.log(`✅ Verification reward awarded: User ${userId} received +${actualCreditsAwarded} credits (${oldBalance} → ${newBalance})${actualCreditsAwarded < creditsToAward ? ' [capped at 200]' : ''}`);
     
-    return { creditsAwarded, level: rewardLevel, oldBalance, newBalance };
+    return { creditsAwarded: actualCreditsAwarded, level: rewardLevel, oldBalance, newBalance };
 }
 
 // Send OTP for email verification

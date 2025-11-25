@@ -220,7 +220,9 @@ router.post('/claim', authenticateToken, async (req, res) => {
         throw new Error('User not found');
       }
       const oldBalance = userRow.credits || 0;
-      const newBalance = oldBalance + rewardAmount;
+      // Cap credits at 200 (maximum indicates best behavior)
+      const MAX_CREDITS = 200;
+      const newBalance = Math.min(MAX_CREDITS, oldBalance + rewardAmount);
 
       await conn.execute('UPDATE users SET credits = ? WHERE id = ?', [newBalance, userId]);
       await conn.execute(

@@ -7,7 +7,8 @@
 INSERT INTO settings (setting_name, setting_val, description) VALUES
 ('verification_reward_level_1', '15', 'Credits awarded when user reaches Verified status (either email or document verified)'),
 ('verification_reward_level_2', '15', 'Additional credits awarded when user reaches Fully Verified status (both email and document verified)'),
-('verification_rewards_enabled', 'true', 'Enable or disable verification credit rewards')
+('verification_rewards_enabled', 'true', 'Enable or disable verification credit rewards'),
+('max_user_credits', '200', 'Maximum credits a user can have (indicates best behavior)')
 ON DUPLICATE KEY UPDATE setting_val = VALUES(setting_val);
 
 -- Add columns to track which verification rewards have been claimed

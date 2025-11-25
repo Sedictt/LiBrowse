@@ -56,6 +56,9 @@ function adjustDateForClosure(dateStr, cfg) {
 }
 
 
+// Maximum credits a user can have (indicates best behavior)
+const MAX_CREDITS = 200;
+
 // Helper function to update user credits
 async function updateUserCredits(connection, userId, creditChange, reason, transactionId = null) {
     // Get current credits
@@ -63,7 +66,8 @@ async function updateUserCredits(connection, userId, creditChange, reason, trans
     if (users.length === 0) return false;
 
     const currentCredits = users[0].credits;
-    const newCredits = Math.max(0, currentCredits + creditChange); // Prevent negative credits
+    // Cap credits between 0 and MAX_CREDITS (200)
+    const newCredits = Math.min(MAX_CREDITS, Math.max(0, currentCredits + creditChange));
 
     // Update user credits
     await connection.execute('UPDATE users SET credits = ? WHERE id = ?', [newCredits, userId]);
