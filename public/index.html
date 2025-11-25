@@ -2020,6 +2020,100 @@
         </div>
     </div>
     </div>
+
+    <!-- User Public Profile Modal -->
+    <div class="modal" id="user-profile-modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3><i class="fas fa-user"></i> User Profile</h3>
+                <button class="modal-close" type="button" onclick="app.closeModal('user-profile-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="public-profile-content">
+                    <!-- Profile Header -->
+                    <div class="public-profile-header">
+                        <div class="public-profile-avatar">
+                            <img id="public-profile-pic" src="/assets/default-avatar.svg" alt="Profile picture">
+                        </div>
+                        <div class="public-profile-info">
+                            <h2 id="public-profile-name">Loading...</h2>
+                            <div class="public-profile-badges">
+                                <span class="badge" id="public-profile-verification"></span>
+                            </div>
+                            <p class="public-profile-program" id="public-profile-program"></p>
+                            <p class="public-profile-member-since" id="public-profile-member-since"></p>
+                        </div>
+                        <div class="public-profile-trust">
+                            <div class="trust-score-circle" id="public-trust-score-circle">
+                                <span class="trust-score-value" id="public-trust-score">--</span>
+                            </div>
+                            <span class="trust-score-label">Trust Score</span>
+                        </div>
+                    </div>
+
+                    <!-- Bio Section -->
+                    <div class="public-profile-section" id="public-profile-bio-section">
+                        <h4><i class="fas fa-quote-left"></i> About</h4>
+                        <p id="public-profile-bio">No bio provided.</p>
+                    </div>
+
+                    <!-- Stats Grid -->
+                    <div class="public-profile-section">
+                        <h4><i class="fas fa-chart-bar"></i> Activity Stats</h4>
+                        <div class="public-profile-stats-grid">
+                            <div class="stat-card">
+                                <i class="fas fa-book"></i>
+                                <span class="stat-value" id="public-stat-books">0</span>
+                                <span class="stat-label">Books Shared</span>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-handshake"></i>
+                                <span class="stat-value" id="public-stat-transactions">0</span>
+                                <span class="stat-label">Transactions</span>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-hand-holding"></i>
+                                <span class="stat-value" id="public-stat-lender">0</span>
+                                <span class="stat-label">As Lender</span>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-book-reader"></i>
+                                <span class="stat-value" id="public-stat-borrower">0</span>
+                                <span class="stat-label">As Borrower</span>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-star"></i>
+                                <span class="stat-value" id="public-stat-rating">-</span>
+                                <span class="stat-label">Avg Rating</span>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-coins"></i>
+                                <span class="stat-value" id="public-stat-credits">0</span>
+                                <span class="stat-label">Credits</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Feedback -->
+                    <div class="public-profile-section" id="public-profile-feedback-section">
+                        <h4><i class="fas fa-comments"></i> Recent Reviews (<span id="public-total-reviews">0</span>)</h4>
+                        <div class="public-feedback-list" id="public-feedback-list">
+                            <p class="no-feedback">No reviews yet.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="app.closeModal('user-profile-modal')">
+                    <i class="fas fa-times"></i>
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications -->
     <div class="toast-container" id="toast-container"></div>
 

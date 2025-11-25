@@ -1800,6 +1800,186 @@ class App {
         }
     }
 
+    // View another user's public profile
+    async viewUserProfile(userId) {
+        if (!userId) return;
+
+        // Don't show profile for current user - redirect to profile section
+        if (authManager.isAuthenticated && authManager.currentUser.id === parseInt(userId)) {
+            this.navigateToSection('profile');
+            return;
+        }
+
+        try {
+            // Show loading state
+            const modal = document.getElementById('user-profile-modal');
+            if (!modal) {
+                console.error('User profile modal not found');
+                return;
+            }
+
+            // Reset and show modal
+            this.resetProfileModal();
+            modal.classList.add('active');
+            modal.style.display = 'flex';
+            modal.style.visibility = 'visible';
+            modal.style.opacity = '1';
+            modal.style.zIndex = '9999';
+            document.body.style.overflow = 'hidden';
+
+            // Fetch public profile data
+            const response = await fetch(`/api/users/${userId}/public`);
+            if (!response.ok) {
+                throw new Error('Failed to load profile');
+            }
+            const data = await response.json();
+
+            // Populate the modal
+            this.populatePublicProfile(data);
+
+        } catch (error) {
+            console.error('Error loading public profile:', error);
+            authManager.showToast('Failed to load user profile', 'error');
+            this.closeModal('user-profile-modal');
+        }
+    }
+
+    resetProfileModal() {
+        document.getElementById('public-profile-pic').src = '/assets/default-avatar.svg';
+        document.getElementById('public-profile-name').textContent = 'Loading...';
+        document.getElementById('public-profile-verification').textContent = '';
+        document.getElementById('public-profile-program').textContent = '';
+        document.getElementById('public-profile-member-since').textContent = '';
+        document.getElementById('public-trust-score').textContent = '--';
+        document.getElementById('public-profile-bio').textContent = 'No bio provided.';
+        document.getElementById('public-stat-books').textContent = '0';
+        document.getElementById('public-stat-transactions').textContent = '0';
+        document.getElementById('public-stat-lender').textContent = '0';
+        document.getElementById('public-stat-borrower').textContent = '0';
+        document.getElementById('public-stat-rating').textContent = '-';
+        document.getElementById('public-stat-credits').textContent = '0';
+        document.getElementById('public-total-reviews').textContent = '0';
+        document.getElementById('public-feedback-list').innerHTML = '<p class="no-feedback">No reviews yet.</p>';
+    }
+
+    populatePublicProfile(data) {
+        const { user, stats, recentFeedback } = data;
+
+        // Profile picture
+        const picEl = document.getElementById('public-profile-pic');
+        if (user.profilePic) {
+            picEl.src = user.profilePic;
+        } else {
+            picEl.src = '/assets/default-avatar.svg';
+        }
+        picEl.onerror = () => { picEl.src = '/assets/default-avatar.svg'; };
+
+        // Name
+        document.getElementById('public-profile-name').textContent = user.name;
+
+        // Verification badge
+        const verifyEl = document.getElementById('public-profile-verification');
+        if (user.verificationLevel === 'fully_verified') {
+            verifyEl.innerHTML = '<i class="fas fa-shield-alt"></i> Fully Verified';
+            verifyEl.className = 'badge badge-fully-verified';
+        } else if (user.verificationLevel === 'verified') {
+            verifyEl.innerHTML = '<i class="fas fa-check-circle"></i> Verified';
+            verifyEl.className = 'badge badge-verified';
+        } else {
+            verifyEl.innerHTML = '<i class="fas fa-user"></i> Unverified';
+            verifyEl.className = 'badge badge-unverified';
+        }
+
+        // Program
+        document.getElementById('public-profile-program').textContent = 
+            user.program ? `${user.program}${user.year ? ` - Year ${user.year}` : ''}` : '';
+
+        // Member since
+        if (user.memberSince) {
+            const memberDate = new Date(user.memberSince);
+            document.getElementById('public-profile-member-since').textContent = 
+                `Member since ${memberDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+        }
+
+        // Trust score
+        const trustScoreEl = document.getElementById('public-trust-score');
+        const trustCircle = document.getElementById('public-trust-score-circle');
+        trustScoreEl.textContent = user.trustScore;
+        
+        // Color based on score
+        if (user.trustScore >= 80) {
+            trustCircle.className = 'trust-score-circle trust-excellent';
+        } else if (user.trustScore >= 60) {
+            trustCircle.className = 'trust-score-circle trust-good';
+        } else if (user.trustScore >= 40) {
+            trustCircle.className = 'trust-score-circle trust-fair';
+        } else {
+            trustCircle.className = 'trust-score-circle trust-low';
+        }
+
+        // Bio
+        const bioSection = document.getElementById('public-profile-bio-section');
+        const bioEl = document.getElementById('public-profile-bio');
+        if (user.bio) {
+            bioEl.textContent = user.bio;
+            bioSection.style.display = 'block';
+        } else {
+            bioSection.style.display = 'none';
+        }
+
+        // Stats
+        document.getElementById('public-stat-books').textContent = stats.booksShared || 0;
+        document.getElementById('public-stat-transactions').textContent = stats.completedTransactions || 0;
+        document.getElementById('public-stat-lender').textContent = stats.asLender || 0;
+        document.getElementById('public-stat-borrower').textContent = stats.asBorrower || 0;
+        document.getElementById('public-stat-rating').textContent = stats.averageRating || '-';
+        document.getElementById('public-stat-credits').textContent = user.credits || 0;
+        document.getElementById('public-total-reviews').textContent = stats.totalReviews || 0;
+
+        // Recent feedback
+        const feedbackListEl = document.getElementById('public-feedback-list');
+        if (recentFeedback && recentFeedback.length > 0) {
+            feedbackListEl.innerHTML = recentFeedback.map(fb => this.createFeedbackCard(fb)).join('');
+        } else {
+            feedbackListEl.innerHTML = '<p class="no-feedback">No reviews yet.</p>';
+        }
+    }
+
+    createFeedbackCard(feedback) {
+        const stars = '★'.repeat(feedback.rating) + '☆'.repeat(5 - feedback.rating);
+        const date = new Date(feedback.created).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric' 
+        });
+        
+        return `
+            <div class="feedback-card">
+                <div class="feedback-header">
+                    <div class="feedback-reviewer">
+                        <img src="${feedback.reviewer_pic || '/assets/default-avatar.svg'}" 
+                             alt="${feedback.reviewer_name}" 
+                             onerror="this.src='/assets/default-avatar.svg'">
+                        <span>${this.escapeHtml(feedback.reviewer_name)}</span>
+                    </div>
+                    <div class="feedback-rating">
+                        <span class="stars">${stars}</span>
+                    </div>
+                </div>
+                ${feedback.book_title ? `<div class="feedback-book"><i class="fas fa-book"></i> ${this.escapeHtml(feedback.book_title)}</div>` : ''}
+                ${feedback.comment ? `<p class="feedback-comment">${this.escapeHtml(feedback.comment)}</p>` : ''}
+                <span class="feedback-date">${date}</span>
+            </div>
+        `;
+    }
+
+    escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
     formatTime(timestamp) {
         const date = new Date(timestamp);
         const now = new Date();

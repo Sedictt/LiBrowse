@@ -439,7 +439,7 @@ class ChatManager {
             if (info.other_user_avatar) {
                 avatar.src = info.other_user_avatar;
             } else {
-                avatar.src = '/images/default-avatar.png';
+                avatar.src = '/assets/default-avatar.svg';
             }
         }
 

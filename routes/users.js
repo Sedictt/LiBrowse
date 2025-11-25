@@ -9,6 +9,148 @@ const router = express.Router();
 // Enable file upload handling (used for /api/users/profile-picture)
 router.use(fileUpload());
 
+// GET /api/users/:userId/public - Public profile for assessing credibility
+// Returns limited info that helps users assess trustworthiness
+router.get('/:userId/public', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const conn = await getConnection();
+    
+    // Get user basic info (limited public data)
+    const [userRows] = await conn.execute(
+      `SELECT 
+         id,
+         fname,
+         lname,
+         course,
+         year,
+         profile_pic,
+         bio,
+         verification_status,
+         is_verified,
+         email_verified,
+         credits,
+         created AS member_since
+       FROM users 
+       WHERE id = ? 
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (userRows.length === 0) {
+      conn.release();
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userRows[0];
+
+    // Get user stats
+    const [[{ books_count }]] = await conn.query(
+      'SELECT COUNT(*) AS books_count FROM books WHERE owner_id = ? AND is_available = 1',
+      [userId]
+    );
+
+    const [[{ completed_transactions }]] = await conn.query(
+      `SELECT COUNT(*) AS completed_transactions FROM transactions 
+       WHERE (borrower_id = ? OR lender_id = ?) AND status = 'completed'`,
+      [userId, userId]
+    );
+
+    const [[{ as_lender }]] = await conn.query(
+      `SELECT COUNT(*) AS as_lender FROM transactions 
+       WHERE lender_id = ? AND status = 'completed'`,
+      [userId]
+    );
+
+    const [[{ as_borrower }]] = await conn.query(
+      `SELECT COUNT(*) AS as_borrower FROM transactions 
+       WHERE borrower_id = ? AND status = 'completed'`,
+      [userId]
+    );
+
+    // Get average rating received
+    const [[{ average_rating, total_reviews }]] = await conn.query(
+      `SELECT AVG(rating) AS average_rating, COUNT(*) AS total_reviews 
+       FROM feedback WHERE reviewee_id = ?`,
+      [userId]
+    );
+
+    // Get recent feedback (last 5 reviews)
+    const [recentFeedback] = await conn.execute(
+      `SELECT 
+         f.rating,
+         f.comment,
+         f.created,
+         CONCAT(reviewer.fname, ' ', LEFT(reviewer.lname, 1), '.') AS reviewer_name,
+         reviewer.profile_pic AS reviewer_pic,
+         b.title AS book_title
+       FROM feedback f
+       JOIN users reviewer ON reviewer.id = f.reviewer_id
+       JOIN transactions t ON t.id = f.transaction_id
+       JOIN books b ON b.id = t.book_id
+       WHERE f.reviewee_id = ?
+       ORDER BY f.created DESC
+       LIMIT 5`,
+      [userId]
+    );
+
+    conn.release();
+
+    // Determine verification level
+    let verificationLevel = 'unverified';
+    let verificationLabel = 'Not Verified';
+    const isDocVerified = user.is_verified === 1 || user.verification_status === 'verified';
+    const isEmailVerified = user.email_verified === 1;
+    
+    if (isDocVerified && isEmailVerified) {
+      verificationLevel = 'fully_verified';
+      verificationLabel = 'Fully Verified';
+    } else if (isDocVerified || isEmailVerified) {
+      verificationLevel = 'verified';
+      verificationLabel = 'Verified';
+    }
+
+    // Calculate trust score (simple algorithm based on various factors)
+    let trustScore = 0;
+    if (verificationLevel === 'fully_verified') trustScore += 30;
+    else if (verificationLevel === 'verified') trustScore += 15;
+    trustScore += Math.min(30, completed_transactions * 3); // Max 30 points for transactions
+    trustScore += Math.min(20, (average_rating || 0) * 4); // Max 20 points for rating
+    trustScore += Math.min(10, user.credits / 20); // Max 10 points for credits
+    trustScore += Math.min(10, books_count * 2); // Max 10 points for books shared
+    trustScore = Math.min(100, Math.round(trustScore));
+
+    return res.json({
+      user: {
+        id: user.id,
+        name: `${user.fname} ${user.lname}`,
+        firstName: user.fname,
+        program: user.course,
+        year: user.year,
+        profilePic: user.profile_pic,
+        bio: user.bio,
+        verificationLevel,
+        verificationLabel,
+        credits: user.credits,
+        memberSince: user.member_since,
+        trustScore
+      },
+      stats: {
+        booksShared: books_count,
+        completedTransactions: completed_transactions,
+        asLender: as_lender,
+        asBorrower: as_borrower,
+        averageRating: average_rating ? parseFloat(average_rating).toFixed(1) : null,
+        totalReviews: total_reviews
+      },
+      recentFeedback
+    });
+  } catch (err) {
+    console.error('GET /users/:userId/public error:', err);
+    res.status(500).json({ error: 'Failed to load public profile' });
+  }
+});
+
 // GET /api/users/profile - current user's profile
 router.get('/profile', authenticateToken, async (req, res) => {
   try {

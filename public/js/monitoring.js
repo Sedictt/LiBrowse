@@ -63,11 +63,12 @@ class MonitoringManager {
             // Backend returns {transactions: [...]}
             let transactions = data.transactions || data || [];
 
-            // Add other_user_name to each transaction
+            // Add other_user_name and other_user_id to each transaction
             const currentUserId = authManager.getCurrentUser()?.id;
             transactions = transactions.map(t => ({
                 ...t,
-                other_user_name: t.borrower_id === currentUserId ? t.lender_name : t.borrower_name
+                other_user_name: t.borrower_id === currentUserId ? t.lender_name : t.borrower_name,
+                other_user_id: t.borrower_id === currentUserId ? t.lender_id : t.borrower_id
             }));
 
             this.categorizeTransactions(transactions);
@@ -256,7 +257,7 @@ class MonitoringManager {
     <div class="transaction-card">
         <div class="transaction-info">
             <h4>${escapeHtml(transaction.book_title)}</h4>
-            <p>With: ${escapeHtml(transaction.other_user_name)}</p>
+            <p>With: <a href="#" class="user-profile-link" onclick="event.stopPropagation(); window.app.viewUserProfile(${transaction.other_user_id}); return false;" title="View ${escapeHtml(transaction.other_user_name)}'s profile">${escapeHtml(transaction.other_user_name)}</a></p>
             ${transaction.expected_return_date ? `<span>Due: ${formatDateTime(transaction.expected_return_date)}</span>` : ''}
         </div>
         <div class="transaction-actions">
@@ -540,12 +541,12 @@ class MonitoringManager {
                 <!-- People Involved -->
                 <div class="transaction-detail-row">
                     <div class="transaction-detail-label">Borrower:</div>
-                    <div class="transaction-detail-value">${escapeHtml(response.borrower_name)}</div>
+                    <div class="transaction-detail-value"><a href="#" class="user-profile-link" onclick="window.app.viewUserProfile(${response.borrower_id}); return false;" title="View profile">${escapeHtml(response.borrower_name)}</a></div>
                 </div>
                 
                 <div class="transaction-detail-row">
                     <div class="transaction-detail-label">Lender:</div>
-                    <div class="transaction-detail-value">${escapeHtml(response.lender_name)}</div>
+                    <div class="transaction-detail-value"><a href="#" class="user-profile-link" onclick="window.app.viewUserProfile(${response.lender_id}); return false;" title="View profile">${escapeHtml(response.lender_name)}</a></div>
                 </div>
                 
                 <!-- Timeline -->

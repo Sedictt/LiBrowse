@@ -190,7 +190,9 @@ class BooksManager {
                     </div>
                     <div class="book-owner">
                         <i class="fas fa-user"></i>
-                        <span>${escapeHtml(book.owner_name || 'Unknown')}</span>
+                        <a href="#" class="user-profile-link" onclick="event.stopPropagation(); window.app.viewUserProfile(${book.owner_id}); return false;" title="View ${escapeHtml(book.owner_name || 'Unknown')}'s profile">
+                            ${escapeHtml(book.owner_name || 'Unknown')}
+                        </a>
                     </div>
                     ${book.minimum_credits || book.min_credit ? `
                         <div class="credit-requirement ${!hasEnoughCredits && isAuthenticated ? 'insufficient' : ''}">
@@ -368,7 +370,12 @@ class BooksManager {
         }
         const ownerEl = document.getElementById('modal-book-owner');
         if (ownerEl) {
-            ownerEl.textContent = book.owner_name || 'Unknown';
+            // Store owner_id on the element so we can make it clickable
+            if (book.owner_id) {
+                ownerEl.innerHTML = `<a href="#" class="user-profile-link" onclick="window.app.viewUserProfile(${book.owner_id}); return false;" title="View ${escapeHtml(book.owner_name || 'Unknown')}'s profile">${escapeHtml(book.owner_name || 'Unknown')}</a>`;
+            } else {
+                ownerEl.textContent = book.owner_name || 'Unknown';
+            }
         }
         const ownerProgEl = document.getElementById('modal-book-owner-program');
         if (ownerProgEl) {

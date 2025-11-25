@@ -467,7 +467,7 @@ class RequestManager {
                         <div class="request-info">
                             <h4>${this.escapeHtml(request.book_title)}</h4>
                             <div class="request-user-info">
-                                <p>${isIncoming ? 'Request from' : 'Request to'} <strong>${this.escapeHtml(userInfo.name)}</strong></p>
+                                <p>${isIncoming ? 'Request from' : 'Request to'} <a href="#" class="user-profile-link" onclick="event.stopPropagation(); window.app.viewUserProfile(${userInfo.id}); return false;" title="View ${this.escapeHtml(userInfo.name)}'s profile"><strong>${this.escapeHtml(userInfo.name)}</strong></a></p>
                                 <div class="user-badges">
                                     ${badges}
                                 </div>
