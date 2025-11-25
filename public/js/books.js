@@ -1147,40 +1147,42 @@ class BooksManager {
 
     renderRecentlyViewed() {
         const container = document.getElementById('recently-viewed-books');
-        const section = document.getElementById('recently-viewed-section');
         if (!container) return;
 
         const items = Array.isArray(this.recentlyViewed) ? this.recentlyViewed : [];
         if (items.length === 0) {
-            container.innerHTML = '<p class="empty-state">No recently viewed books</p>';
-            if (section) section.style.display = 'none';
+            container.innerHTML = '<p class="empty-hint">No recently viewed books</p>';
             return;
         }
 
-        // Ensure section is visible when we have items
-        if (section) section.style.display = '';
-
-        container.innerHTML = items.map(book => `
-    <div class="book-card-mini" data-book-id="${book.id}">
-      <div class="book-mini-image">
-        <img src="${book.image_url || book.cover_image || '/images/default-book.png'}" 
-             alt="${escapeHtml(book.title)}" 
-             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-        <i class="fas fa-book fallback-icon" style="display: none;"></i>
-      </div>
-      <div class="book-mini-info">
-        <h5>${escapeHtml(book.title)}</h5>
-        <p>${escapeHtml(book.author || 'Unknown Author')}</p>
-        <small>${this.formatTimeAgo(book.viewed_at)}</small>
-      </div>
-    </div>
-  `).join('');
+        container.innerHTML = items.slice(0, 5).map(book => {
+            const hasImage = book.image_url || book.cover_image;
+            return `
+                <div class="recent-book-item" data-book-id="${book.id}">
+                    ${hasImage ? `
+                        <img class="book-thumb" 
+                             src="${book.image_url || book.cover_image}" 
+                             alt="${escapeHtml(book.title)}"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="book-thumb-fallback" style="display:none;"><i class="fas fa-book"></i></div>
+                    ` : `
+                        <div class="book-thumb-fallback"><i class="fas fa-book"></i></div>
+                    `}
+                    <div class="book-info">
+                        <p class="book-title">${escapeHtml(book.title)}</p>
+                        <p class="book-author">${escapeHtml(book.author || 'Unknown Author')}</p>
+                    </div>
+                </div>
+            `;
+        }).join('');
 
         // Add click handlers
-        container.querySelectorAll('.book-card-mini').forEach(card => {
+        container.querySelectorAll('.recent-book-item').forEach(card => {
             card.addEventListener('click', () => {
                 const bookId = card.dataset.bookId;
-                this.viewBookDetails(bookId);
+                this.viewBook(bookId);
+                // Close dropdown
+                document.getElementById('search-dropdown')?.classList.remove('active');
             });
         });
     }

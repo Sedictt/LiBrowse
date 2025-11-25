@@ -3817,26 +3817,46 @@ document.addEventListener("DOMContentLoaded", () => {
 
         init() {
             this.setupEventListeners();
+            this.setupSearchDropdown();
+        }
+
+        setupSearchDropdown() {
+            const searchExtrasBtn = document.getElementById('search-extras-btn');
+            const searchDropdown = document.getElementById('search-dropdown');
+            
+            if (searchExtrasBtn && searchDropdown) {
+                // Toggle dropdown on button click
+                searchExtrasBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isActive = searchDropdown.classList.toggle('active');
+                    searchExtrasBtn.classList.toggle('active', isActive);
+                    
+                    // Load data when opening
+                    if (isActive) {
+                        this.loadSavedSearches();
+                        if (window.booksManager) {
+                            window.booksManager.loadRecentlyViewed();
+                        }
+                    }
+                });
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!searchDropdown.contains(e.target) && !searchExtrasBtn.contains(e.target)) {
+                        searchDropdown.classList.remove('active');
+                        searchExtrasBtn.classList.remove('active');
+                    }
+                });
+            }
         }
 
         setupEventListeners() {
             // Save current search button
             const saveSearchBtn = document.getElementById('save-search-btn');
             if (saveSearchBtn) {
-                saveSearchBtn.addEventListener('click', () => this.showSaveSearchModal());
-            }
-
-            // Saved searches dropdown/list
-            const savedSearchesList = document.getElementById('saved-searches-list');
-            if (savedSearchesList) {
-                savedSearchesList.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('apply-search')) {
-                        const searchId = e.target.dataset.searchId;
-                        this.applySavedSearch(searchId);
-                    } else if (e.target.classList.contains('delete-search')) {
-                        const searchId = e.target.dataset.searchId;
-                        this.deleteSavedSearch(searchId);
-                    }
+                saveSearchBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.showSaveSearchModal();
                 });
             }
         }
@@ -3858,26 +3878,61 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!container) return;
 
             if (this.savedSearches.length === 0) {
-                container.innerHTML = '<p class="empty-state">No saved searches yet</p>';
+                container.innerHTML = '<p class="empty-hint">No saved searches yet</p>';
                 return;
             }
 
-            container.innerHTML = this.savedSearches.map(search => `
-      <div class="saved-search-item" data-search-id="${search.id}">
-        <div class="search-info">
-          <h4>${search.search_name}</h4>
-          <small>Last used: ${this.formatDate(search.last_used || search.created_at)}</small>
-        </div>
-        <div class="search-actions">
-          <button class="btn-icon apply-search" data-search-id="${search.id}" title="Apply this search">
-            <i class="fas fa-search"></i>
-          </button>
-          <button class="btn-icon delete-search" data-search-id="${search.id}" title="Delete">
-            <i class="fas fa-trash"></i>
-          </button>
-        </div>
-      </div>
-    `).join('');
+            container.innerHTML = this.savedSearches.slice(0, 5).map(search => {
+                // Parse the search criteria to show filter tags
+                let filters = {};
+                try {
+                    filters = typeof search.search_criteria === 'string' 
+                        ? JSON.parse(search.search_criteria) 
+                        : search.search_criteria || {};
+                } catch (e) {}
+
+                const filterTags = [];
+                if (filters.query) filterTags.push(`"${filters.query.substring(0, 15)}${filters.query.length > 15 ? '...' : ''}"`);
+                if (filters.program) filterTags.push(filters.program);
+                if (filters.condition) filterTags.push(filters.condition);
+
+                return `
+                    <div class="saved-search-item" data-search-id="${search.id}">
+                        <span class="search-query">${this.escapeHtml(search.search_name)}</span>
+                        ${filterTags.length > 0 ? `
+                            <div class="search-filters-tags">
+                                ${filterTags.slice(0, 2).map(tag => `<span class="filter-tag">${this.escapeHtml(tag)}</span>`).join('')}
+                            </div>
+                        ` : ''}
+                        <button class="delete-btn" data-search-id="${search.id}" title="Delete">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+
+            // Add click handlers
+            container.querySelectorAll('.saved-search-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    if (e.target.closest('.delete-btn')) {
+                        e.stopPropagation();
+                        const searchId = e.target.closest('.delete-btn').dataset.searchId;
+                        this.deleteSavedSearch(searchId);
+                    } else {
+                        const searchId = item.dataset.searchId;
+                        this.applySavedSearch(searchId);
+                        // Close dropdown
+                        document.getElementById('search-dropdown')?.classList.remove('active');
+                    }
+                });
+            });
+        }
+
+        escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
         }
 
 

@@ -436,9 +436,36 @@
 
                 <!-- Search and Filters -->
                 <div class="search-filters">
-                    <div class="search-bar">
-                        <i class="fas fa-search"></i>
-                        <input type="text" id="book-search" placeholder="Search books by title, author, or course...">
+                    <div class="search-bar-wrapper">
+                        <div class="search-bar">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="book-search" placeholder="Search books by title, author, or course..." autocomplete="off">
+                            <button class="search-extras-btn" id="search-extras-btn" title="Saved searches & history">
+                                <i class="fas fa-clock"></i>
+                            </button>
+                        </div>
+                        <!-- Search Dropdown (Saved Searches + Recently Viewed) -->
+                        <div class="search-dropdown" id="search-dropdown">
+                            <div class="search-dropdown-section" id="saved-searches-dropdown">
+                                <div class="dropdown-section-header">
+                                    <span><i class="fas fa-bookmark"></i> Saved Searches</span>
+                                    <button class="btn btn-xs btn-primary" id="save-search-btn" title="Save current search">
+                                        <i class="fas fa-plus"></i> Save
+                                    </button>
+                                </div>
+                                <div class="saved-searches-list" id="saved-searches-list">
+                                    <p class="empty-hint">No saved searches yet</p>
+                                </div>
+                            </div>
+                            <div class="search-dropdown-section" id="recently-viewed-dropdown">
+                                <div class="dropdown-section-header">
+                                    <span><i class="fas fa-history"></i> Recently Viewed</span>
+                                </div>
+                                <div class="recently-viewed-books" id="recently-viewed-books">
+                                    <p class="empty-hint">No recently viewed books</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="filters">
                         <select id="program-filter" class="filter-select">
@@ -468,43 +495,6 @@
                             <option value="creditslow">Credits (Low to High)</option>
                             <option value="creditshigh">Credits (High to Low)</option>
                         </select>
-                    </div>
-                </div>
-
-                <!-- Saved Searches Panel (Collapsible) -->
-                <div class="saved-searches-panel collapsed">
-                    <div class="saved-searches-header" onclick="this.parentElement.classList.toggle('collapsed')">
-                        <h3><i class="fas fa-bookmark"></i> Saved Searches</h3>
-                        <div class="panel-actions">
-                            <button class="btn btn-sm btn-primary" id="save-search-btn" title="Save current search"
-                                onclick="event.stopPropagation()">
-                                <i class="fas fa-save"></i>
-                            </button>
-                            <button class="panel-toggle" title="Toggle panel">
-                                <i class="fas fa-chevron-down"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="panel-content">
-                        <div class="saved-searches-list" id="saved-searches-list">
-                            <!-- Saved searches will be loaded here dynamically -->
-                            <p class="empty-state">No saved searches yet</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Recently Viewed Books (Collapsible) -->
-                <div class="recently-viewed-section collapsed" id="recently-viewed-section" style="display: none;">
-                    <div class="section-header-small" onclick="this.parentElement.classList.toggle('collapsed')">
-                        <h3><i class="fas fa-history"></i> Recently Viewed</h3>
-                        <button class="panel-toggle" title="Toggle panel">
-                            <i class="fas fa-chevron-down"></i>
-                        </button>
-                    </div>
-                    <div class="panel-content">
-                        <div class="recently-viewed-books" id="recently-viewed-books">
-                            <!-- Recently viewed books will be loaded here -->
-                        </div>
                     </div>
                 </div>
 

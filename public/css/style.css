@@ -11072,3 +11072,266 @@ body {
         font-size: 1.25rem;
     }
 }
+
+/* ===== SEARCH DROPDOWN (Saved Searches & Recently Viewed) ===== */
+.search-bar-wrapper {
+    position: relative;
+    flex: 1;
+    min-width: 300px;
+}
+
+.search-bar-wrapper .search-bar {
+    flex: unset;
+    min-width: unset;
+    width: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-bar-wrapper .search-bar input {
+    padding-right: 45px;
+    flex: 1;
+}
+
+.search-extras-btn {
+    position: absolute;
+    right: 12px;
+    top: 0;
+    bottom: 0;
+    margin: auto 0;
+    height: 32px;
+    width: 32px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0;
+    border-radius: var(--radius-sm);
+    transition: var(--transition-fast);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-extras-btn:hover {
+    color: var(--primary);
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.search-extras-btn.active {
+    color: var(--primary);
+}
+
+.search-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    z-index: 100;
+    display: none;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.search-dropdown.active {
+    display: block;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.search-dropdown-section {
+    padding: var(--spacing-md);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.search-dropdown-section:last-child {
+    border-bottom: none;
+}
+
+.dropdown-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dropdown-section-header span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dropdown-section-header span i {
+    font-size: 0.75rem;
+}
+
+.btn-xs {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+}
+
+.empty-hint {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-align: center;
+    padding: var(--spacing-sm);
+    margin: 0;
+    font-style: italic;
+}
+
+/* Saved Search Items in Dropdown */
+.saved-searches-list .saved-search-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.saved-searches-list .saved-search-item:hover {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.saved-searches-list .saved-search-item:last-child {
+    margin-bottom: 0;
+}
+
+.saved-search-item .search-query {
+    flex: 1;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.saved-search-item .search-filters-tags {
+    display: flex;
+    gap: 4px;
+    margin-left: 8px;
+}
+
+.saved-search-item .filter-tag {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    background: rgba(102, 126, 234, 0.2);
+    color: var(--primary-light);
+    border-radius: 10px;
+}
+
+.saved-search-item .delete-btn {
+    opacity: 0;
+    padding: 4px 6px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    margin-left: 8px;
+}
+
+.saved-search-item:hover .delete-btn {
+    opacity: 1;
+}
+
+.saved-search-item .delete-btn:hover {
+    color: var(--danger);
+}
+
+/* Recently Viewed Books in Dropdown */
+.recently-viewed-books {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.recently-viewed-books .recent-book-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.recently-viewed-books .recent-book-item:hover {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.recently-viewed-books .book-thumb {
+    width: 40px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 4px;
+    background: var(--bg-secondary);
+}
+
+.recently-viewed-books .book-thumb-fallback {
+    width: 40px;
+    height: 50px;
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.recently-viewed-books .book-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.recently-viewed-books .book-title {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+}
+
+.recently-viewed-books .book-author {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .search-bar-wrapper {
+        min-width: 100%;
+    }
+    
+    .search-dropdown {
+        max-height: 300px;
+    }
+}
