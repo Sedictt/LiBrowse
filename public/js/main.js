@@ -1463,8 +1463,8 @@ class App {
                 ? notifications.filter(n => !n.is_read).length
                 : 0);
 
-        // Keep badge text in sync
-        badge.textContent = unreadCount;
+        // Keep badge text in sync - empty string hides via CSS :empty
+        badge.textContent = unreadCount > 0 ? unreadCount : '';
 
         // Prefer the new NotificationManager badge animation if available
         if (window.notificationManager && typeof window.notificationManager.updateBadge === 'function') {

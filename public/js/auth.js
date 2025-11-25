@@ -730,12 +730,23 @@ class AuthManager {
         const navUser = document.getElementById('nav-user');
         const navCredits = document.getElementById('nav-credits');
         const navMenu = document.getElementById('nav-menu');
+        const dropdownUsername = document.getElementById('dropdown-username');
+        const dropdownEmail = document.getElementById('dropdown-email');
 
         if (isAuthenticated) {
             if (navAuth) navAuth.classList.add('hidden');
             if (navUser) navUser.classList.remove('hidden');
             if (navCredits) navCredits.classList.remove('hidden');
             if (navMenu) navMenu.classList.add('authenticated');
+            
+            // Update dropdown header with user info
+            if (dropdownUsername && this.currentUser) {
+                dropdownUsername.textContent = this.currentUser.username || this.currentUser.name || 'User';
+            }
+            if (dropdownEmail && this.currentUser) {
+                dropdownEmail.textContent = this.currentUser.email || '';
+            }
+            
             this.updateCreditsDisplay();
             this.setRegisterControlsEnabled(false);
         } else {
@@ -743,6 +754,8 @@ class AuthManager {
             if (navUser) navUser.classList.add('hidden');
             if (navCredits) navCredits.classList.add('hidden');
             if (navMenu) navMenu.classList.remove('authenticated');
+            if (dropdownUsername) dropdownUsername.textContent = 'User';
+            if (dropdownEmail) dropdownEmail.textContent = '';
             this.setRegisterControlsEnabled(true);
         }
     }

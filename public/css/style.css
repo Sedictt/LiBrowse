@@ -674,9 +674,13 @@ body {
 
 .nav-user {
     position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
 }
 
 .user-avatar {
+    position: relative;
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -693,9 +697,14 @@ body {
     box-shadow: var(--shadow-glow);
 }
 
+/* User Avatar Wrapper - contains avatar and dropdown */
+.user-avatar-wrapper {
+    position: relative;
+}
+
 .user-dropdown {
     position: absolute;
-    top: 100%;
+    top: calc(100% + 8px);
     right: 0;
     background: var(--bg-secondary);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -707,9 +716,10 @@ body {
     transform: translateY(-10px);
     transition: var(--transition-fast);
     box-shadow: var(--shadow-lg);
+    z-index: 100;
 }
 
-.user-avatar:hover + .user-dropdown,
+.user-avatar-wrapper:hover .user-dropdown,
 .user-dropdown:hover {
     opacity: 1;
     visibility: visible;
@@ -2001,6 +2011,81 @@ body {
     0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,184,0,0.6); }
     60% { transform: scale(1.08); box-shadow: 0 0 0 8px rgba(255,184,0,0); }
     100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,184,0,0); }
+}
+
+/* Navigation Notification Bell */
+.nav-notification-bell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--bg-glass);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    z-index: 10;
+}
+
+.nav-notification-bell:hover {
+    background: rgba(102, 126, 234, 0.15);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.nav-notification-bell i {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    transition: var(--transition-fast);
+}
+
+.nav-notification-bell:hover i {
+    color: var(--primary);
+}
+
+.nav-notification-bell .notification-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: var(--danger);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 600;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-notification-bell .notification-badge:empty {
+    display: none;
+}
+
+/* User Dropdown Header */
+.dropdown-header {
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dropdown-header span:first-child {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.dropdown-email {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
 }
 
 .book-card::before {
