@@ -10726,3 +10726,24 @@ body {
     padding: 2rem;
     color: rgba(255, 255, 255, 0.5);
 }
+
+/* ===== NOTIFICATION CLICK HIGHLIGHT ANIMATION ===== */
+@keyframes highlightFlash {
+    0% {
+        background-color: rgba(102, 126, 234, 0.3);
+        box-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
+    }
+    50% {
+        background-color: rgba(102, 126, 234, 0.5);
+        box-shadow: 0 0 30px rgba(102, 126, 234, 0.6);
+    }
+    100% {
+        background-color: transparent;
+        box-shadow: none;
+    }
+}
+
+.highlight-flash {
+    animation: highlightFlash 2s ease-out;
+    border-color: var(--primary) !important;
+}

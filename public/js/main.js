@@ -658,6 +658,19 @@ class App {
             });
         });
 
+        // Check if we should open a specific tab (e.g., from notification click)
+        const openTab = sessionStorage.getItem('openProfileTab');
+        if (openTab) {
+            sessionStorage.removeItem('openProfileTab');
+            const targetBtn = document.querySelector(`.profile-tabs .tab-btn[data-tab="${openTab}"]`);
+            if (targetBtn) {
+                tabBtns.forEach(b => b.classList.remove('active'));
+                targetBtn.classList.add('active');
+                this.loadProfileTabContent(openTab);
+                return;
+            }
+        }
+
         // Auto-load the first active tab content
         const activeTab = document.querySelector('.profile-tabs .tab-btn.active');
         if (activeTab) {
@@ -4014,11 +4027,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 const cat = n.category || n.type || '';
                 const created = n.created || n.created_at;
+                const relatedId = n.related_id || null;
                 const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(n.title || '') : (n.title || '');
                 const safeMsg = typeof escapeHtml === 'function' ? escapeHtml(msg) : msg;
                 return `
                 <div class="notification-item ${!n.is_read ? 'unread' : ''}" 
-                     onclick="notificationManager.handleNotificationClick(${n.id}, '${cat}')">
+                     onclick="notificationManager.handleNotificationClick(${n.id}, '${cat}', ${relatedId}, '${safeTitle}')">
                     <div class="notification-content">
                         <div class="notification-icon ${this.getNotificationClass(cat)}">
                             ${this.getNotificationIcon(cat)}
@@ -4035,30 +4049,51 @@ document.addEventListener("DOMContentLoaded", () => {
 
         getNotificationIcon(type) {
             const icons = {
+                // Transaction types
+                'transaction': '<i class="fas fa-exchange-alt"></i>',
                 'request': '<i class="fas fa-envelope-open"></i>',
                 'approval': '<i class="fas fa-check-circle"></i>',
                 'rejection': '<i class="fas fa-times-circle"></i>',
                 'pickup': '<i class="fas fa-box-open"></i>',
                 'return': '<i class="fas fa-undo"></i>',
+                // Reminder types
                 'reminder': '<i class="fas fa-clock"></i>',
                 'overdue': '<i class="fas fa-exclamation-triangle"></i>',
-                'feedback': '<i class="fas fa-star"></i>'
+                // Credit types  
+                'credit': '<i class="fas fa-coins"></i>',
+                // Feedback types
+                'feedback': '<i class="fas fa-star"></i>',
+                // System types
+                'system': '<i class="fas fa-cog"></i>',
+                'verification': '<i class="fas fa-shield-alt"></i>',
+                // Legacy fallbacks
+                'book': '<i class="fas fa-book"></i>',
+                'message': '<i class="fas fa-envelope"></i>'
             };
             return icons[type] || '<i class="fas fa-bell"></i>';
         }
 
         getNotificationClass(type) {
             const classes = {
+                // Transaction types
+                'transaction': 'transaction',
                 'request': 'request',
                 'approval': 'approval',
                 'rejection': 'rejection',
                 'pickup': 'request',
                 'return': 'approval',
+                // Reminder types
                 'reminder': 'reminder',
                 'overdue': 'overdue',
-                'feedback': 'feedback'
+                // Credit types
+                'credit': 'credit',
+                // Feedback types
+                'feedback': 'feedback',
+                // System types
+                'system': 'system',
+                'verification': 'system'
             };
-            return classes[type] || 'request';
+            return classes[type] || 'default';
         }
 
         formatTime(timestamp) {
@@ -4114,29 +4149,90 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (_) { /* noop */ }
         }
 
-        async handleNotificationClick(notificationId, type) {
+        async handleNotificationClick(notificationId, category, relatedId = null, title = '') {
             try {
                 // Mark as read
                 if (this.notifications.find(n => n.id === notificationId && !n.is_read)) {
                     await api.markNotificationAsRead(notificationId);
                 }
 
-                // Navigate based on type
-                switch (type) {
-                    case 'request':
-                    case 'approval':
-                    case 'rejection':
-                        if (window.app && typeof window.app.navigateToSection === 'function') window.app.navigateToSection('requests');
-                        break;
-                    case 'feedback':
-                        if (window.app && typeof window.app.navigateToSection === 'function') window.app.navigateToSection('profile');
-                        break;
-                    case 'reminder':
-                    case 'overdue':
-                        if (window.app && typeof window.app.navigateToSection === 'function') window.app.navigateToSection('monitoring');
-                        break;
-                    default:
-                        if (window.app && typeof window.app.navigateToSection === 'function') window.app.navigateToSection('notifications');
+                // Determine the target section based on category and title keywords
+                let targetSection = 'notifications'; // Default fallback
+                const lowerTitle = (title || '').toLowerCase();
+                const lowerCategory = (category || '').toLowerCase();
+
+                // Transaction-related notifications
+                if (lowerCategory === 'transaction' || 
+                    lowerTitle.includes('borrow') || 
+                    lowerTitle.includes('request') ||
+                    lowerTitle.includes('approved') ||
+                    lowerTitle.includes('rejected') ||
+                    lowerTitle.includes('denied') ||
+                    lowerTitle.includes('cancelled') ||
+                    lowerTitle.includes('pickup') ||
+                    lowerTitle.includes('return')) {
+                    targetSection = 'requests';
+                }
+                // Reminder notifications (due dates, overdue)
+                else if (lowerCategory === 'reminder' || 
+                         lowerTitle.includes('reminder') || 
+                         lowerTitle.includes('overdue') ||
+                         lowerTitle.includes('due soon') ||
+                         lowerTitle.includes('return date')) {
+                    targetSection = 'monitoring';
+                }
+                // Credit-related notifications
+                else if (lowerCategory === 'credit' || 
+                         lowerTitle.includes('credit') || 
+                         lowerTitle.includes('penalty') ||
+                         lowerTitle.includes('reward') ||
+                         lowerTitle.includes('check-in') ||
+                         lowerTitle.includes('daily')) {
+                    targetSection = 'profile';
+                }
+                // Feedback/rating notifications
+                else if (lowerTitle.includes('feedback') || 
+                         lowerTitle.includes('rating') || 
+                         lowerTitle.includes('review') ||
+                         lowerTitle.includes('star')) {
+                    targetSection = 'profile';
+                }
+                // Verification notifications
+                else if (lowerCategory === 'system' && 
+                         (lowerTitle.includes('verification') || 
+                          lowerTitle.includes('verified') ||
+                          lowerTitle.includes('id verification'))) {
+                    targetSection = 'profile';
+                    // Store flag to open verification tab
+                    sessionStorage.setItem('openProfileTab', 'verification');
+                }
+                // System notifications (general)
+                else if (lowerCategory === 'system') {
+                    // Check for specific system notification types
+                    if (lowerTitle.includes('account')) {
+                        targetSection = 'profile';
+                    } else if (lowerTitle.includes('book')) {
+                        targetSection = 'books';
+                    } else {
+                        targetSection = 'notifications';
+                    }
+                }
+
+                // Navigate to the target section
+                if (window.app && typeof window.app.navigateToSection === 'function') {
+                    window.app.navigateToSection(targetSection);
+                    
+                    // If we have a related transaction ID, try to highlight/scroll to it
+                    if (relatedId && (targetSection === 'requests' || targetSection === 'monitoring')) {
+                        setTimeout(() => {
+                            const transactionCard = document.querySelector(`[data-transaction-id="${relatedId}"]`);
+                            if (transactionCard) {
+                                transactionCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                transactionCard.classList.add('highlight-flash');
+                                setTimeout(() => transactionCard.classList.remove('highlight-flash'), 2000);
+                            }
+                        }, 500);
+                    }
                 }
 
                 // Reload notifications
