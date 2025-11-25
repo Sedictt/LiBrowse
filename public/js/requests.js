@@ -36,14 +36,20 @@ class RequestManager {
     }
 
     setupEventListeners() {
-        // Tab switching
-        const tabBtns = document.querySelectorAll('.tab-btn[data-tab]');
-        tabBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const tab = e.currentTarget.dataset.tab;
-                this.switchTab(tab);
+        // Tab switching - only for request-related tabs within the requests section
+        const requestsSection = document.getElementById('requests');
+        if (requestsSection) {
+            const tabBtns = requestsSection.querySelectorAll('.tab-btn[data-tab]');
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const tab = e.currentTarget.dataset.tab;
+                    // Only handle valid request tabs
+                    if (['incoming', 'outgoing', 'active-chats'].includes(tab)) {
+                        this.switchTab(tab);
+                    }
+                });
             });
-        });
+        }
 
         // Filter inputs (support both input and change for cross-browser reliability)
         const filterInputs = document.querySelectorAll('.filter-input');
@@ -75,20 +81,30 @@ class RequestManager {
     }
 
     switchTab(tab) {
-        // Update tab buttons
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-
-        const tabBtn = document.querySelector(`[data-tab="${tab}"]`);
-        if (tabBtn) {
-            tabBtn.classList.add('active');
+        // Validate tab - only allow valid request tabs
+        const validTabs = ['incoming', 'outgoing', 'active-chats'];
+        if (!validTabs.includes(tab)) {
+            console.warn(`Invalid request tab: ${tab}, defaulting to 'incoming'`);
+            tab = 'incoming';
         }
 
-        // Update tab content
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
+        // Update tab buttons within the requests section only
+        const requestsSection = document.getElementById('requests');
+        if (requestsSection) {
+            requestsSection.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            const tabBtn = requestsSection.querySelector(`[data-tab="${tab}"]`);
+            if (tabBtn) {
+                tabBtn.classList.add('active');
+            }
+
+            // Update tab content within requests section
+            requestsSection.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+        }
 
         const tabContent = document.getElementById(`${tab}-tab`);
         if (tabContent) {
