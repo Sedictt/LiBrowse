@@ -310,29 +310,42 @@ router.post('/request', [
         }
 
         // Step 2.5: Check borrower verification status
+        // User can borrow if they are at least "Verified" (Level 1)
+        // This means either email_verified OR document verified (verification_status = 'verified')
         const vrows = await connection.execute(
-            `SELECT verification_status FROM users WHERE id = ?`,
+            `SELECT is_verified, email_verified, verification_status FROM users WHERE id = ?`,
             [req.user.id]
         );
 
         // Fix: connection.execute returns [rows, fields], so vrows[0] is the rows array
         const rows = vrows[0];
-        const rawStatus = rows && rows.length ? rows[0].verification_status : null;
-
+        const userVerification = rows && rows.length ? rows[0] : null;
+        
         // DEBUG: Log what we're reading from the database
-        console.log('🔍 DEBUG - User ID:', req.user.id, '| Raw Status:', rawStatus, '| Type:', typeof rawStatus);
+        console.log('🔍 DEBUG - User ID:', req.user.id, '| Verification data:', userVerification);
 
-        const status = (rawStatus || '').toLowerCase();
-        if (!status || (status !== 'verified' && status !== 'fully_verified')) {
-            console.log('❌ VERIFICATION FAILED - Status:', status);
+        // User is verified if:
+        // 1. is_verified flag is TRUE, OR
+        // 2. email_verified is TRUE, OR
+        // 3. verification_status is 'verified'
+        const isVerified = userVerification && (
+            userVerification.is_verified === 1 || 
+            userVerification.is_verified === true ||
+            userVerification.email_verified === 1 ||
+            userVerification.email_verified === true ||
+            (userVerification.verification_status || '').toLowerCase() === 'verified'
+        );
+
+        if (!isVerified) {
+            console.log('❌ VERIFICATION FAILED - User not verified:', userVerification);
             connection.release();
             return res.status(403).json({
-                error: 'You must complete account verification to borrow books.',
-                verification_status: rawStatus || 'none'
+                error: 'You must complete account verification to borrow books. Complete either email or document verification.',
+                verification_status: userVerification?.verification_status || 'none'
             });
         }
 
-        console.log('✅ VERIFICATION PASSED - User', req.user.id, 'is verified with status:', rawStatus);
+        console.log('✅ VERIFICATION PASSED - User', req.user.id, 'is verified');
 
 
         // Step 3: Check borrower's credit points (Following SRS flowchart)

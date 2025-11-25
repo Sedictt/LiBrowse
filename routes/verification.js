@@ -3,7 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const router = express.Router();
-const { getOne, executeQuery } = require('../config/database');
+const { pool, getOne, executeQuery } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const ocrService = require('../services/ocrService_enhanced');
 const NotificationHelper = require('../services/notificationHelper');
@@ -11,6 +11,164 @@ const NotificationHelper = require('../services/notificationHelper');
 // Generate OTP
 function generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+/**
+ * Get verification reward settings from database
+ * Returns default values if settings not found
+ */
+async function getVerificationRewardSettings() {
+    try {
+        const settings = await executeQuery(
+            `SELECT setting_name, setting_val FROM settings 
+             WHERE setting_name IN ('verification_reward_level_1', 'verification_reward_level_2', 'verification_rewards_enabled')`
+        );
+        
+        const settingsMap = {};
+        for (const row of settings) {
+            settingsMap[row.setting_name] = row.setting_val;
+        }
+        
+        return {
+            level1Reward: parseInt(settingsMap.verification_reward_level_1 || '15', 10),
+            level2Reward: parseInt(settingsMap.verification_reward_level_2 || '15', 10),
+            enabled: settingsMap.verification_rewards_enabled !== 'false'
+        };
+    } catch (error) {
+        console.warn('Could not load verification reward settings, using defaults:', error.message);
+        return { level1Reward: 15, level2Reward: 15, enabled: true };
+    }
+}
+
+/**
+ * Calculate and award verification credits based on the user's verification state
+ * Level 1 (Verified): Either email OR document verified - awards level1Reward
+ * Level 2 (Fully Verified): Both email AND document verified - awards level2Reward
+ * 
+ * @param {number} userId - The user's ID
+ * @param {string} verificationMethod - 'email' or 'document'
+ * @returns {Object} - { creditsAwarded, level, oldBalance, newBalance }
+ */
+async function processVerificationRewards(userId, verificationMethod) {
+    const rewardSettings = await getVerificationRewardSettings();
+    
+    if (!rewardSettings.enabled) {
+        console.log('🔕 Verification rewards are disabled');
+        return { creditsAwarded: 0, level: null, oldBalance: 0, newBalance: 0 };
+    }
+    
+    // Get current user state including reward claim flags
+    let userState;
+    try {
+        const [rows] = await pool.query(
+            `SELECT is_verified, email_verified, verification_status, credits,
+                    COALESCE(verification_reward_l1_claimed, FALSE) as l1_claimed,
+                    COALESCE(verification_reward_l2_claimed, FALSE) as l2_claimed
+             FROM users WHERE id = ?`,
+            [userId]
+        );
+        userState = rows[0];
+    } catch (e) {
+        // Fallback if new columns don't exist yet
+        if (e.code === 'ER_BAD_FIELD_ERROR') {
+            const [rows] = await pool.query(
+                `SELECT is_verified, email_verified, verification_status, credits
+                 FROM users WHERE id = ?`,
+                [userId]
+            );
+            userState = { ...rows[0], l1_claimed: false, l2_claimed: false };
+        } else {
+            throw e;
+        }
+    }
+    
+    if (!userState) {
+        throw new Error('User not found');
+    }
+    
+    const oldBalance = userState.credits || 0;
+    let creditsToAward = 0;
+    let rewardLevel = null;
+    
+    // Determine current verification state AFTER this verification
+    const emailVerified = verificationMethod === 'email' ? true : !!userState.email_verified;
+    const docVerified = verificationMethod === 'document' ? true : (userState.verification_status === 'verified');
+    const isNowVerified = emailVerified || docVerified;
+    const isNowFullyVerified = emailVerified && docVerified;
+    
+    console.log('📊 Verification state check:', {
+        userId,
+        verificationMethod,
+        emailVerified,
+        docVerified,
+        isNowVerified,
+        isNowFullyVerified,
+        l1Claimed: userState.l1_claimed,
+        l2Claimed: userState.l2_claimed
+    });
+    
+    // Check for Level 1 reward (first time reaching Verified status)
+    if (isNowVerified && !userState.l1_claimed) {
+        creditsToAward += rewardSettings.level1Reward;
+        rewardLevel = 1;
+        console.log(`🎯 Level 1 (Verified) reward eligible: +${rewardSettings.level1Reward} credits`);
+    }
+    
+    // Check for Level 2 reward (first time reaching Fully Verified status)
+    if (isNowFullyVerified && !userState.l2_claimed) {
+        creditsToAward += rewardSettings.level2Reward;
+        rewardLevel = userState.l1_claimed ? 2 : 'both'; // 'both' means claiming L1 and L2 together
+        console.log(`🎯 Level 2 (Fully Verified) reward eligible: +${rewardSettings.level2Reward} credits`);
+    }
+    
+    if (creditsToAward === 0) {
+        console.log('ℹ️ No verification rewards to claim (already claimed or not eligible)');
+        return { creditsAwarded: 0, level: null, oldBalance, newBalance: oldBalance };
+    }
+    
+    // Award credits and update claim flags
+    const newBalance = oldBalance + creditsToAward;
+    const updateL1 = isNowVerified && !userState.l1_claimed;
+    const updateL2 = isNowFullyVerified && !userState.l2_claimed;
+    
+    try {
+        await pool.query(
+            `UPDATE users SET 
+                credits = credits + ?,
+                verification_reward_l1_claimed = CASE WHEN ? THEN TRUE ELSE verification_reward_l1_claimed END,
+                verification_reward_l2_claimed = CASE WHEN ? THEN TRUE ELSE verification_reward_l2_claimed END,
+                modified = NOW()
+             WHERE id = ?`,
+            [creditsToAward, updateL1, updateL2, userId]
+        );
+    } catch (e) {
+        // Fallback if new columns don't exist
+        if (e.code === 'ER_BAD_FIELD_ERROR') {
+            await pool.query(
+                `UPDATE users SET credits = credits + ?, modified = NOW() WHERE id = ?`,
+                [creditsToAward, userId]
+            );
+        } else {
+            throw e;
+        }
+    }
+    
+    // Log to credit history
+    const reason = rewardLevel === 'both' 
+        ? 'Full account verification bonus (Verified + Fully Verified)'
+        : rewardLevel === 1 
+            ? `Account verification bonus (Verified via ${verificationMethod})`
+            : `Full account verification bonus (Fully Verified via ${verificationMethod})`;
+    
+    await executeQuery(
+        `INSERT INTO credit_history (user_id, credit_change, reason, old_balance, new_balance, created_at)
+         VALUES (?, ?, ?, ?, ?, NOW())`,
+        [userId, creditsToAward, reason, oldBalance, newBalance]
+    );
+    
+    console.log(`✅ Verification reward awarded: User ${userId} received +${creditsToAward} credits (${oldBalance} → ${newBalance})`);
+    
+    return { creditsAwarded, level: rewardLevel, oldBalance, newBalance };
 }
 
 // Send OTP for email verification
@@ -77,29 +235,17 @@ router.post('/verify-otp', authenticateToken, async (req, res) => {
             [codes[0].id]
         );
 
-        // ✅ Check if ALREADY VERIFIED (by any method)
-        const [userRows] = await pool.query(
-            `SELECT is_verified, credits FROM users WHERE id = ?`,
-            [userId]
-        );
-
-        const isFirstTimeVerification = !userRows[0].is_verified; // Check is_verified, not just email_verified
-        const oldCredits = userRows[0].credits;
-
-        console.log('🎯 Is first time verification?', isFirstTimeVerification);
-
-        // Update user - mark as FULLY verified
+        // Update user - mark email as verified
         try {
             await pool.query(
                 `UPDATE users 
                  SET email_verified = TRUE, 
                      verification_status = 'verified',
-                     verification_method = 'email',
+                     verification_method = COALESCE(verification_method, 'email'),
                      is_verified = 1,
-                     credits = credits + ?,
                      modified = NOW()
                  WHERE id = ?`,
-                [isFirstTimeVerification ? 15 : 0, userId]
+                [userId]
             );
         } catch (e) {
             if (e && e.code === 'ER_BAD_FIELD_ERROR') {
@@ -108,28 +254,17 @@ router.post('/verify-otp', authenticateToken, async (req, res) => {
                      SET verification_status = 'verified',
                          verification_method = 'email',
                          is_verified = 1,
-                         credits = credits + ?,
                          modified = NOW()
                      WHERE id = ?`,
-                    [isFirstTimeVerification ? 15 : 0, userId]
+                    [userId]
                 );
             } else {
                 throw e;
             }
         }
 
-        // Log credit history if bonus was awarded
-        if (isFirstTimeVerification) {
-            const newCredits = oldCredits + 15;
-
-            await pool.query(
-                `INSERT INTO credit_history (user_id, credit_change, reason, old_balance, new_balance, created_at)
-                 VALUES (?, 15, 'Account verification bonus', ?, ?, NOW())`,
-                [userId, oldCredits, newCredits]
-            );
-
-            console.log(`✅ Verification bonus awarded: User ${userId} received +15 credits (${oldCredits} → ${newCredits})`);
-        }
+        // Process verification rewards (handles both L1 and L2 rewards)
+        const rewardResult = await processVerificationRewards(userId, 'email');
 
         // Get updated user data
         const [updatedUser] = await pool.query(
@@ -142,8 +277,9 @@ router.post('/verify-otp', authenticateToken, async (req, res) => {
 
         res.json({
             message: 'Email verified successfully',
-            bonusAwarded: isFirstTimeVerification,
-            creditsEarned: isFirstTimeVerification ? 15 : 0,
+            bonusAwarded: rewardResult.creditsAwarded > 0,
+            creditsEarned: rewardResult.creditsAwarded,
+            rewardLevel: rewardResult.level,
             user: updatedUser[0]
         });
 
@@ -154,6 +290,29 @@ router.post('/verify-otp', authenticateToken, async (req, res) => {
 });
 
 
+// Get verification reward settings (public endpoint for UI)
+router.get('/rewards', async (req, res) => {
+    try {
+        const settings = await getVerificationRewardSettings();
+        res.json({
+            level1: {
+                name: 'Verified',
+                description: 'Complete either email or document verification',
+                credits: settings.level1Reward
+            },
+            level2: {
+                name: 'Fully Verified',
+                description: 'Complete both email AND document verification',
+                credits: settings.level2Reward
+            },
+            enabled: settings.enabled,
+            totalPossible: settings.level1Reward + settings.level2Reward
+        });
+    } catch (error) {
+        console.error('Error fetching verification rewards:', error);
+        res.status(500).json({ error: 'Failed to fetch verification rewards' });
+    }
+});
 
 
 // Check verification status
@@ -432,65 +591,46 @@ async function runOcrAndFinalizeVerification({ user, userInfo, frontIdPath, back
             combinedConfidence, verificationStatus, autoApproved ? 1 : 0
         ]);
 
-        // ✅ Check if ALREADY VERIFIED (bonus only once, regardless of method)
-        let isFirstTimeVerification = false;
-        let oldCredits = 0;
-
+        // Update user - mark as verified if auto-approved
         if (autoApproved) {
-            const [userRows] = await executeQuery(
-                `SELECT is_verified, credits FROM users WHERE id = ?`,
-                [user.id]
-            );
-
-            isFirstTimeVerification = !userRows[0].is_verified; // Check is_verified, not id_verified
-            oldCredits = userRows[0].credits;
-        }
-
-        console.log('🎯 Document verification - First time?', isFirstTimeVerification);
-
-        // Update user - mark as FULLY verified if auto-approved
-        try {
-            await executeQuery(
-                `UPDATE users 
-                 SET verification_status = ?, 
-                     verification_method = ?, 
-                     is_verified = CASE WHEN ? THEN 1 ELSE is_verified END,
-                     id_verified = CASE WHEN ? THEN TRUE ELSE id_verified END,
-                     credits = credits + ?,
-                     modified = NOW() 
-                 WHERE id = ?`,
-                [verificationStatus, 'document_upload', autoApproved, autoApproved, isFirstTimeVerification ? 15 : 0, user.id]
-            );
-        } catch (e) {
-            const msg = (e && (e.sqlMessage || e.message || '')).toLowerCase();
-            if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+            try {
                 await executeQuery(
                     `UPDATE users 
                      SET verification_status = ?, 
-                         verification_method = ?, 
-                         is_verified = CASE WHEN ? THEN 1 ELSE is_verified END,
-                         id_verified = CASE WHEN ? THEN TRUE ELSE id_verified END,
-                         credits = credits + ?,
+                         verification_method = COALESCE(verification_method, ?),
+                         is_verified = 1,
+                         id_verified = TRUE,
                          modified = NOW() 
                      WHERE id = ?`,
-                    [verificationStatus, 'document_upload', autoApproved, autoApproved, isFirstTimeVerification ? 15 : 0, user.id]
+                    [verificationStatus, 'document_upload', user.id]
                 );
-            } else {
-                throw e;
+            } catch (e) {
+                if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+                    await executeQuery(
+                        `UPDATE users 
+                         SET verification_status = ?, 
+                             verification_method = 'document_upload',
+                             is_verified = 1,
+                             modified = NOW() 
+                         WHERE id = ?`,
+                        [verificationStatus, user.id]
+                    );
+                } else {
+                    throw e;
+                }
             }
+        } else {
+            // Just update status to pending_review
+            await executeQuery(
+                `UPDATE users SET verification_status = ?, modified = NOW() WHERE id = ?`,
+                [verificationStatus, user.id]
+            );
         }
 
-        // ✅ Log credit history if bonus was awarded
-        if (isFirstTimeVerification) {
-            const newCredits = oldCredits + 15;
-
-            await executeQuery(
-                `INSERT INTO credit_history (user_id, credit_change, reason, old_balance, new_balance, created_at)
-                 VALUES (?, 15, 'Account verification bonus (document)', ?, ?, NOW())`,
-                [user.id, oldCredits, newCredits]
-            );
-
-            console.log(`✅ Verification bonus awarded: User ${user.id} received +15 credits (${oldCredits} → ${newCredits})`);
+        // Process verification rewards if auto-approved (handles both L1 and L2 rewards)
+        let rewardResult = { creditsAwarded: 0, level: null };
+        if (autoApproved) {
+            rewardResult = await processVerificationRewards(user.id, 'document');
         }
 
         // Notify user
@@ -499,7 +639,9 @@ async function runOcrAndFinalizeVerification({ user, userInfo, frontIdPath, back
             autoApproved,
             verificationStatus,
             failureReasons: authFailureReasons,
-            bonusAwarded: isFirstTimeVerification
+            bonusAwarded: rewardResult.creditsAwarded > 0,
+            creditsEarned: rewardResult.creditsAwarded,
+            rewardLevel: rewardResult.level
         });
 
         console.log(`OCR verification completed for user ${user.id} with status ${verificationStatus}`);
@@ -515,7 +657,5 @@ async function runOcrAndFinalizeVerification({ user, userInfo, frontIdPath, back
 }
 
 
-
-module.exports = router;
 
 module.exports = router;

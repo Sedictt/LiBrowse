@@ -685,6 +685,7 @@ class App {
             case 'verification':
                 tabContent.innerHTML = this.getVerificationTab();
                 this.setupVerificationEventListeners();
+                this.loadVerificationRewards(); // Load reward amounts from server
                 break;
 
             case 'books':
@@ -815,6 +816,47 @@ class App {
                     </div>
                 </div>
 
+                <!-- Verification Rewards Section -->
+                <div class="verification-rewards-info" id="verification-rewards-section">
+                    <h4><i class="fas fa-coins"></i> Earn Credits by Verifying</h4>
+                    <div class="rewards-grid">
+                        <div class="reward-tier ${eitherVerified ? 'claimed' : ''}">
+                            <div class="tier-header">
+                                <span class="tier-badge">Level 1</span>
+                                <span class="tier-name">Verified</span>
+                            </div>
+                            <div class="tier-requirement">
+                                Complete email <strong>OR</strong> document verification
+                            </div>
+                            <div class="tier-reward">
+                                <i class="fas fa-plus-circle"></i>
+                                <span class="reward-amount" id="l1-reward">15</span>
+                                <span class="reward-label">credits</span>
+                            </div>
+                            ${eitherVerified ? '<div class="tier-status claimed"><i class="fas fa-check"></i> Claimed</div>' : '<div class="tier-status pending"><i class="fas fa-gift"></i> Available</div>'}
+                        </div>
+                        <div class="reward-tier ${bothVerified ? 'claimed' : ''}">
+                            <div class="tier-header">
+                                <span class="tier-badge tier-2">Level 2</span>
+                                <span class="tier-name">Fully Verified</span>
+                            </div>
+                            <div class="tier-requirement">
+                                Complete <strong>BOTH</strong> email AND document verification
+                            </div>
+                            <div class="tier-reward">
+                                <i class="fas fa-plus-circle"></i>
+                                <span class="reward-amount" id="l2-reward">15</span>
+                                <span class="reward-label">credits</span>
+                            </div>
+                            ${bothVerified ? '<div class="tier-status claimed"><i class="fas fa-check"></i> Claimed</div>' : (eitherVerified ? '<div class="tier-status pending"><i class="fas fa-gift"></i> Available</div>' : '<div class="tier-status locked"><i class="fas fa-lock"></i> Locked</div>')}
+                        </div>
+                    </div>
+                    <div class="total-rewards">
+                        <span>Total Possible Rewards:</span>
+                        <strong id="total-rewards">30 credits</strong>
+                    </div>
+                </div>
+
                 <div class="verification-info">
                     <div class="info-card">
                         <div class="info-icon">
@@ -823,11 +865,11 @@ class App {
                         <div class="info-content">
                             <h4>Why Verify Your Account?</h4>
                             <ul>
-                                <li> Build trust with other users</li>
-                                <li> Access to premium features</li>
-                                <li> Higher borrowing limits</li>
-                                <li> Priority in book requests</li>
-                                <li> Enhanced security protection</li>
+                                <li><i class="fas fa-coins"></i> Earn bonus credits (up to 30 total!)</li>
+                                <li><i class="fas fa-handshake"></i> Build trust with other users</li>
+                                <li><i class="fas fa-star"></i> Access to premium features</li>
+                                <li><i class="fas fa-book"></i> Higher borrowing limits</li>
+                                <li><i class="fas fa-bolt"></i> Priority in book requests</li>
                             </ul>
                         </div>
                     </div>
@@ -1885,6 +1927,34 @@ class App {
         // Initialize state
         this.profileSelectedFiles = { front: null, back: null };
         this.resendTimer = null;
+    }
+
+    /**
+     * Load verification reward amounts from the server and update the UI
+     */
+    async loadVerificationRewards() {
+        try {
+            const response = await fetch('/api/verification/rewards');
+            if (!response.ok) {
+                console.warn('Could not load verification rewards:', response.statusText);
+                return;
+            }
+            
+            const rewards = await response.json();
+            
+            // Update reward amounts in the UI
+            const l1RewardEl = document.getElementById('l1-reward');
+            const l2RewardEl = document.getElementById('l2-reward');
+            const totalRewardsEl = document.getElementById('total-rewards');
+            
+            if (l1RewardEl) l1RewardEl.textContent = rewards.level1.credits;
+            if (l2RewardEl) l2RewardEl.textContent = rewards.level2.credits;
+            if (totalRewardsEl) totalRewardsEl.textContent = `${rewards.totalPossible} credits`;
+            
+            console.log('✅ Verification rewards loaded:', rewards);
+        } catch (error) {
+            console.error('Error loading verification rewards:', error);
+        }
     }
 
     handleProfileFileSelect(event, side) {

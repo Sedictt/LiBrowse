@@ -4579,6 +4579,163 @@ body {
     color: var(--success);
 }
 
+/* ===== VERIFICATION REWARDS SECTION ===== */
+.verification-rewards-info {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.05), rgba(255, 152, 0, 0.05));
+    border: 1px solid rgba(255, 193, 7, 0.2);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+}
+
+.verification-rewards-info h4 {
+    color: var(--warning);
+    font-size: 1.1rem;
+    margin-bottom: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.rewards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.reward-tier {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    transition: var(--transition-smooth);
+    position: relative;
+    overflow: hidden;
+}
+
+.reward-tier:hover {
+    border-color: rgba(255, 193, 7, 0.3);
+    transform: translateY(-2px);
+}
+
+.reward-tier.claimed {
+    background: rgba(0, 212, 170, 0.05);
+    border-color: rgba(0, 212, 170, 0.2);
+}
+
+.reward-tier.claimed::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--success);
+}
+
+.tier-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.tier-badge {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+}
+
+.tier-badge.tier-2 {
+    background: linear-gradient(135deg, var(--warning), #ff9800);
+}
+
+.tier-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.tier-requirement {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-sm);
+    line-height: 1.4;
+}
+
+.tier-requirement strong {
+    color: var(--text-secondary);
+}
+
+.tier-reward {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    background: rgba(255, 193, 7, 0.1);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.tier-reward i {
+    color: var(--success);
+    font-size: 0.9rem;
+}
+
+.reward-amount {
+    font-weight: 700;
+    color: var(--warning);
+    font-size: 1.1rem;
+}
+
+.reward-label {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.tier-status {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.tier-status.claimed {
+    color: var(--success);
+}
+
+.tier-status.pending {
+    color: var(--warning);
+}
+
+.tier-status.locked {
+    color: var(--text-muted);
+}
+
+.total-rewards {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.total-rewards strong {
+    color: var(--warning);
+    font-size: 1.1rem;
+}
+
+/* ===== END VERIFICATION REWARDS SECTION ===== */
+
 .verification-tips {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.1);
