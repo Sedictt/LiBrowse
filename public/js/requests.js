@@ -37,7 +37,7 @@ class RequestManager {
 
     setupEventListeners() {
         // Tab switching - only for request-related tabs within the requests section
-        const requestsSection = document.getElementById('requests');
+        const requestsSection = document.getElementById('requests-section');
         if (requestsSection) {
             const tabBtns = requestsSection.querySelectorAll('.tab-btn[data-tab]');
             tabBtns.forEach(btn => {
@@ -89,7 +89,7 @@ class RequestManager {
         }
 
         // Update tab buttons within the requests section only
-        const requestsSection = document.getElementById('requests');
+        const requestsSection = document.getElementById('requests-section');
         if (requestsSection) {
             requestsSection.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.classList.remove('active');
