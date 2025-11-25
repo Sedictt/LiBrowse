@@ -4574,11 +4574,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Initialize notification manager when DOM is ready
-    document.addEventListener('DOMContentLoaded', () => {
-        if (!window.notificationManager) {
-            window.notificationManager = new NotificationManager();
-        }
-    });
+    if (!window.notificationManager) {
+        window.notificationManager = new NotificationManager();
+    }
 
 });
 
