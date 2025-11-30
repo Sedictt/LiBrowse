@@ -1,6 +1,7 @@
 // server.js
 // Main entry point for LiBrowse backend
 
+// Server entry point - Restart trigger
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -171,22 +172,25 @@ const startServer = async () => {
 const cron = require('node-cron');
 const ReminderTask = require('./tasks/reminderTask');
 
-// Run every day at 8:00 AM
-cron.schedule('0 8 * * *', () => {
-    console.log('[Scheduler] Running daily reminder task...');
-    ReminderTask.checkDueDates().catch(err => {
-        console.error('[Scheduler] Reminder task failed:', err.message);
-    });
-});
 
-// Run once on startup after 5 seconds
-setTimeout(() => {
-    console.log('[Scheduler] Running initial reminder check...');
-    ReminderTask.checkDueDates().catch(err => {
-        console.error('[Scheduler] Initial reminder check failed:', err.message);
+if (require.main === module) {
+    // Run every day at 8:00 AM
+    cron.schedule('0 8 * * *', () => {
+        console.log('[Scheduler] Running daily reminder task...');
+        ReminderTask.checkDueDates().catch(err => {
+            console.error('[Scheduler] Reminder task failed:', err.message);
+        });
     });
-}, 5000);
 
-startServer();
+    // Run once on startup after 5 seconds
+    setTimeout(() => {
+        console.log('[Scheduler] Running initial reminder check...');
+        ReminderTask.checkDueDates().catch(err => {
+            console.error('[Scheduler] Initial reminder check failed:', err.message);
+        });
+    }, 5000);
+
+    startServer();
+}
 
 module.exports = app;

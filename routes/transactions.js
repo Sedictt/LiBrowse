@@ -324,7 +324,7 @@ router.post('/request', [
         // Fix: connection.execute returns [rows, fields], so vrows[0] is the rows array
         const rows = vrows[0];
         const userVerification = rows && rows.length ? rows[0] : null;
-        
+
         // DEBUG: Log what we're reading from the database
         console.log('🔍 DEBUG - User ID:', req.user.id, '| Verification data:', userVerification);
 
@@ -333,7 +333,7 @@ router.post('/request', [
         // 2. email_verified is TRUE, OR
         // 3. verification_status is 'verified'
         const isVerified = userVerification && (
-            userVerification.is_verified === 1 || 
+            userVerification.is_verified === 1 ||
             userVerification.is_verified === true ||
             userVerification.email_verified === 1 ||
             userVerification.email_verified === true ||
@@ -383,8 +383,11 @@ router.post('/request', [
         // Step 5: Create borrow request
         // Build values with NULLs instead of undefined
         // Compute expected return date from start date + duration (server is source of truth)
+        console.log('DEBUG: Step 5 start');
         const libCfg = getLibraryConfigFromEnv();
+        console.log('DEBUG: libCfg', libCfg);
         const durationDays = durationToDays(borrow_duration);
+        console.log('DEBUG: durationDays', durationDays);
         if (!durationDays) {
             connection.release();
             return res.status(400).json({ error: 'Validation failed', details: [{ field: 'borrow_duration', message: 'Invalid duration' }] });
@@ -393,7 +396,9 @@ router.post('/request', [
             connection.release();
             return res.status(400).json({ error: 'Validation failed', details: [{ field: 'borrow_start_date', message: 'Start date is required' }] });
         }
+        console.log('DEBUG: calculating expected_return_date');
         const expected_return_date = adjustDateForClosure(addDaysYYYYMMDD(borrow_start_date, durationDays), libCfg);
+        console.log('DEBUG: expected_return_date', expected_return_date);
 
         const insertValues = [
             book_id, req.user.id, book.owner_id, request_message,
@@ -402,6 +407,7 @@ router.post('/request', [
         ];
         console.assert(!insertValues.some(v => v === undefined), 'Undefined value in INSERT params', insertValues);
 
+        console.log('DEBUG: Inserting transaction with values:', insertValues);
         const [result] = await connection.execute(`
             INSERT INTO transactions (
                 book_id, borrower_id, lender_id, status, request_message,
@@ -422,10 +428,13 @@ router.post('/request', [
         }
 
         // Step 6: Send notification to lender (both in-app and email)
+        console.log('DEBUG: Fetching borrower details for user', req.user.id);
         const [borrowerRows] = await connection.execute('SELECT fname, lname, email FROM users WHERE id = ?', [req.user.id]);
+        console.log('DEBUG: Borrower rows:', borrowerRows);
         const borrowerFullName = borrowerRows.length ? `${borrowerRows[0].fname} ${borrowerRows[0].lname}` : 'A borrower';
 
         // Create in-app notification
+        console.log('DEBUG: Calling createNotification', { owner_id: book.owner_id, borrowerFullName, title: book.title, insertId: result.insertId });
         await createNotification(
             connection,
             book.owner_id,

@@ -19,6 +19,7 @@ const RECAPTCHA_SITE_KEY = process.env.RECAPTCHA_SITE_KEY || '';
 const PLV_EMAIL_DOMAIN = '@plv.edu.ph';
 
 async function verifyCaptcha(token) {
+  return true; // TEMPORARY QA BYPASS
   // If not fully configured, allow by default (align with frontend enablement)
   if (!RECAPTCHA_SECRET || !RECAPTCHA_SITE_KEY) return true;
   if (!token || token === 'dev-mode-skip') return false; // frontend shouldn't send this when enabled

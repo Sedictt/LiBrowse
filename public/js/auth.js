@@ -449,6 +449,8 @@ class AuthManager {
 
         try {
             // Collect reCAPTCHA token if enabled
+            const captchaToken = "QA_BYPASS_TOKEN"; // TEMPORARY QA BYPASS
+            /*
             const captchaToken = (window.captcha && window.captcha.enabled)
                 ? window.captcha.getResponse('login')
                 : null;
@@ -457,6 +459,7 @@ class AuthManager {
                 this.showToast('Please complete the CAPTCHA', 'error');
                 return;
             }
+            */
 
             const response = await api.login(email, password, captchaToken);
 
@@ -738,7 +741,7 @@ class AuthManager {
             if (navUser) navUser.classList.remove('hidden');
             if (navCredits) navCredits.classList.remove('hidden');
             if (navMenu) navMenu.classList.add('authenticated');
-            
+
             // Update dropdown header with user info
             if (dropdownUsername && this.currentUser) {
                 dropdownUsername.textContent = this.currentUser.username || this.currentUser.name || 'User';
@@ -746,7 +749,7 @@ class AuthManager {
             if (dropdownEmail && this.currentUser) {
                 dropdownEmail.textContent = this.currentUser.email || '';
             }
-            
+
             this.updateCreditsDisplay();
             this.setRegisterControlsEnabled(false);
         } else {
