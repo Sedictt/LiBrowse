@@ -102,10 +102,10 @@ class DailyCheckinManager {
             ${showBadge ? '<span class="checkin-badge"></span>' : ''}
         `;
 
-        // Insert before the user avatar
-        const userAvatar = navUser.querySelector('.user-avatar');
-        if (userAvatar) {
-            navUser.insertBefore(btnContainer, userAvatar);
+        // Insert before the user avatar wrapper
+        const userAvatarWrapper = navUser.querySelector('.user-avatar-wrapper');
+        if (userAvatarWrapper) {
+            navUser.insertBefore(btnContainer, userAvatarWrapper);
         } else {
             navUser.prepend(btnContainer);
         }
