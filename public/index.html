@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="/css/bookManagement.css?v=1.0">
     <link rel="stylesheet" href="/css/chat-modal.css?v=1.0">
     <link rel="stylesheet" href="/css/dailyCheckin.css?v=1.0">
+    <link rel="stylesheet" href="/css/requests.css?v=1.0">
     <!-- Flatpickr for improved date/time pickers -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
@@ -443,7 +444,8 @@
                     <div class="search-bar-wrapper">
                         <div class="search-bar">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="book-search" placeholder="Search books by title, author, or course..." autocomplete="off">
+                            <input type="text" id="book-search"
+                                placeholder="Search books by title, author, or course..." autocomplete="off">
                             <button class="search-extras-btn" id="search-extras-btn" title="Saved searches & history">
                                 <i class="fas fa-clock"></i>
                             </button>
@@ -453,7 +455,8 @@
                             <div class="search-dropdown-section" id="saved-searches-dropdown">
                                 <div class="dropdown-section-header">
                                     <span><i class="fas fa-bookmark"></i> Saved Searches</span>
-                                    <button class="btn btn-xs btn-primary" id="save-search-btn" title="Save current search">
+                                    <button class="btn btn-xs btn-primary" id="save-search-btn"
+                                        title="Save current search">
                                         <i class="fas fa-plus"></i> Save
                                     </button>
                                 </div>
@@ -2092,7 +2095,8 @@
 
                     <!-- Recent Feedback -->
                     <div class="public-profile-section" id="public-profile-feedback-section">
-                        <h4><i class="fas fa-comments"></i> Recent Reviews (<span id="public-total-reviews">0</span>)</h4>
+                        <h4><i class="fas fa-comments"></i> Recent Reviews (<span id="public-total-reviews">0</span>)
+                        </h4>
                         <div class="public-feedback-list" id="public-feedback-list">
                             <p class="no-feedback">No reviews yet.</p>
                         </div>

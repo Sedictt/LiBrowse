@@ -350,7 +350,7 @@ class RequestManager {
         const bulkActionsHtml = this.currentTab === 'incoming' ? `
             <div class="bulk-actions-bar">
                 <div class="bulk-select">
-                    <input type="checkbox" id="select-all-requests" ${this.selectedRequests.size === filteredRequests.length ? 'checked' : ''}>
+                    <input type="checkbox" id="select-all-requests" class="request-checkbox" ${this.selectedRequests.size === filteredRequests.length ? 'checked' : ''}>
                     <label for="select-all-requests">Select All</label>
                     <span class="selected-count">${this.selectedRequests.size} selected</span>
                 </div>
@@ -473,64 +473,70 @@ class RequestManager {
             </div>
         ` : '';
 
+        const actionsHtml = this.getRequestActions(request, isIncoming);
+
         return `
             <div class="request-card ${this.selectedRequests.has(request.id) ? 'selected' : ''}" data-request-id="${request.id}">
                 ${checkboxHtml}
-                <div class="request-content">
-                    <div class="request-header">
-                        <div class="request-info">
-                            <h4>${this.escapeHtml(request.book_title)}</h4>
-                            <div class="request-user-info">
-                                <p>${isIncoming ? 'Request from' : 'Request to'} <a href="#" class="user-profile-link" onclick="event.stopPropagation(); window.app.viewUserProfile(${userInfo.id}); return false;" title="View ${this.escapeHtml(userInfo.name)}'s profile"><strong>${this.escapeHtml(userInfo.name)}</strong></a></p>
+                <div class="card-main">
+                    <div class="book-visual">
+                        <i class="fas fa-book"></i>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-header">
+                            <h3 class="book-title">${this.escapeHtml(request.book_title)}</h3>
+                            <div class="request-status ${request.status}">
+                                ${this.getStatusIcon(request.status)}
+                                ${this.formatStatus(request.status)}
+                            </div>
+                        </div>
+
+                        <div class="user-info-row">
+                            <div class="user-avatar-small">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="user-details">
+                                <a href="#" class="user-name-link" onclick="event.stopPropagation(); window.app.viewUserProfile(${userInfo.id}); return false;">
+                                    ${isIncoming ? 'From: ' : 'To: '} ${this.escapeHtml(userInfo.name)}
+                                </a>
                                 <div class="user-badges">
                                     ${badges}
                                 </div>
                             </div>
                         </div>
-                        <div class="request-status ${request.status}">
-                            ${this.getStatusIcon(request.status)}
-                            ${this.formatStatus(request.status)}
-                        </div>
-                    </div>
 
-                    <div class="request-details">
-                        <div class="detail-row">
-                            <span class="detail-label"><i class="fas fa-calendar"></i> Requested:</span>
-                            <span class="detail-value">${this.formatDate(request.request_date)}</span>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Requested</span>
+                                <span class="detail-value"><i class="fas fa-calendar"></i> ${this.formatDate(request.request_date)}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Return Date</span>
+                                <span class="detail-value"><i class="fas fa-calendar-check"></i> ${this.formatDate(request.expected_return_date)}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Duration</span>
+                                <span class="detail-value"><i class="fas fa-clock"></i> ${request.borrow_duration || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Pickup</span>
+                                <span class="detail-value"><i class="fas fa-map-marker-alt"></i> ${this.formatPickupMethod(request.pickup_method)}</span>
+                            </div>
                         </div>
-                        <div class="detail-row">
-                            <span class="detail-label"><i class="fas fa-calendar-check"></i> Return Date:</span>
-                            <span class="detail-value">${this.formatDate(request.expected_return_date)}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label"><i class="fas fa-clock"></i> Duration:</span>
-                            <span class="detail-value">${request.borrow_duration || 'Not specified'}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label"><i class="fas fa-map-marker-alt"></i> Pickup Method:</span>
-                            <span class="detail-value">${this.formatPickupMethod(request.pickup_method)}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label"><i class="fas fa-location-dot"></i> Meeting Location:</span>
-                            <span class="detail-value">${this.escapeHtml(request.pickup_location) || 'Not specified'}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label"><i class="fas fa-phone"></i> Contact:</span>
-                            <span class="detail-value">${this.escapeHtml(request.borrower_contact)}</span>
-                        </div>
-                    </div>
 
-                    ${request.request_message ? `
-                        <div class="request-message">
-                            <i class="fas fa-comment"></i>
-                            <p>"${this.escapeHtml(request.request_message)}"</p>
-                        </div>
-                    ` : ''}
-
-                    <div class="request-actions">
-                        ${this.getRequestActions(request, isIncoming)}
+                        ${request.request_message ? `
+                            <div class="message-box">
+                                <p class="message-text">"${this.escapeHtml(request.request_message)}"</p>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
+                
+                ${actionsHtml.trim() ? `
+                <div class="card-actions">
+                    ${actionsHtml}
+                </div>
+                ` : ''}
             </div>
         `;
     }
@@ -576,39 +582,47 @@ class RequestManager {
         `;
         }
 
-        // OUTGOING requests (you're the borrower) - Cancel button ⬅️ ADD THIS SECTION
+        // OUTGOING requests (you're the borrower) - Cancel button
         if (request.status === 'pending' && !isIncoming) {
             return `
-            <button class="btn btn-error btn-outline" onclick="requestManager.cancelRequest(${request.id})">
-                <i class="fas fa-ban"></i> Cancel Request
-            </button>
-            <small class="text-muted" style="display: block; margin-top: 8px;">Waiting for lender's response</small>
+            <div style="display: flex; align-items: center; gap: 12px; width: 100%; justify-content: flex-end;">
+                <small class="text-muted">Waiting for lender's response</small>
+                <button class="btn btn-error btn-outline" onclick="requestManager.cancelRequest(${request.id})">
+                    <i class="fas fa-ban"></i> Cancel Request
+                </button>
+            </div>
         `;
         }
 
         // Approved status - Open Chat button
         if (request.status === 'approved') {
             return `
-            <button class="btn btn-primary" onclick="requestManager.openChatByTransaction(${request.id})">
-                <i class="fas fa-comments"></i> Open Chat
-            </button>
-            <small class="text-muted">Chat with ${isIncoming ? 'borrower' : 'lender'} to discuss pickup details</small>
+            <div style="display: flex; align-items: center; gap: 12px; width: 100%; justify-content: flex-start;">
+                <button class="btn btn-primary" onclick="requestManager.openChatByTransaction(${request.id})">
+                    <i class="fas fa-comments"></i> Open Chat
+                </button>
+                <small class="text-muted">Chat with ${isIncoming ? 'borrower' : 'lender'} to discuss pickup details</small>
+            </div>
         `;
         }
 
         // Rejected status
         if (request.status === 'rejected') {
             return `
-            <span class="text-muted">Request was rejected</span>
-            ${request.rejection_reason ? `<br><small>Reason: ${this.escapeHtml(request.rejection_reason)}</small>` : ''}
+            <div style="text-align: right;">
+                <span class="text-muted">Request was rejected</span>
+                ${request.rejection_reason ? `<br><small>Reason: ${this.escapeHtml(request.rejection_reason)}</small>` : ''}
+            </div>
         `;
         }
 
         // Cancelled status
         if (request.status === 'cancelled') {
             return `
-            <span class="text-muted">Transaction was cancelled</span>
-            ${request.rejection_reason ? `<br><small>Reason: ${this.escapeHtml(request.rejection_reason)}</small>` : ''}
+            <div style="text-align: right;">
+                <span class="text-muted">Transaction was cancelled</span>
+                ${request.rejection_reason ? `<br><small>Reason: ${this.escapeHtml(request.rejection_reason)}</small>` : ''}
+            </div>
         `;
         }
 
