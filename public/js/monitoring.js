@@ -64,11 +64,11 @@ class MonitoringManager {
             let transactions = data.transactions || data || [];
 
             // Add other_user_name and other_user_id to each transaction
-            const currentUserId = authManager.getCurrentUser()?.id;
+            const currentUserId = Number(authManager.getCurrentUser()?.id);
             transactions = transactions.map(t => ({
                 ...t,
-                other_user_name: t.borrower_id === currentUserId ? t.lender_name : t.borrower_name,
-                other_user_id: t.borrower_id === currentUserId ? t.lender_id : t.borrower_id
+                other_user_name: Number(t.borrower_id) === currentUserId ? t.lender_name : t.borrower_name,
+                other_user_id: Number(t.borrower_id) === currentUserId ? t.lender_id : t.borrower_id
             }));
 
             this.categorizeTransactions(transactions);
@@ -200,9 +200,9 @@ class MonitoringManager {
     }
 
     createTransactionCard(transaction, showFeedbackButton = false) {
-        const userId = authManager.getCurrentUser()?.id;
-        const isLender = transaction.lender_id === userId;
-        const isBorrower = transaction.borrower_id === userId;
+        const userId = Number(authManager.getCurrentUser()?.id);
+        const isLender = Number(transaction.lender_id) === userId;
+        const isBorrower = Number(transaction.borrower_id) === userId;
 
         // Build action buttons based on status and role
         let actionButtons = '';

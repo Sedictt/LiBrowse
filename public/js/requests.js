@@ -20,12 +20,12 @@ class RequestManager {
         this.setupEventListeners();
         // Ensure status filter options exist (in case HTML was outdated)
         this.ensureStatusOptions();
-        
+
         // Auto-load when already authenticated
         if (authManager?.isAuthenticated && authManager?.currentUser) {
             this.loadRequests();
         }
-        
+
         // Load once after login if section is active
         document.addEventListener('login-success', () => {
             const requestsSection = document.getElementById('requests-section');
@@ -143,7 +143,7 @@ class RequestManager {
             // lender/borrower-specific lists. For Active Chats we can rely on
             // the JWT token alone and still load chats even if currentUser has
             // not been hydrated yet.
-            if ((!window.authManager || !authManager.currentUser) && this.currentTab !== 'active-chats') {
+            if ((!authManager || !authManager.currentUser) && this.currentTab !== 'active-chats') {
                 console.log('User not authenticated, showing empty state for tab:', this.currentTab);
                 // Still show empty state even if not authenticated
                 this.currentRequests = [];
@@ -167,11 +167,11 @@ class RequestManager {
                     }
 
                     if (this.currentTab === 'incoming') {
-                        const isLender = t.lender_id === authManager.currentUser.id;
+                        const isLender = Number(t.lender_id) === Number(authManager.currentUser.id);
                         console.log(`Transaction ${t.id}: lender_id=${t.lender_id}, status=${t.status}, isLender=${isLender}`);
                         return isLender;
                     } else {
-                        return t.borrower_id === authManager.currentUser.id;
+                        return Number(t.borrower_id) === Number(authManager.currentUser.id);
                     }
                 });
 
@@ -299,8 +299,6 @@ class RequestManager {
         }
 
         const filteredRequests = this.getFilteredRequests();
-        console.log('Filtered requests count:', filteredRequests.length);
-        console.log('Filtered requests:', filteredRequests);
 
         if (filteredRequests.length === 0) {
             // Dynamic empty state based on active filters

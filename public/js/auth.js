@@ -1120,3 +1120,4 @@ class AuthManager {
 
 
 const authManager = new AuthManager();
+window.authManager = authManager;
