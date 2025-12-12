@@ -115,14 +115,18 @@ router.get('/status', authenticateToken, async (req, res) => {
       timeline,
       totalCheckins: checkins.length,
       userCredits: userCredits?.credits || 0,
-      nextReward: (nextDayNumber === 7 ? reward7 : reward1to6)
+      nextReward: (nextDayNumber === 7 ? reward7 : reward1to6),
+      rewards: {
+        day1to6: reward1to6,
+        day7: reward7
+      }
     });
 
   } catch (error) {
     console.error('Error fetching check-in status:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch check-in status' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch check-in status'
     });
   }
 });

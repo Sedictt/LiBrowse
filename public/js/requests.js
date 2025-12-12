@@ -138,6 +138,16 @@ class RequestManager {
     }
 
     async loadRequests() {
+        // Check for tab override from notification click
+        const tabOverride = sessionStorage.getItem('openRequestsTab');
+        if (tabOverride) {
+            sessionStorage.removeItem('openRequestsTab');
+            if (['incoming', 'outgoing', 'active-chats'].includes(tabOverride)) {
+                this.switchTab(tabOverride);
+                return;
+            }
+        }
+
         try {
             // For incoming/outgoing requests we need a currentUser to filter
             // lender/borrower-specific lists. For Active Chats we can rely on

@@ -170,19 +170,7 @@ class App {
             });
         }
 
-        // Notifications filter tabs (All / Unread)
-        const notificationTabs = document.querySelectorAll('.notification-tab[data-filter]');
-        if (notificationTabs && notificationTabs.length) {
-            notificationTabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const filter = tab.getAttribute('data-filter') || 'all';
-                    this.notificationsFilter = filter;
-                    notificationTabs.forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    this.loadNotifications();
-                });
-            });
-        }
+
 
         const notificationsListEl = document.getElementById('notifications-list');
         if (notificationsListEl) {
@@ -1891,13 +1879,13 @@ class App {
         }
 
         // Program
-        document.getElementById('public-profile-program').textContent = 
+        document.getElementById('public-profile-program').textContent =
             user.program ? `${user.program}${user.year ? ` - Year ${user.year}` : ''}` : '';
 
         // Member since
         if (user.memberSince) {
             const memberDate = new Date(user.memberSince);
-            document.getElementById('public-profile-member-since').textContent = 
+            document.getElementById('public-profile-member-since').textContent =
                 `Member since ${memberDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
         }
 
@@ -1905,7 +1893,7 @@ class App {
         const trustScoreEl = document.getElementById('public-trust-score');
         const trustCircle = document.getElementById('public-trust-score-circle');
         trustScoreEl.textContent = user.trustScore;
-        
+
         // Color based on score
         if (user.trustScore >= 80) {
             trustCircle.className = 'trust-score-circle trust-excellent';
@@ -1947,12 +1935,12 @@ class App {
 
     createFeedbackCard(feedback) {
         const stars = '★'.repeat(feedback.rating) + '☆'.repeat(5 - feedback.rating);
-        const date = new Date(feedback.created).toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric' 
+        const date = new Date(feedback.created).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
         });
-        
+
         return `
             <div class="feedback-card">
                 <div class="feedback-header">
@@ -2132,18 +2120,18 @@ class App {
                 console.warn('Could not load verification rewards:', response.statusText);
                 return;
             }
-            
+
             const rewards = await response.json();
-            
+
             // Update reward amounts in the UI
             const l1RewardEl = document.getElementById('l1-reward');
             const l2RewardEl = document.getElementById('l2-reward');
             const totalRewardsEl = document.getElementById('total-rewards');
-            
+
             if (l1RewardEl) l1RewardEl.textContent = rewards.level1.credits;
             if (l2RewardEl) l2RewardEl.textContent = rewards.level2.credits;
             if (totalRewardsEl) totalRewardsEl.textContent = `${rewards.totalPossible} credits`;
-            
+
             console.log('✅ Verification rewards loaded:', rewards);
         } catch (error) {
             console.error('Error loading verification rewards:', error);
@@ -3823,14 +3811,14 @@ document.addEventListener("DOMContentLoaded", () => {
         setupSearchDropdown() {
             const searchExtrasBtn = document.getElementById('search-extras-btn');
             const searchDropdown = document.getElementById('search-dropdown');
-            
+
             if (searchExtrasBtn && searchDropdown) {
                 // Toggle dropdown on button click
                 searchExtrasBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const isActive = searchDropdown.classList.toggle('active');
                     searchExtrasBtn.classList.toggle('active', isActive);
-                    
+
                     // Load data when opening
                     if (isActive) {
                         this.loadSavedSearches();
@@ -3886,10 +3874,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Parse the search criteria to show filter tags
                 let filters = {};
                 try {
-                    filters = typeof search.search_criteria === 'string' 
-                        ? JSON.parse(search.search_criteria) 
+                    filters = typeof search.search_criteria === 'string'
+                        ? JSON.parse(search.search_criteria)
                         : search.search_criteria || {};
-                } catch (e) {}
+                } catch (e) { }
 
                 const filterTags = [];
                 if (filters.query) filterTags.push(`"${filters.query.substring(0, 15)}${filters.query.length > 15 ? '...' : ''}"`);
@@ -4215,8 +4203,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (el) el.classList.add('active');
             }
 
-            // Render notifications
-            this.renderNotifications();
+            // Reload notifications with new filter
+            this.loadNotifications();
         }
 
         async loadNotifications() {
@@ -4263,7 +4251,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 const cat = n.category || n.type || '';
                 const created = n.created || n.created_at;
                 const relatedId = n.related_id || null;
-                const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(n.title || '') : (n.title || '');
+                const safeTitle = (typeof escapeHtml === 'function' ? escapeHtml(n.title || '') : (n.title || ''))
+                    .replace(/'/g, "\\'")
+                    .replace(/\n/g, " ");
                 const safeMsg = typeof escapeHtml === 'function' ? escapeHtml(msg) : msg;
                 return `
                 <div class="notification-item ${!n.is_read ? 'unread' : ''}" 
@@ -4396,47 +4386,54 @@ document.addEventListener("DOMContentLoaded", () => {
                 const lowerTitle = (title || '').toLowerCase();
                 const lowerCategory = (category || '').toLowerCase();
 
-                // Transaction-related notifications
-                if (lowerCategory === 'transaction' || 
-                    lowerTitle.includes('borrow') || 
-                    lowerTitle.includes('request') ||
-                    lowerTitle.includes('approved') ||
-                    lowerTitle.includes('rejected') ||
-                    lowerTitle.includes('denied') ||
-                    lowerTitle.includes('cancelled') ||
-                    lowerTitle.includes('pickup') ||
-                    lowerTitle.includes('return')) {
+                // Chat/Message notifications
+                if (lowerCategory === 'message' || lowerCategory === 'chat' ||
+                    lowerTitle.includes('message') || lowerTitle.includes('chat')) {
+                    targetSection = 'requests';
+                    // Store flag to open active chats tab
+                    sessionStorage.setItem('openRequestsTab', 'active-chats');
+                }
+                // Monitoring related (Approved, Active, Returned, Overdue)
+                else if (lowerCategory === 'approval' || lowerCategory === 'pickup' ||
+                    lowerCategory === 'return' || lowerCategory === 'overdue' ||
+                    lowerCategory === 'reminder' ||
+                    lowerTitle.includes('approved') || lowerTitle.includes('pickup') ||
+                    lowerTitle.includes('return') || lowerTitle.includes('borrowed') ||
+                    lowerTitle.includes('overdue') || lowerTitle.includes('due')) {
+                    targetSection = 'monitoring';
+
+                    if (lowerCategory === 'overdue' || lowerTitle.includes('overdue')) {
+                        sessionStorage.setItem('openMonitoringTab', 'overdue');
+                    }
+                }
+                // Request related (Pending, Rejected, Cancelled)
+                else if (lowerCategory === 'request' || lowerCategory === 'rejection' ||
+                    lowerCategory === 'cancellation' || lowerCategory === 'transaction' ||
+                    lowerTitle.includes('request') || lowerTitle.includes('rejected') ||
+                    lowerTitle.includes('denied') || lowerTitle.includes('cancelled')) {
                     targetSection = 'requests';
                 }
-                // Reminder notifications (due dates, overdue)
-                else if (lowerCategory === 'reminder' || 
-                         lowerTitle.includes('reminder') || 
-                         lowerTitle.includes('overdue') ||
-                         lowerTitle.includes('due soon') ||
-                         lowerTitle.includes('return date')) {
-                    targetSection = 'monitoring';
-                }
                 // Credit-related notifications
-                else if (lowerCategory === 'credit' || 
-                         lowerTitle.includes('credit') || 
-                         lowerTitle.includes('penalty') ||
-                         lowerTitle.includes('reward') ||
-                         lowerTitle.includes('check-in') ||
-                         lowerTitle.includes('daily')) {
+                else if (lowerCategory === 'credit' ||
+                    lowerTitle.includes('credit') ||
+                    lowerTitle.includes('penalty') ||
+                    lowerTitle.includes('reward') ||
+                    lowerTitle.includes('check-in') ||
+                    lowerTitle.includes('daily')) {
                     targetSection = 'profile';
                 }
                 // Feedback/rating notifications
-                else if (lowerTitle.includes('feedback') || 
-                         lowerTitle.includes('rating') || 
-                         lowerTitle.includes('review') ||
-                         lowerTitle.includes('star')) {
+                else if (lowerTitle.includes('feedback') ||
+                    lowerTitle.includes('rating') ||
+                    lowerTitle.includes('review') ||
+                    lowerTitle.includes('star')) {
                     targetSection = 'profile';
                 }
                 // Verification notifications
-                else if (lowerCategory === 'system' && 
-                         (lowerTitle.includes('verification') || 
-                          lowerTitle.includes('verified') ||
-                          lowerTitle.includes('id verification'))) {
+                else if (lowerCategory === 'system' &&
+                    (lowerTitle.includes('verification') ||
+                        lowerTitle.includes('verified') ||
+                        lowerTitle.includes('id verification'))) {
                     targetSection = 'profile';
                     // Store flag to open verification tab
                     sessionStorage.setItem('openProfileTab', 'verification');
@@ -4456,7 +4453,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Navigate to the target section
                 if (window.app && typeof window.app.navigateToSection === 'function') {
                     window.app.navigateToSection(targetSection);
-                    
+
                     // If we have a related transaction ID, try to highlight/scroll to it
                     if (relatedId && (targetSection === 'requests' || targetSection === 'monitoring')) {
                         setTimeout(() => {

@@ -49,6 +49,15 @@ class MonitoringManager {
     async loadTransactions() {
         if (!authManager.isAuthenticated) return;
 
+        // Check for tab override from notification click
+        const tabOverride = sessionStorage.getItem('openMonitoringTab');
+        if (tabOverride) {
+            sessionStorage.removeItem('openMonitoringTab');
+            if (['active', 'pending-feedback', 'completed', 'overdue'].includes(tabOverride)) {
+                this.switchTab(tabOverride);
+            }
+        }
+
         try {
             this.showLoading(true);
             const data = await api.getTransactions();
@@ -199,75 +208,133 @@ class MonitoringManager {
             .join('');
     }
 
-    createTransactionCard(transaction, showFeedbackButton = false) {
+    createTransactionCard(transaction) {
         const userId = Number(authManager.getCurrentUser()?.id);
         const isLender = Number(transaction.lender_id) === userId;
         const isBorrower = Number(transaction.borrower_id) === userId;
+        const otherUserName = transaction.other_user_name;
+        const otherUserId = transaction.other_user_id;
 
-        // Build action buttons based on status and role
+        // Status Badge Logic
+        let statusClass = transaction.status;
+        if (transaction.is_overdue) statusClass = 'overdue';
+
+        const statusLabel = transaction.is_overdue ? 'Overdue' : (transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1));
+
+        // Build action buttons
         let actionButtons = '';
 
         // Approved status - lender can mark as picked up
         if (transaction.status === 'approved' && isLender) {
             actionButtons += `
-        <button class="btn btn-primary btn-sm" onclick="monitoringManager.markAsBorrowed(${transaction.id})">
-            <i class="fas fa-hand-holding"></i> Mark as Picked Up
-        </button>
-    `;
+                <button class="btn btn-primary btn-sm" onclick="monitoringManager.markAsBorrowed(${transaction.id})">
+                    <i class="fas fa-hand-holding"></i> Mark as Picked Up
+                </button>
+            `;
         }
 
         // Borrowed/ongoing status - borrower can mark as returned
         if (transaction.status === 'borrowed' && isBorrower) {
             actionButtons += `
-        <button class="btn btn-primary btn-sm" onclick="monitoringManager.markAsReturned(${transaction.id})">
-            <i class="fas fa-undo"></i> Mark as Returned
-        </button>
-    `;
+                <button class="btn btn-primary btn-sm" onclick="monitoringManager.markAsReturned(${transaction.id})">
+                    <i class="fas fa-undo"></i> Mark as Returned
+                </button>
+            `;
         }
 
         // Returned status - lender can mark as complete
         if (transaction.status === 'returned' && isLender) {
             actionButtons += `
-        <button class="btn btn-success btn-sm" onclick="monitoringManager.markAsCompleted(${transaction.id})">
-            <i class="fas fa-check-circle"></i> Mark as Complete
-        </button>
-    `;
+                <button class="btn btn-success btn-sm" onclick="monitoringManager.markAsCompleted(${transaction.id})">
+                    <i class="fas fa-check-circle"></i> Mark as Complete
+                </button>
+            `;
         }
 
-        // Show feedback button or "Already Given" badge
+        // Feedback buttons
         if (transaction.status === 'returned' || transaction.status === 'completed') {
             if (transaction.user_gave_feedback && transaction.user_gave_feedback > 0) {
-                // Already gave feedback - show badge
                 actionButtons += `
-        <span class="feedback-given-badge">
-            <i class="fas fa-check-circle"></i> Feedback Given
-        </span>
-    `;
+                    <button class="btn btn-outline btn-sm" disabled style="opacity: 0.7; cursor: default;">
+                        <i class="fas fa-check-circle"></i> Feedback Given
+                    </button>
+                `;
             } else {
-                // Can still give feedback - show button
                 actionButtons += `
-        <button class="btn btn-primary btn-sm" onclick="monitoringManager.showFeedbackModal(${transaction.id}, '${escapeHtml(transaction.book_title)}', '${transaction.type}')">
-           <i class="fas fa-star"></i> Give Feedback
-         </button>
-    `;
+                    <button class="btn btn-primary btn-sm" onclick="monitoringManager.showFeedbackModal(${transaction.id}, '${escapeHtml(transaction.book_title)}', '${transaction.type}')">
+                       <i class="fas fa-star"></i> Give Feedback
+                     </button>
+                `;
             }
         }
 
-        return `
-    <div class="transaction-card">
-        <div class="transaction-info">
-            <h4>${escapeHtml(transaction.book_title)}</h4>
-            <p>With: <a href="#" class="user-profile-link" onclick="event.stopPropagation(); window.app.viewUserProfile(${transaction.other_user_id}); return false;" title="View ${escapeHtml(transaction.other_user_name)}'s profile">${escapeHtml(transaction.other_user_name)}</a></p>
-            ${transaction.expected_return_date ? `<span>Due: ${formatDateTime(transaction.expected_return_date)}</span>` : ''}
-        </div>
-        <div class="transaction-actions">
-            ${actionButtons}
+        // View Details Button (always present)
+        actionButtons += `
             <button class="btn btn-outline btn-sm" onclick="monitoringManager.viewTransaction(${transaction.id})">
-                <i class="fas fa-eye"></i> View
+                <i class="fas fa-eye"></i> View Details
             </button>
-        </div>
-    </div>
-`;
+        `;
+
+        return `
+            <div class="transaction-card">
+                <div class="card-main">
+                    <div class="book-visual">
+                        <i class="fas fa-book"></i>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-header">
+                            <h3 class="book-title">${escapeHtml(transaction.book_title)}</h3>
+                            <div class="transaction-status ${statusClass}">
+                                ${statusLabel}
+                            </div>
+                        </div>
+
+                        <div class="user-info-row">
+                            <div class="user-avatar-small">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="user-details">
+                                <a href="#" class="user-name-link" onclick="event.stopPropagation(); window.app.viewUserProfile(${otherUserId}); return false;">
+                                    ${isLender ? 'Borrower: ' : 'Lender: '} ${escapeHtml(otherUserName)}
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="details-grid">
+                            ${transaction.expected_return_date ? `
+                            <div class="detail-item">
+                                <span class="detail-label">Due Date</span>
+                                <span class="detail-value"><i class="fas fa-calendar-alt"></i> ${formatDateTime(transaction.expected_return_date)}</span>
+                            </div>
+                            ` : ''}
+                            
+                            ${transaction.borrowed_date ? `
+                            <div class="detail-item">
+                                <span class="detail-label">Borrowed On</span>
+                                <span class="detail-value"><i class="fas fa-clock"></i> ${formatDate(transaction.borrowed_date)}</span>
+                            </div>
+                            ` : ''}
+
+                            ${transaction.actual_return_date ? `
+                            <div class="detail-item">
+                                <span class="detail-label">Returned On</span>
+                                <span class="detail-value"><i class="fas fa-check"></i> ${formatDate(transaction.actual_return_date)}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        
+                        ${transaction.request_message ? `
+                        <div class="message-box">
+                             <p class="message-text">"${escapeHtml(transaction.request_message)}"</p>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="card-actions">
+                    ${actionButtons}
+                </div>
+            </div>
+        `;
     }
 
 

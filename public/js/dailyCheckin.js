@@ -160,7 +160,7 @@ class DailyCheckinManager {
                             </div>
                             <div class="info-reward-details">
                                 <h4>Daily Rewards</h4>
-                                <p>Days 1-6: Earn <strong>+5 credits</strong> each day</p>
+                                <p>Days 1-6: Earn <strong>+${this.checkinData?.rewards?.day1to6 || 5} credits</strong> each day</p>
                             </div>
                         </div>
                         <div class="info-reward-item">
@@ -169,7 +169,7 @@ class DailyCheckinManager {
                             </div>
                             <div class="info-reward-details">
                                 <h4>Bonus Reward</h4>
-                                <p>Day 7: Earn <strong>+20 credits</strong> bonus</p>
+                                <p>Day 7: Earn <strong>+${this.checkinData?.rewards?.day7 || 20} credits</strong> bonus</p>
                             </div>
                         </div>
                         <div class="info-note">
@@ -257,7 +257,9 @@ class DailyCheckinManager {
             `;
         }
         const credits = userCredits || 0;
-        const computedNextReward = typeof nextReward === 'number' ? nextReward : (nextDayNumber === 7 ? 20 : 5);
+        const reward1to6 = this.checkinData.rewards?.day1to6 || 5;
+        const reward7 = this.checkinData.rewards?.day7 || 20;
+        const computedNextReward = typeof nextReward === 'number' ? nextReward : (nextDayNumber === 7 ? reward7 : reward1to6);
 
         return `
             <div class="checkin-card-content">
@@ -298,109 +300,117 @@ class DailyCheckinManager {
                     
                     <div class="checkin-timeline">
                         <div class="timeline-days">
-                            ${this.renderTimeline(timeline)}
+                            ${this.renderTimeline()}
                         </div>
                     </div>
                 </div>
 
                 <div class="checkin-action">
-                    ${!claimedToday 
-                        ? `<button class="btn-claim-reward" onclick="dailyCheckin.claimReward()">
+                    ${!claimedToday
+                ? `<button class="btn-claim-reward" onclick="dailyCheckin.claimReward()">
                             <i class="fas fa-gift"></i>
                             <span>Claim Today's Reward</span>
                            </button>`
-                        : `<div class="claimed-message">
+                : `<div class="claimed-message">
                             <i class="fas fa-check-circle"></i>
                             <span>Reward claimed! Come back tomorrow for Day ${nextDayNumber > 7 ? 1 : nextDayNumber}</span>
                            </div>`
-                    }
+            }
                 </div>
             </div>
         `;
     }
 
     /**
-     * Render the 7-day timeline
+     * Render the 7-day streak timeline (Day 1 to Day 7)
      */
-    renderTimeline(timeline) {
-        if (!timeline || timeline.length === 0) {
-            return '<p>No check-in data available</p>';
+    renderTimeline() {
+        const { nextDayNumber, claimedToday } = this.checkinData;
+        const reward1to6 = this.checkinData.rewards?.day1to6 || 5;
+        const reward7 = this.checkinData.rewards?.day7 || 20;
+
+        // Determine the "active" day number for visualization
+        let currentDayNum = nextDayNumber;
+
+        if (claimedToday) {
+            if (nextDayNumber === 1) {
+                // We just finished Day 7
+                currentDayNum = 7;
+            } else {
+                // We claimed an intermediate day, nextDayNumber is tomorrow's step
+                // So today was nextDayNumber - 1
+                currentDayNum = nextDayNumber - 1;
+            }
         }
 
-        // Use local timezone for "today" to avoid UTC off-by-one
-        const today = this.getLocalDateString();
-        const todayDate = this.parseLocalDate(today);
-        const { currentStreak, nextDayNumber } = this.checkinData;
+        // We always render 7 steps: Day 1 to Day 7
+        let html = '';
+        const todayDate = new Date();
 
-        return timeline.map((day, index) => {
-            // Interpret backend date strings as local dates (no timezone shift)
-            const date = this.parseLocalDate(day.date);
-            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-            const dayNum = date.getDate();
-            const isToday = day.date === today;
-            const isPast = day.date < today;
-            const isFuture = day.date > today;
-            
-            let statusClass = 'day-unclaimed';
+        for (let i = 1; i <= 7; i++) {
+            let statusClass = '';
             let statusIcon = '';
-            let displayDayNumber = null;
-            let displayReward = 5;
+            let statusText = '';
+            let reward = (i === 7) ? reward7 : reward1to6;
 
-            // Calculate what day number this would be in the sequence
-            if (day.claimed) {
-                // Already claimed - show actual data
+            // Calculate projected date
+            const dayOffset = i - currentDayNum;
+            const targetDate = new Date(todayDate);
+            targetDate.setDate(todayDate.getDate() + dayOffset);
+
+            const dayName = targetDate.toLocaleDateString('en-US', { weekday: 'short' });
+
+            // Determine status
+            if (i < currentDayNum) {
+                // Past / Claimed
                 statusClass = 'day-claimed';
                 statusIcon = '<i class="fas fa-check-circle"></i>';
-                displayDayNumber = day.dayNumber;
-                displayReward = day.reward;
-            } else if (isToday) {
-                // Today - show as available to claim
-                statusClass = 'day-today';
-                statusIcon = '<i class="fas fa-star"></i>';
-                displayDayNumber = nextDayNumber;
-                displayReward = nextDayNumber === 7 ? 20 : 5;
-            } else if (isPast) {
-                // Past unclaimed - show as missed (faded)
-                statusClass = 'day-missed';
-                statusIcon = '<i class="fas fa-times-circle"></i>';
-                // Calculate what day it would have been
-                const daysDiff = Math.floor((todayDate - date) / (1000 * 60 * 60 * 24));
-                const wouldBeDayNum = ((nextDayNumber - daysDiff - 1) <= 0) ? 1 : (nextDayNumber - daysDiff);
-                displayDayNumber = wouldBeDayNum;
-                displayReward = wouldBeDayNum === 7 ? 20 : 5;
-            } else if (isFuture) {
-                // Future day - show projected reward
+                statusText = 'Claimed';
+            } else if (i === currentDayNum) {
+                // Current Step
+                if (claimedToday) {
+                    statusClass = 'day-claimed is-today';
+                    statusIcon = '<i class="fas fa-check-circle"></i>';
+                    statusText = 'Claimed';
+                } else {
+                    statusClass = 'day-today';
+                    statusIcon = '<i class="fas fa-star"></i>';
+                    statusText = 'Today!';
+                }
+            } else {
+                // Future
                 statusClass = 'day-future';
-                statusIcon = '<i class="fas fa-calendar"></i>';
-                const daysDiff = Math.floor((date - todayDate) / (1000 * 60 * 60 * 24));
-                const willBeDayNum = ((nextDayNumber + daysDiff) % 7) || 7;
-                displayDayNumber = willBeDayNum;
-                displayReward = willBeDayNum === 7 ? 20 : 5;
+                statusIcon = '<i class="fas fa-lock"></i>';
+                statusText = `Day ${i}`;
             }
 
-            return `
-                <div class="timeline-day ${statusClass} ${isToday ? 'is-today' : ''} ${displayReward === 20 ? 'bonus-day' : ''}">
+            // Special styling for Day 7
+            const isBonusDay = (i === 7);
+            if (isBonusDay) {
+                statusClass += ' bonus-day';
+                if (statusIcon.includes('lock')) {
+                    statusIcon = '<i class="fas fa-gift"></i>';
+                }
+            }
+
+            html += `
+                <div class="timeline-day ${statusClass}">
                     <div class="day-date">
                         <span class="day-name">${dayName}</span>
-                        <span class="day-number">${dayNum}</span>
+                        <span class="day-number">Day ${i}</span>
                     </div>
                     <div class="day-icon">
                         ${statusIcon}
                     </div>
                     <div class="day-info">
-                        ${day.claimed 
-                            ? '<span class="day-status-text">Claimed</span>' 
-                            : isToday 
-                            ? '<span class="day-status-text today-text">Today!</span>'
-                            : isPast 
-                            ? '<span class="day-status-text missed-text">Missed</span>'
-                            : '<span class="day-status-text future-text">Day ' + displayDayNumber + '</span>'
-                        }
-                        ${displayReward ? `<span class="day-reward-text ${displayReward === 20 ? 'bonus-reward' : ''}">+${displayReward} ${displayReward === 20 ? '🎉' : ''}</span>` : ''}
+                        <span class="day-status-text ${claimedToday && i === currentDayNum ? 'today-text' : ''}">${statusText}</span>
+                        <span class="day-reward-text ${isBonusDay ? 'bonus-reward' : ''}">+${reward} ${isBonusDay ? '🎉' : ''}</span>
                     </div>
                 </div>
             `;
-        }).join('');
+        }
+
+        return html;
     }
 
     /**
@@ -423,7 +433,7 @@ class DailyCheckinManager {
             const response = await fetch('/api/daily-checkin/claim', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${token} `,
                     'Content-Type': 'application/json'
                 }
             });
@@ -433,10 +443,10 @@ class DailyCheckinManager {
             if (response.ok) {
                 // Success!
                 showToast(data.message, 'success');
-                
+
                 // Show celebration animation
                 this.showCelebration(data);
-                
+
                 // Reload status and update UI
                 await this.loadCheckinStatus();
                 this.updateModal();
@@ -458,7 +468,7 @@ class DailyCheckinManager {
         } catch (error) {
             console.error('Error claiming reward:', error);
             showToast('Failed to claim reward. Please try again.', 'error');
-            
+
             const claimBtn = document.querySelector('.btn-claim-reward');
             if (claimBtn) {
                 claimBtn.disabled = false;
@@ -480,8 +490,8 @@ class DailyCheckinManager {
                 <p class="celebration-day">Day ${data.dayNumber} Complete</p>
                 <p class="celebration-reward">+${data.rewardAmount} Credits</p>
                 ${data.isWeekComplete ? '<p class="celebration-bonus">🎉 Week Complete! Bonus Earned!</p>' : ''}
-            </div>
-        `;
+            </div >
+            `;
 
         document.body.appendChild(celebration);
 
@@ -500,7 +510,7 @@ class DailyCheckinManager {
      */
     updateModal() {
         if (!this.modalElement) return;
-        
+
         const modalBody = this.modalElement.querySelector('.checkin-modal-body');
         if (modalBody) {
             modalBody.innerHTML = this.renderCheckinContent();
