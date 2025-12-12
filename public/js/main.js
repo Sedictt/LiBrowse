@@ -4487,7 +4487,7 @@ document.addEventListener("DOMContentLoaded", () => {
         startPolling() {
             // Poll for new notifications every 30 seconds
             setInterval(async () => {
-                if (document.visibilityState === 'visible') {
+                if (document.visibilityState === 'visible' && authManager && authManager.isAuthenticated) {
                     try {
                         const response = await api.getNotifications(false, 1, 0);
                         const newUnreadCount = response.unreadCount || 0;

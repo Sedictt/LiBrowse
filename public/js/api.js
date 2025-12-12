@@ -78,9 +78,7 @@ class ApiClient {
                 }
 
 
-                if (!err.suppressLog) {
-                    console.error('API request failed:', err);
-                }
+
                 throw err;
             }
 
